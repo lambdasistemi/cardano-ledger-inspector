@@ -17,7 +17,10 @@ format-check:
 ui-check:
     nix develop --quiet -c sh -c 'cd docs/inspector && spago build'
 
-deploy-preview:
+build-pages-site:
+    nix build .#packages.x86_64-linux.tx-inspector-ui -o result-site
+
+deploy-surge-preview:
     nix build .#packages.x86_64-linux.tx-inspector-ui
     rm -rf /tmp/cardano-ledger-wasi-surge
     mkdir -p /tmp/cardano-ledger-wasi-surge
