@@ -80,6 +80,14 @@
             ];
           };
 
+          mkdocsEnv = pkgs.python3.withPackages (
+            ps: with ps; [
+              mkdocs
+              mkdocs-material
+              pymdown-extensions
+            ]
+          );
+
           wasmTargets = import ./nix/wasm-targets.nix {
             inherit pkgs;
             libWasm = self.lib.wasm;
@@ -113,6 +121,7 @@
               pkgs.curl
               pkgs.nixfmt-rfc-style
               pkgs.haskellPackages.fourmolu
+              mkdocsEnv
               psPkgs.purs
               psPkgs.spago-unstable
               psPkgs.esbuild
