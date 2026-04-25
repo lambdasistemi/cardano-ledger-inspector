@@ -49,6 +49,116 @@ const formatLovelace = (value) => {
   }
 };
 
+const invalidIdentification = (title, subtitle) => ({
+  valid: false,
+  title,
+  subtitle,
+  primary: [],
+  witnesses: [],
+});
+
+const identifyPath = (...segments) => JSON.stringify(["identification", ...segments]);
+
+const identityRow = (label, value, path, copyValue = value) => ({
+  label,
+  value: text(value),
+  copyValue: text(copyValue),
+  path,
+});
+
+const witnessCount = (counts, key) => {
+  const value = counts && typeof counts === "object" ? counts[key] : 0;
+  return value === null || value === undefined ? 0 : value;
+};
+
+const normalizeIdentification = (identification) => {
+  if (!identification || typeof identification !== "object") {
+    return invalidIdentification(
+      "Transaction identity",
+      "Ledger operation response missing identification."
+    );
+  }
+
+  const counts =
+    identification.witness_counts && typeof identification.witness_counts === "object"
+      ? identification.witness_counts
+      : {};
+  const fee = identification.fee_lovelace;
+  const size = identification.tx_size_bytes;
+  const sizeLabel =
+    size === null || size === undefined || size === "" ? "n/a" : `${text(size)} bytes`;
+  const title = `${text(identification.era || "Conway")} transaction identity`;
+  const subtitle = `${shortHex(identification.tx_id)} / ${formatLovelace(fee)} / ${sizeLabel}`;
+
+  return {
+    valid: true,
+    title,
+    subtitle,
+    primary: [
+      identityRow(
+        "Transaction ID",
+        identification.tx_id,
+        identifyPath("tx_id")
+      ),
+      identityRow("Body hash", identification.body_hash, identifyPath("body_hash")),
+      identityRow("CBOR size", sizeLabel, identifyPath("tx_size_bytes"), size),
+      identityRow("Fee", formatLovelace(fee), identifyPath("fee_lovelace"), fee),
+      identityRow("Inputs", identification.input_count ?? 0, identifyPath("input_count")),
+      identityRow(
+        "Reference inputs",
+        identification.reference_input_count ?? 0,
+        identifyPath("reference_input_count")
+      ),
+      identityRow("Outputs", identification.output_count ?? 0, identifyPath("output_count")),
+      identityRow(
+        "Required signers",
+        identification.required_signer_count ?? 0,
+        identifyPath("required_signer_count")
+      ),
+      identityRow("Certificates", identification.cert_count ?? 0, identifyPath("cert_count")),
+      identityRow(
+        "Withdrawals",
+        identification.withdrawal_count ?? 0,
+        identifyPath("withdrawal_count")
+      ),
+    ],
+    witnesses: [
+      identityRow("VKey", witnessCount(counts, "vkey"), identifyPath("witness_counts", "vkey")),
+      identityRow(
+        "Bootstrap",
+        witnessCount(counts, "bootstrap"),
+        identifyPath("witness_counts", "bootstrap")
+      ),
+      identityRow(
+        "Native scripts",
+        witnessCount(counts, "native_script"),
+        identifyPath("witness_counts", "native_script")
+      ),
+      identityRow(
+        "Plutus V1",
+        witnessCount(counts, "plutus_v1"),
+        identifyPath("witness_counts", "plutus_v1")
+      ),
+      identityRow(
+        "Plutus V2",
+        witnessCount(counts, "plutus_v2"),
+        identifyPath("witness_counts", "plutus_v2")
+      ),
+      identityRow(
+        "Plutus V3",
+        witnessCount(counts, "plutus_v3"),
+        identifyPath("witness_counts", "plutus_v3")
+      ),
+      identityRow(
+        "Redeemers",
+        witnessCount(counts, "redeemer"),
+        identifyPath("witness_counts", "redeemer")
+      ),
+      identityRow("Datums", witnessCount(counts, "datum"), identifyPath("witness_counts", "datum")),
+    ],
+  };
+};
+
 const policyEntries = (assets) =>
   assets && typeof assets === "object" && !Array.isArray(assets)
     ? Object.entries(assets)
@@ -242,5 +352,17 @@ export const operationBrowserImpl = (raw) => {
     return normalizeBrowser(operationResult(parsed)?.browser);
   } catch (_err) {
     return invalidBrowser("Transaction browser", "Ledger operation response was not JSON.", raw);
+  }
+};
+
+export const operationIdentificationImpl = (raw) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return normalizeIdentification(operationResult(parsed)?.identification);
+  } catch (_err) {
+    return invalidIdentification(
+      "Transaction identity",
+      "Ledger operation response was not JSON."
+    );
   }
 };

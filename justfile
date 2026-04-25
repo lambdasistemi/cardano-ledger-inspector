@@ -16,6 +16,16 @@ check-openapi:
 check-swagger:
     nix build .#checks.x86_64-linux.ledger-functional-swagger-check
 
+check-identify:
+    nix build .#checks.x86_64-linux.tx-identify-smoke -o result-identify-smoke
+
+test-playwright: build-ui
+    nix develop --quiet -c sh -c 'cd docs/inspector && ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules && TX_INSPECTOR_SITE_DIR=../../result playwright test --reporter=list'
+
+test:
+    just check-identify
+    just test-playwright
+
 build-smokes:
     nix build .#packages.x86_64-linux.wasm-smoke
     nix build .#packages.x86_64-linux.wasm-ledger-smoke

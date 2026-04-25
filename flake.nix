@@ -136,6 +136,35 @@
                 generated/cardano-ledger-functional.openapi.json
               touch $out/passed
             '';
+
+          tx-identify-smoke = pkgs.runCommand "tx-identify-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.identify",
+                args: {}
+              }' > request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < request.json > response.json
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.identify"
+              and (.result.identification.tx_id | test("^[0-9a-f]{64}$"))
+              and (.result.identification.body_hash | test("^[0-9a-f]{64}$"))
+              and (.result.identification.tx_size_bytes > 0)
+              and (.result.identification.fee_lovelace | test("^[0-9]+$"))
+              and (.result.identification.witness_counts.vkey >= 0)
+              and (.result.identification.witness_counts.bootstrap >= 0)
+            ' response.json
+            cp request.json response.json $out/
+          '';
         in
         {
           packages = {
@@ -150,7 +179,7 @@
           };
 
           checks = {
-            inherit ledger-functional-openapi-check;
+            inherit ledger-functional-openapi-check tx-identify-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
@@ -160,6 +189,7 @@
               pkgs.wasmtime
               pkgs.jq
               pkgs.curl
+              pkgs.playwright-test
               pkgs.nixfmt-rfc-style
               pkgs.haskellPackages.fourmolu
               mkdocsEnv
@@ -168,6 +198,8 @@
               psPkgs.esbuild
               psPkgs.nodejs_20
             ];
+            PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
           };
         };
     };

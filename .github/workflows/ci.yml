@@ -34,6 +34,12 @@ jobs:
       - name: Check committed Swagger is generated
         run: nix build --quiet .#checks.x86_64-linux.ledger-functional-swagger-check
 
+      - name: Smoke tx.identify operation
+        run: nix build --quiet .#checks.x86_64-linux.tx-identify-smoke
+
+      - name: Run inspector Playwright tests
+        run: nix develop --quiet -c just test-playwright
+
       - name: Prepare downloadable artifacts
         run: |
           mkdir -p artifacts/wasm-tx-inspector artifacts/tx-inspector-ui artifacts/ledger-functional-openapi

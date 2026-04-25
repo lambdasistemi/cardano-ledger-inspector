@@ -1,7 +1,9 @@
-node_modules/
+node_modules
 dist/index.js
 dist/bundle.js
 dist/deps.js
 src/assets/inspector.wasm
 output/
 .spago/
+test-results/
+playwright-report/

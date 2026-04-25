@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-identify-result.schema.json",
+  "title": "Cardano Ledger WASI tx.identify Result",
+  "type": "object",
+  "required": [
+    "era",
+    "tx_id",
+    "body_hash",
+    "tx_size_bytes",
+    "fee_lovelace",
+    "input_count",
+    "reference_input_count",
+    "output_count",
+    "cert_count",
+    "withdrawal_count",
+    "required_signer_count",
+    "witness_counts"
+  ],
+  "properties": {
+    "era": {
+      "type": "string",
+      "const": "Conway"
+    },
+    "tx_id": {
+      "$ref": "#/$defs/hash32"
+    },
+    "body_hash": {
+      "$ref": "#/$defs/hash32"
+    },
+    "tx_size_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "fee_lovelace": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "input_count": {
+      "$ref": "#/$defs/count"
+    },
+    "reference_input_count": {
+      "$ref": "#/$defs/count"
+    },
+    "output_count": {
+      "$ref": "#/$defs/count"
+    },
+    "cert_count": {
+      "$ref": "#/$defs/count"
+    },
+    "withdrawal_count": {
+      "$ref": "#/$defs/count"
+    },
+    "required_signer_count": {
+      "$ref": "#/$defs/count"
+    },
+    "witness_counts": {
+      "type": "object",
+      "required": [
+        "vkey",
+        "bootstrap",
+        "native_script",
+        "plutus_v1",
+        "plutus_v2",
+        "plutus_v3",
+        "redeemer",
+        "datum"
+      ],
+      "properties": {
+        "vkey": {
+          "$ref": "#/$defs/count"
+        },
+        "bootstrap": {
+          "$ref": "#/$defs/count"
+        },
+        "native_script": {
+          "$ref": "#/$defs/count"
+        },
+        "plutus_v1": {
+          "$ref": "#/$defs/count"
+        },
+        "plutus_v2": {
+          "$ref": "#/$defs/count"
+        },
+        "plutus_v3": {
+          "$ref": "#/$defs/count"
+        },
+        "redeemer": {
+          "$ref": "#/$defs/count"
+        },
+        "datum": {
+          "$ref": "#/$defs/count"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "hash32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

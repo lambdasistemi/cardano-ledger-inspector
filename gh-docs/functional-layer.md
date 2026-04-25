@@ -45,6 +45,10 @@ Transforming operations must return the resulting transaction as
 : Return a navigable representation suitable for expanding transaction
   structure in the UI.
 
+`tx.identify`
+: Return stable transaction identifiers, byte-level metadata, and witness
+  counts from the ledger-decoded transaction.
+
 ## Contract Source
 
 The readable API page and detailed contract are tracked here:

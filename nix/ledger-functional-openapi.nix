@@ -65,6 +65,15 @@
                     };
                   };
                 };
+                identify = {
+                  summary = "Identify a transaction";
+                  value = {
+                    ledger_functional_layer = "cardano-ledger-functional/v1";
+                    tx_cbor = "84a4...";
+                    op = "tx.identify";
+                    args = { };
+                  };
+                };
                 balance = {
                   summary = "Target shape for best-effort balancing";
                   value = {
@@ -128,6 +137,38 @@
                       };
                     };
                   };
+                  identify = {
+                    summary = "Identity response envelope";
+                    value = {
+                      ledger_functional_layer = "cardano-ledger-functional/v1";
+                      op = "tx.identify";
+                      result = {
+                        identification = {
+                          era = "Conway";
+                          tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                          body_hash = "1111111111111111111111111111111111111111111111111111111111111111";
+                          tx_size_bytes = 1234;
+                          fee_lovelace = "0";
+                          input_count = 1;
+                          reference_input_count = 0;
+                          output_count = 2;
+                          cert_count = 0;
+                          withdrawal_count = 0;
+                          required_signer_count = 1;
+                          witness_counts = {
+                            vkey = 1;
+                            bootstrap = 0;
+                            native_script = 0;
+                            plutus_v1 = 0;
+                            plutus_v2 = 0;
+                            plutus_v3 = 0;
+                            redeemer = 0;
+                            datum = 0;
+                          };
+                        };
+                      };
+                    };
+                  };
                   patch = {
                     summary = "Target shape for a transforming operation";
                     value = {
@@ -179,6 +220,9 @@
       };
       BrowserView = {
         "$ref" = "browser-view.schema.json";
+      };
+      TxIdentifyResult = {
+        "$ref" = "tx-identify-result.schema.json";
       };
       LedgerOperationError = {
         type = "object";

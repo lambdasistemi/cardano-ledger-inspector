@@ -37,6 +37,7 @@ Transforming operations must return the new transaction bytes as
 | --- | --- |
 | `tx.inspect` | Decode transaction CBOR with the Haskell ledger and return a compact summary plus the root browser view. |
 | `tx.browse` | Decode transaction CBOR and return a browser view at `args.path`. |
+| `tx.identify` | Return transaction id, body hash, era, byte size, fee, structural counts, and witness counts. |
 
 `tx.browse` request paths are arrays of strings. Object fields use their key
 name and array indexes use `#<index>`, for example:
@@ -58,7 +59,6 @@ wallets, inspectors, and transaction builders:
 
 | Operation | Description |
 | --- | --- |
-| `tx.identify` | Transaction id, body hash, era, byte size, and witness counts. |
 | `tx.witness.plan` | Required signatures, scripts, redeemers, datums, and reference inputs. |
 | `tx.validate` | Full ledger validation with explicit UTxO, protocol, epoch, slot, governance, and network context. |
 | `tx.evaluate.scripts` | Phase-2 script evaluation and execution-unit reporting with explicit context. |
@@ -77,6 +77,7 @@ The detailed contract and schemas are tracked in the repository:
 - [Request schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-request.schema.json)
 - [Response schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-response.schema.json)
 - [Browser view schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/browser-view.schema.json)
+- [tx.identify result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-identify-result.schema.json)
 
 The same OpenAPI bundle is a flake output:
 

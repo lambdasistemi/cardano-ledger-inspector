@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -24,7 +25,9 @@ import qualified Cardano.Ledger.BaseTypes as BaseTypes
 import qualified Cardano.Ledger.Binary as Binary
 import qualified Cardano.Ledger.Coin as Coin
 import qualified Cardano.Ledger.Conway as Conway
+import qualified Cardano.Ledger.Conway.Scripts as ConwayScripts
 import Cardano.Ledger.Core (TxLevel (..))
+import qualified Cardano.Ledger.Core as Core
 import qualified Cardano.Ledger.Hashes as Hashes
 import qualified Cardano.Ledger.Mary.Value as Mary
 import qualified Cardano.Ledger.Plutus.Data as PData
@@ -39,9 +42,10 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Short as SBS
 import Data.Foldable (toList)
-import Data.List (stripPrefix)
+import Data.List (foldl', stripPrefix)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Lens.Micro ((^.))
@@ -94,6 +98,7 @@ instance Aeson.FromJSON LedgerOperationRequest where
 
         normalizeOperation "inspect" = "tx.inspect"
         normalizeOperation "browse" = "tx.browse"
+        normalizeOperation "identify" = "tx.identify"
         normalizeOperation op = op
 
 -- | Hex → bytes → Conway tx → JSON.
@@ -123,7 +128,7 @@ looksLikeJsonRequest input =
 
 runLedgerOperation :: LedgerOperationRequest -> Either InspectError Aeson.Value
 runLedgerOperation request = do
-    tx <- decodeTx (T.encodeUtf8 (lorTxCbor request))
+    (txBytes, tx) <- decodeTxWithBytes (T.encodeUtf8 (lorTxCbor request))
     case lorOperation request of
         "tx.inspect" ->
             pure $
@@ -137,6 +142,12 @@ runLedgerOperation request = do
                 ledgerOperationResponse
                     (lorOperation request)
                     [ "browser" .= browserJson tx (lorPath request)
+                    ]
+        "tx.identify" ->
+            pure $
+                ledgerOperationResponse
+                    (lorOperation request)
+                    [ "identification" .= identifyJson txBytes tx
                     ]
         other -> Left (UnknownLedgerOperation other)
 
@@ -152,7 +163,15 @@ decodeTx ::
     BS.ByteString ->
     Either InspectError (L.Tx TopTx Conway.ConwayEra)
 decodeTx =
-    hexDecode >=> decodeConway . BSL.fromStrict
+    fmap snd . decodeTxWithBytes
+
+decodeTxWithBytes ::
+    BS.ByteString ->
+    Either InspectError (BS.ByteString, L.Tx TopTx Conway.ConwayEra)
+decodeTxWithBytes hexBytes = do
+    txBytes <- hexDecode hexBytes
+    tx <- decodeConway (BSL.fromStrict txBytes)
+    pure (txBytes, tx)
 
 hexDecode :: BS.ByteString -> Either InspectError BS.ByteString
 hexDecode bs =
@@ -302,6 +321,65 @@ encodePath :: [T.Text] -> T.Text
 encodePath path =
     T.decodeUtf8 (BSL.toStrict (Aeson.encode path))
 
+identifyJson ::
+    BS.ByteString ->
+    L.Tx TopTx Conway.ConwayEra ->
+    Aeson.Value
+identifyJson txBytes tx =
+    let body = tx ^. L.bodyTxL
+        wits = tx ^. Core.witsTxL
+        scripts = Map.elems (wits ^. Core.scriptTxWitsL)
+        (nativeScripts, plutusV1, plutusV2, plutusV3) =
+            scriptWitnessCounts scripts
+        inputs = toList (body ^. L.inputsTxBodyL)
+        refIns = toList (body ^. L.referenceInputsTxBodyL)
+        outputs = toList (body ^. L.outputsTxBodyL)
+        certs = toList (body ^. L.certsTxBodyL)
+        withdrawals = body ^. L.withdrawalsTxBodyL
+        reqSigners = toList (body ^. L.reqSignerHashesTxBodyL)
+     in Aeson.object
+            [ "era" .= ("Conway" :: T.Text)
+            , "tx_id" .= txIdHex (Core.txIdTx tx)
+            , "body_hash" .= txIdHex (Core.txIdTxBody body)
+            , "tx_size_bytes" .= BS.length txBytes
+            , "fee_lovelace" .= T.pack (show (Coin.unCoin (body ^. L.feeTxBodyL)))
+            , "input_count" .= length inputs
+            , "reference_input_count" .= length refIns
+            , "output_count" .= length outputs
+            , "cert_count" .= length certs
+            , "withdrawal_count" .= withdrawalsCount withdrawals
+            , "required_signer_count" .= length reqSigners
+            , "witness_counts"
+                .= Aeson.object
+                    [ "vkey" .= Set.size (wits ^. Core.addrTxWitsL)
+                    , "bootstrap" .= Set.size (wits ^. Core.bootAddrTxWitsL)
+                    , "native_script" .= nativeScripts
+                    , "plutus_v1" .= plutusV1
+                    , "plutus_v2" .= plutusV2
+                    , "plutus_v3" .= plutusV3
+                    , "redeemer" .= Map.size (L.unRedeemers (wits ^. L.rdmrsTxWitsL))
+                    , "datum" .= Map.size (L.unTxDats (wits ^. L.datsTxWitsL))
+                    ]
+            ]
+
+scriptWitnessCounts ::
+    [ConwayScripts.AlonzoScript Conway.ConwayEra] ->
+    (Int, Int, Int, Int)
+scriptWitnessCounts =
+    foldl' step (0, 0, 0, 0)
+  where
+    step (nativeN, v1N, v2N, v3N) = \case
+        ConwayScripts.NativeScript _ ->
+            (nativeN + 1, v1N, v2N, v3N)
+        ConwayScripts.PlutusScript plutusScript ->
+            case plutusScript of
+                ConwayScripts.ConwayPlutusV1 _ ->
+                    (nativeN, v1N + 1, v2N, v3N)
+                ConwayScripts.ConwayPlutusV2 _ ->
+                    (nativeN, v1N, v2N + 1, v3N)
+                ConwayScripts.ConwayPlutusV3 _ ->
+                    (nativeN, v1N, v2N, v3N + 1)
+
 renderTx :: L.Tx TopTx Conway.ConwayEra -> Aeson.Value
 renderTx tx =
     let body = tx ^. L.bodyTxL
@@ -402,6 +480,14 @@ datumJson (PData.Datum _) =
 txInJson :: TxIn.TxIn -> Aeson.Value
 txInJson (TxIn.TxIn (TxIn.TxId safeHash) (BaseTypes.TxIx ix)) =
     Aeson.object
-        [ "tx_id" .= T.decodeUtf8 (B16.encode (Crypto.hashToBytes (Hashes.extractHash safeHash)))
+        [ "tx_id" .= hashHex (Hashes.extractHash safeHash)
         , "index" .= fromEnum ix
         ]
+
+txIdHex :: TxIn.TxId -> T.Text
+txIdHex (TxIn.TxId safeHash) =
+    hashHex (Hashes.extractHash safeHash)
+
+hashHex :: Crypto.Hash h a -> T.Text
+hashHex =
+    T.decodeUtf8 . B16.encode . Crypto.hashToBytes
