@@ -1,8 +1,5 @@
 site_name: Cardano Ledger WASI
 site_url: https://lambdasistemi.github.io/cardano-ledger-wasi/
-repo_url: https://github.com/lambdasistemi/cardano-ledger-wasi
-repo_name: lambdasistemi/cardano-ledger-wasi
-edit_uri: edit/main/gh-docs/
 docs_dir: gh-docs
 
 theme:
@@ -34,6 +31,7 @@ nav:
   - Architecture: architecture.md
   - Functional Layer: functional-layer.md
   - Build and Artifacts: build.md
+  - Repository: https://github.com/lambdasistemi/cardano-ledger-wasi
 
 plugins:
   - search
