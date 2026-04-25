@@ -106,19 +106,52 @@
             src = ./docs/inspector;
           };
 
+          ledgerFunctionalOpenapiSpec = import ./nix/ledger-functional-openapi.nix;
+
+          ledgerFunctionalOpenapiSource = pkgs.writeText
+            "cardano-ledger-functional.openapi.raw.json"
+            (builtins.toJSON ledgerFunctionalOpenapiSpec);
+
+          ledger-functional-openapi-generated =
+            pkgs.runCommand "ledger-functional-openapi-generated" { } ''
+              mkdir -p $out
+              ${pkgs.jq}/bin/jq --sort-keys . ${ledgerFunctionalOpenapiSource} \
+                > $out/cardano-ledger-functional.openapi.json
+            '';
+
           ledger-functional-openapi = pkgs.runCommand "ledger-functional-openapi" { } ''
             mkdir -p $out
-            cp ${./specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json} \
+            cp ${ledger-functional-openapi-generated}/cardano-ledger-functional.openapi.json \
               $out/cardano-ledger-functional.openapi.json
             cp ${./specs/001-ledger-functional-layer/schemas}/*.json $out/
           '';
+
+          ledger-functional-openapi-check =
+            pkgs.runCommand "ledger-functional-openapi-check" { } ''
+              mkdir -p generated $out
+              cp ${ledger-functional-openapi-generated}/cardano-ledger-functional.openapi.json \
+                generated/cardano-ledger-functional.openapi.json
+              ${pkgs.diffutils}/bin/diff -u \
+                ${./specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json} \
+                generated/cardano-ledger-functional.openapi.json
+              touch $out/passed
+            '';
         in
         {
           packages = {
             inherit (wasmTargets) wasm-smoke wasm-ledger-smoke wasm-tx-inspector;
-            inherit ledger-functional-openapi tx-inspector-ui;
+            inherit
+              ledger-functional-openapi
+              ledger-functional-openapi-generated
+              tx-inspector-ui
+              ;
             ledger-functional-swagger = ledger-functional-openapi;
             default = tx-inspector-ui;
+          };
+
+          checks = {
+            inherit ledger-functional-openapi-check;
+            ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
           devShells.default = pkgs.mkShell {

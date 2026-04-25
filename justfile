@@ -10,6 +10,12 @@ build-ui:
 build-openapi:
     nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
 
+check-openapi:
+    nix build .#checks.x86_64-linux.ledger-functional-openapi-check
+
+check-swagger:
+    nix build .#checks.x86_64-linux.ledger-functional-swagger-check
+
 build-smokes:
     nix build .#packages.x86_64-linux.wasm-smoke
     nix build .#packages.x86_64-linux.wasm-ledger-smoke
