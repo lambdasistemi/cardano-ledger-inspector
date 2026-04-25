@@ -1,0 +1,10 @@
+result
+result-*
+dist-newstyle/
+.direnv/
+.envrc
+.wasm-dev-workspace/
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
