@@ -41,9 +41,11 @@ The first full WASI ledger build can take a long time because Cabal populates a
 fresh dependency cache. Haskell-only edits inside the tx inspector use the
 split `prebuiltDeps` path and rebuild much faster after the cache exists.
 
-## Live Preview
+## Published Site
 
-Current preview: <https://cardano-tx-inspector.surge.sh>
+Canonical site: <https://lambdasistemi.github.io/cardano-ledger-wasi/>
+
+Pull-request previews are published to Surge by the `PR preview` workflow.
 
 ## License
 
