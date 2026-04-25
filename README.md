@@ -22,12 +22,19 @@ library.
 ## Build
 
 ```bash
-nix build .#packages.x86_64-linux.wasm-tx-inspector
-nix build .#packages.x86_64-linux.tx-inspector-ui
+nix build .#packages.x86_64-linux.wasm-tx-inspector -o result-wasm
+nix build .#packages.x86_64-linux.tx-inspector-ui -o result-site
 ```
 
-The built browser bundle is in `./result/{index.html,index.js}` after the UI
-build.
+The WASI executable is `./result-wasm/wasm-tx-inspector.wasm`. The built
+browser bundle is `./result-site/{index.html,index.js}` after the UI build.
+
+You can also build directly from GitHub:
+
+```bash
+nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.wasm-tx-inspector
+nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.tx-inspector-ui
+```
 
 ## Development
 
@@ -46,6 +53,17 @@ split `prebuiltDeps` path and rebuild much faster after the cache exists.
 Canonical site: <https://lambdasistemi.github.io/cardano-ledger-wasi/>
 
 Pull-request previews are published to Surge by the `PR preview` workflow.
+
+## CI Artifacts
+
+Every `CI` workflow run uploads downloadable artifacts:
+
+- `wasm-tx-inspector` — `wasm-tx-inspector.wasm` plus `SHA256SUMS`.
+- `tx-inspector-ui` — static `index.html`, `index.js`, plus `SHA256SUMS`.
+
+Open a workflow run under
+<https://github.com/lambdasistemi/cardano-ledger-wasi/actions/workflows/ci.yml>
+and download them from the run's **Artifacts** section.
 
 ## License
 
