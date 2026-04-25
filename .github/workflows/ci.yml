@@ -22,8 +22,31 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Build inspector WASI package and UI
-        run: >-
-          nix build --quiet
-          .#packages.x86_64-linux.wasm-tx-inspector
-          .#packages.x86_64-linux.tx-inspector-ui
+      - name: Build inspector WASI package
+        run: nix build --quiet .#packages.x86_64-linux.wasm-tx-inspector -o result-wasm
+
+      - name: Build inspector UI
+        run: nix build --quiet .#packages.x86_64-linux.tx-inspector-ui -o result-site
+
+      - name: Prepare downloadable artifacts
+        run: |
+          mkdir -p artifacts/wasm-tx-inspector artifacts/tx-inspector-ui
+          cp -L result-wasm/wasm-tx-inspector.wasm artifacts/wasm-tx-inspector/
+          cp -L result-site/* artifacts/tx-inspector-ui/
+          (cd artifacts/wasm-tx-inspector && sha256sum wasm-tx-inspector.wasm > SHA256SUMS)
+          (cd artifacts/tx-inspector-ui && sha256sum index.html index.js > SHA256SUMS)
+          chmod -R u+w artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-tx-inspector
+          path: artifacts/wasm-tx-inspector
+          if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tx-inspector-ui
+          path: artifacts/tx-inspector-ui
+          if-no-files-found: error
+          retention-days: 30
