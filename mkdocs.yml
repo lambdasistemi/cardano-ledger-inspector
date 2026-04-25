@@ -1,0 +1,54 @@
+site_name: Cardano Ledger WASI
+site_url: https://lambdasistemi.github.io/cardano-ledger-wasi/
+repo_url: https://github.com/lambdasistemi/cardano-ledger-wasi
+repo_name: lambdasistemi/cardano-ledger-wasi
+edit_uri: edit/main/gh-docs/
+docs_dir: gh-docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.indexes
+    - navigation.sections
+    - navigation.path
+    - toc.integrate
+    - content.code.copy
+
+nav:
+  - Overview: index.md
+  - Architecture: architecture.md
+  - Functional Layer: functional-layer.md
+  - Build and Artifacts: build.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - attr_list
+  - admonition
+  - tables
+  - footnotes
+  - def_list
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true

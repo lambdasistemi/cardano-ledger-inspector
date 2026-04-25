@@ -50,7 +50,9 @@ split `prebuiltDeps` path and rebuild much faster after the cache exists.
 
 ## Published Site
 
-Canonical site: <https://lambdasistemi.github.io/cardano-ledger-wasi/>
+Repository docs: <https://lambdasistemi.github.io/cardano-ledger-wasi/>
+
+Transaction inspector: <https://lambdasistemi.github.io/cardano-ledger-wasi/inspector/>
 
 Pull-request previews are published to Surge by the `PR preview` workflow.
 

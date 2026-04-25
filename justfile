@@ -18,7 +18,11 @@ ui-check:
     nix develop --quiet -c sh -c 'cd docs/inspector && spago build'
 
 build-pages-site:
-    nix build .#packages.x86_64-linux.tx-inspector-ui -o result-site
+    nix build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
+    rm -rf _site
+    nix develop --quiet -c mkdocs build --strict --site-dir _site
+    mkdir -p _site/inspector
+    cp -rL result-inspector/* _site/inspector/
 
 deploy-surge-preview:
     nix build .#packages.x86_64-linux.tx-inspector-ui

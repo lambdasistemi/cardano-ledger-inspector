@@ -29,12 +29,15 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build inspector UI
-        run: nix --quiet build .#packages.x86_64-linux.tx-inspector-ui -o result-site
+        run: nix --quiet build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
+
+      - name: Build repository docs
+        run: nix develop --quiet -c mkdocs build --strict --site-dir _site
 
       - name: Prepare Pages artifact
         run: |
-          mkdir -p _site
-          cp -L result-site/* _site/
+          mkdir -p _site/inspector
+          cp -L result-inspector/* _site/inspector/
           touch _site/.nojekyll
           chmod -R u+w _site
 

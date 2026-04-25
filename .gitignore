@@ -1,6 +1,9 @@
 result
 result-*
 artifacts/
+_site/
+site/
+surge-site/
 dist-newstyle/
 .direnv/
 .envrc
