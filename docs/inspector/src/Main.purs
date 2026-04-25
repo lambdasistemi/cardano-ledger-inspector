@@ -14,7 +14,7 @@ import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, inspect, operationBrowser, operationInspection, pretty) as Json
+import FFI.Json (Browser, Identification, inspect, operationBrowser, operationIdentification, operationInspection, pretty) as Json
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
@@ -80,6 +80,7 @@ type State =
   , result :: Maybe InspectorResult
   , txCbor :: Maybe String
   , browser :: Maybe Json.Browser
+  , identification :: Maybe Json.Identification
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , running :: Boolean
@@ -134,6 +135,7 @@ inspectorComponent initial =
         , result: Nothing
         , txCbor: Nothing
         , browser: Nothing
+        , identification: Nothing
         , browserNodes: []
         , expandedPaths: []
         , running: false
@@ -419,10 +421,18 @@ inspectorComponent initial =
                      then renderInspection summary
                      else []
                  )
+              <> renderIdentificationMaybe state
               <> renderBrowserMaybe state r.exitOk
               <> [ renderRawJson r.stdout ]
               <> renderStderr r.stderr
               )
+
+  renderIdentificationMaybe state =
+    case state.identification of
+      Just identification ->
+        if identification.valid then [ renderIdentification state identification ]
+        else []
+      Nothing -> []
 
   renderBrowserMaybe state exitOk =
     case state.browser of
@@ -439,6 +449,50 @@ inspectorComponent initial =
             (map renderMetric summary.metrics)
         ]
     ]
+
+  renderIdentification state identification =
+    HH.div
+      [ classNames [ "identity-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text identification.title ]
+              , HH.p_ [ HH.text identification.subtitle ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "identity-grid" ] ]
+          (map (renderIdentityRow state) identification.primary)
+      , HH.div
+          [ classNames [ "identity-section-title" ] ]
+          [ HH.text "Witnesses" ]
+      , HH.div
+          [ classNames [ "witness-grid" ] ]
+          (map (renderIdentityRow state) identification.witnesses)
+      ]
+
+  renderIdentityRow state row =
+    HH.div
+      [ classNames [ "identity-row" ] ]
+      [ HH.div
+          [ classNames [ "identity-copy" ] ]
+          [ HH.span
+              [ classNames [ "identity-label" ] ]
+              [ HH.text row.label ]
+          , HH.button
+              [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
+              , classNames [ "inline-action" ]
+              ]
+              [ HH.text
+                  ( if state.copiedPath == Just row.path then
+                      "Copied"
+                    else
+                      "Copy"
+                  )
+              ]
+          ]
+      , HH.code_ [ HH.text row.value ]
+      ]
 
   renderBrowser state browser =
     HH.div
@@ -641,6 +695,7 @@ inspectorComponent initial =
           , result = Nothing
           , txCbor = Nothing
           , browser = Nothing
+          , identification = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -677,15 +732,20 @@ inspectorComponent initial =
         Left err -> H.modify_ _ { running = false, fetchError = Just err, browserPath = "[]" }
         Right h -> do
           operationResult <- H.liftAff (runLedgerOperation h "tx.inspect" "[]")
+          identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" "[]")
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
+            identification = Json.operationIdentification identifyResult.stdout
           H.modify_
             _
               { running = false
               , result = Just inspectionResult
               , txCbor = Just h
               , browser = if operationResult.exitOk && browser.valid then Just browser else Nothing
+              , identification =
+                  if identifyResult.exitOk && identification.valid then Just identification
+                  else Nothing
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
                   else []

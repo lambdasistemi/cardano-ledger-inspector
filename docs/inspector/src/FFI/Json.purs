@@ -2,12 +2,15 @@ module FFI.Json
   ( Breadcrumb
   , Browser
   , BrowserRow
+  , Identification
+  , IdentificationRow
   , Inspection
   , Metric
   , MintRow
   , OutputRow
   , inspect
   , operationBrowser
+  , operationIdentification
   , operationInspection
   , pretty
   ) where
@@ -16,6 +19,7 @@ foreign import prettyImpl :: String -> String
 foreign import inspectImpl :: String -> Inspection
 foreign import operationInspectionImpl :: String -> String
 foreign import operationBrowserImpl :: String -> Browser
+foreign import operationIdentificationImpl :: String -> Identification
 
 type Metric =
   { label :: String
@@ -73,6 +77,21 @@ type Browser =
   , rows :: Array BrowserRow
   }
 
+type IdentificationRow =
+  { label :: String
+  , value :: String
+  , copyValue :: String
+  , path :: String
+  }
+
+type Identification =
+  { valid :: Boolean
+  , title :: String
+  , subtitle :: String
+  , primary :: Array IdentificationRow
+  , witnesses :: Array IdentificationRow
+  }
+
 pretty :: String -> String
 pretty = prettyImpl
 
@@ -84,3 +103,6 @@ operationInspection = operationInspectionImpl
 
 operationBrowser :: String -> Browser
 operationBrowser = operationBrowserImpl
+
+operationIdentification :: String -> Identification
+operationIdentification = operationIdentificationImpl

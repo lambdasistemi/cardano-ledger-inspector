@@ -42,6 +42,9 @@
       },
       "LedgerOperationResponse": {
         "$ref": "ledger-operation-response.schema.json"
+      },
+      "TxIdentifyResult": {
+        "$ref": "tx-identify-result.schema.json"
       }
     }
   },
@@ -107,6 +110,15 @@
                     "tx_cbor": "84a4..."
                   }
                 },
+                "identify": {
+                  "summary": "Identify a transaction",
+                  "value": {
+                    "args": {},
+                    "ledger_functional_layer": "cardano-ledger-functional/v1",
+                    "op": "tx.identify",
+                    "tx_cbor": "84a4..."
+                  }
+                },
                 "inspect": {
                   "summary": "Inspect a transaction",
                   "value": {
@@ -129,6 +141,38 @@
             "content": {
               "application/json": {
                 "examples": {
+                  "identify": {
+                    "summary": "Identity response envelope",
+                    "value": {
+                      "ledger_functional_layer": "cardano-ledger-functional/v1",
+                      "op": "tx.identify",
+                      "result": {
+                        "identification": {
+                          "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "cert_count": 0,
+                          "era": "Conway",
+                          "fee_lovelace": "0",
+                          "input_count": 1,
+                          "output_count": 2,
+                          "reference_input_count": 0,
+                          "required_signer_count": 1,
+                          "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "tx_size_bytes": 1234,
+                          "withdrawal_count": 0,
+                          "witness_counts": {
+                            "bootstrap": 0,
+                            "datum": 0,
+                            "native_script": 0,
+                            "plutus_v1": 0,
+                            "plutus_v2": 0,
+                            "plutus_v3": 0,
+                            "redeemer": 0,
+                            "vkey": 1
+                          }
+                        }
+                      }
+                    }
+                  },
                   "inspect": {
                     "summary": "Inspection response envelope",
                     "value": {

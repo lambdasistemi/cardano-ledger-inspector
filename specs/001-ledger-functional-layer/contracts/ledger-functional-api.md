@@ -202,7 +202,7 @@ and null it is compact JSON.
 | --- | --- | --- |
 | `tx.inspect` | implemented | Decode transaction CBOR and return a compact summary plus root browser view. |
 | `tx.browse` | implemented | Decode transaction CBOR and return a browser view at a path. |
-| `tx.identify` | 0.1 target | Return stable identifiers and metadata such as transaction id, body hash, era, size, and witness counts. |
+| `tx.identify` | implemented | Return stable identifiers and metadata such as transaction id, body hash, era, size, and witness counts. |
 | `tx.witness.plan` | 0.1 target | Explain required signatures, scripts, redeemers, datums, and reference inputs. |
 | `tx.validate` | 0.1 target | Run ledger validation with explicit UTxO, protocol, epoch, slot, and network context. |
 | `tx.evaluate.scripts` | 0.1 target | Evaluate phase-2 scripts and report execution units or failures with explicit context. |
@@ -254,45 +254,46 @@ Arguments:
 The browser MUST send the full current `tx_cbor` on every browse operation.
 The ledger layer MAY cache decoded values, but cache state is not authoritative.
 
+### `tx.identify`
+
+Decode the supplied transaction CBOR with the Haskell ledger and return stable
+identifiers plus byte-level metadata:
+
+```json
+{
+  "identification": {
+    "era": "Conway",
+    "tx_id": "<transaction id hex>",
+    "body_hash": "<body hash hex>",
+    "tx_size_bytes": 1234,
+    "fee_lovelace": "0",
+    "input_count": 0,
+    "reference_input_count": 0,
+    "output_count": 0,
+    "cert_count": 0,
+    "withdrawal_count": 0,
+    "required_signer_count": 0,
+    "witness_counts": {
+      "vkey": 0,
+      "bootstrap": 0,
+      "native_script": 0,
+      "plutus_v1": 0,
+      "plutus_v2": 0,
+      "plutus_v3": 0,
+      "redeemer": 0,
+      "datum": 0
+    }
+  }
+}
+```
+
+Arguments: none.
+
 ## 0.1 Target Operations
 
 These operations define the next API surface. They are intentionally explicit
 about context because a transaction alone is not enough for full ledger checks
 or balancing.
-
-### `tx.identify`
-
-Return stable identifiers and byte-level metadata.
-
-Request:
-
-```json
-{
-  "tx_cbor": "<hex>",
-  "op": "tx.identify",
-  "args": {}
-}
-```
-
-Result:
-
-```json
-{
-  "era": "Conway",
-  "tx_id": "<transaction id hex>",
-  "body_hash": "<body hash hex>",
-  "tx_size_bytes": 1234,
-  "witness_counts": {
-    "vkey": 0,
-    "native_script": 0,
-    "plutus_v1": 0,
-    "plutus_v2": 0,
-    "plutus_v3": 0,
-    "redeemer": 0,
-    "datum": 0
-  }
-}
-```
 
 ### `tx.witness.plan`
 
@@ -464,11 +465,12 @@ Machine-readable draft schemas are tracked next to this contract:
 - `../schemas/ledger-operation-request.schema.json`
 - `../schemas/ledger-operation-response.schema.json`
 - `../schemas/browser-view.schema.json`
+- `../schemas/tx-identify-result.schema.json`
 
 The OpenAPI document is packaged as the `ledger-functional-openapi` flake
 output and rendered by the published Swagger UI. The schemas describe the draft
-0.1 envelopes and currently implemented browser view. Operation-specific result
-schemas will be added as each 0.1 target operation is implemented.
+0.1 envelopes, currently implemented browser view, and implemented operation
+results.
 
 ## Compatibility
 
@@ -482,3 +484,4 @@ Legacy operation names are normalized:
 | --- | --- |
 | `inspect` | `tx.inspect` |
 | `browse` | `tx.browse` |
+| `identify` | `tx.identify` |

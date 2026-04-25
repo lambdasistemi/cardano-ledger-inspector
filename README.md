@@ -47,6 +47,9 @@ just build-wasm
 just build-ui
 just check-openapi
 just check-swagger
+just check-identify
+just test-playwright
+just test
 ```
 
 The first full WASI ledger build can take a long time because Cabal populates a
@@ -54,6 +57,10 @@ fresh dependency cache. Haskell-only edits inside the tx inspector use the
 split `prebuiltDeps` path and rebuild much faster after the cache exists.
 `just check-openapi` and `just check-swagger` regenerate the OpenAPI document
 through Nix and fail if it differs from the committed Swagger JSON.
+`just check-identify` runs the WASI executable against a committed Conway
+transaction fixture and verifies the `tx.identify` response shape.
+`just test-playwright` runs the Playwright E2E suite against the packaged inspector UI.
+`just test` runs the feature smoke check plus the browser suite.
 
 ## Published Site
 
