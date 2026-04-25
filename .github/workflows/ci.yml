@@ -22,10 +22,8 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Build WASI packages and inspector UI
+      - name: Build inspector WASI package and UI
         run: >-
           nix build --quiet
-          .#packages.x86_64-linux.wasm-smoke
-          .#packages.x86_64-linux.wasm-ledger-smoke
           .#packages.x86_64-linux.wasm-tx-inspector
           .#packages.x86_64-linux.tx-inspector-ui
