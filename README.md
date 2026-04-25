@@ -45,11 +45,15 @@ nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.tx-insp
 just --list
 just build-wasm
 just build-ui
+just check-openapi
+just check-swagger
 ```
 
 The first full WASI ledger build can take a long time because Cabal populates a
 fresh dependency cache. Haskell-only edits inside the tx inspector use the
 split `prebuiltDeps` path and rebuild much faster after the cache exists.
+`just check-openapi` and `just check-swagger` regenerate the OpenAPI document
+through Nix and fail if it differs from the committed Swagger JSON.
 
 ## Published Site
 
