@@ -27,6 +27,9 @@ jobs:
       - name: Build inspector UI
         run: nix --quiet build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
 
+      - name: Build OpenAPI artifact
+        run: nix --quiet build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
+
       - name: Build repository docs
         run: nix develop --quiet -c mkdocs build --strict --site-dir surge-site
 
@@ -34,6 +37,8 @@ jobs:
         run: |
           mkdir -p surge-site/inspector
           cp -L result-inspector/* surge-site/inspector/
+          mkdir -p surge-site/openapi
+          cp -L result-openapi/* surge-site/openapi/
           chmod -R u+w surge-site
 
       - name: Deploy to Surge

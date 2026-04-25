@@ -28,13 +28,18 @@ jobs:
       - name: Build inspector UI
         run: nix build --quiet .#packages.x86_64-linux.tx-inspector-ui -o result-site
 
+      - name: Build OpenAPI artifact
+        run: nix build --quiet .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
+
       - name: Prepare downloadable artifacts
         run: |
-          mkdir -p artifacts/wasm-tx-inspector artifacts/tx-inspector-ui
+          mkdir -p artifacts/wasm-tx-inspector artifacts/tx-inspector-ui artifacts/ledger-functional-openapi
           cp -L result-wasm/wasm-tx-inspector.wasm artifacts/wasm-tx-inspector/
           cp -L result-site/* artifacts/tx-inspector-ui/
+          cp -L result-openapi/* artifacts/ledger-functional-openapi/
           (cd artifacts/wasm-tx-inspector && sha256sum wasm-tx-inspector.wasm > SHA256SUMS)
           (cd artifacts/tx-inspector-ui && sha256sum index.html index.js > SHA256SUMS)
+          (cd artifacts/ledger-functional-openapi && sha256sum *.json > SHA256SUMS)
           chmod -R u+w artifacts
 
       - uses: actions/upload-artifact@v4
@@ -48,5 +53,12 @@ jobs:
         with:
           name: tx-inspector-ui
           path: artifacts/tx-inspector-ui
+          if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ledger-functional-openapi
+          path: artifacts/ledger-functional-openapi
           if-no-files-found: error
           retention-days: 30

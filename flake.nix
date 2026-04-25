@@ -105,11 +105,19 @@
             wasmArtifactName = "wasm-tx-inspector";
             src = ./docs/inspector;
           };
+
+          ledger-functional-openapi = pkgs.runCommand "ledger-functional-openapi" { } ''
+            mkdir -p $out
+            cp ${./specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json} \
+              $out/cardano-ledger-functional.openapi.json
+            cp ${./specs/001-ledger-functional-layer/schemas}/*.json $out/
+          '';
         in
         {
           packages = {
             inherit (wasmTargets) wasm-smoke wasm-ledger-smoke wasm-tx-inspector;
-            inherit tx-inspector-ui;
+            inherit ledger-functional-openapi tx-inspector-ui;
+            ledger-functional-swagger = ledger-functional-openapi;
             default = tx-inspector-ui;
           };
 

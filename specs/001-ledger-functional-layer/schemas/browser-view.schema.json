@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/browser-view.schema.json",
+  "title": "Cardano Ledger WASI Browser View",
+  "type": "object",
+  "required": [
+    "valid",
+    "title",
+    "subtitle",
+    "currentPath",
+    "currentJson",
+    "breadcrumbs",
+    "rows"
+  ],
+  "properties": {
+    "valid": {
+      "type": "boolean"
+    },
+    "title": {
+      "type": "string"
+    },
+    "subtitle": {
+      "type": "string"
+    },
+    "currentPath": {
+      "type": "string",
+      "description": "JSON-encoded path array for the current browser location."
+    },
+    "currentJson": {
+      "type": "string",
+      "description": "Copyable representation of the current value."
+    },
+    "breadcrumbs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/browserLink"
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/browserRow"
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "browserLink": {
+      "type": "object",
+      "required": ["label", "path"],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "description": "JSON-encoded path array."
+        }
+      },
+      "additionalProperties": true
+    },
+    "browserRow": {
+      "type": "object",
+      "required": [
+        "label",
+        "path",
+        "kind",
+        "summary",
+        "copyValue",
+        "canDive"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "description": "JSON-encoded path array."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["null", "boolean", "number", "string", "array", "object"]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "copyValue": {
+          "type": "string"
+        },
+        "canDive": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/ledger-operation-response.schema.json",
+  "title": "Cardano Ledger WASI Ledger Operation Response",
+  "type": "object",
+  "required": ["ledger_functional_layer", "op", "result"],
+  "properties": {
+    "ledger_functional_layer": {
+      "type": "string",
+      "const": "cardano-ledger-functional/v1"
+    },
+    "op": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)+$"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

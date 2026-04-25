@@ -24,10 +24,13 @@ library.
 ```bash
 nix build .#packages.x86_64-linux.wasm-tx-inspector -o result-wasm
 nix build .#packages.x86_64-linux.tx-inspector-ui -o result-site
+nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
 ```
 
 The WASI executable is `./result-wasm/wasm-tx-inspector.wasm`. The built
 browser bundle is `./result-site/{index.html,index.js}` after the UI build.
+The OpenAPI/Swagger artifact is `./result-openapi/cardano-ledger-functional.openapi.json`
+with the JSON schemas it references.
 
 You can also build directly from GitHub:
 
@@ -52,6 +55,10 @@ split `prebuiltDeps` path and rebuild much faster after the cache exists.
 
 Repository docs: <https://lambdasistemi.github.io/cardano-ledger-wasi/>
 
+Functional API definition: <https://lambdasistemi.github.io/cardano-ledger-wasi/api/>
+
+Swagger UI: <https://lambdasistemi.github.io/cardano-ledger-wasi/swagger/>
+
 Transaction inspector: <https://lambdasistemi.github.io/cardano-ledger-wasi/inspector/>
 
 Pull-request previews are published to Surge by the `PR preview` workflow.
@@ -62,6 +69,8 @@ Every `CI` workflow run uploads downloadable artifacts:
 
 - `wasm-tx-inspector` — `wasm-tx-inspector.wasm` plus `SHA256SUMS`.
 - `tx-inspector-ui` — static `index.html`, `index.js`, plus `SHA256SUMS`.
+- `ledger-functional-openapi` — OpenAPI JSON, referenced schemas, plus
+  `SHA256SUMS`.
 
 Open a workflow run under
 <https://github.com/lambdasistemi/cardano-ledger-wasi/actions/workflows/ci.yml>

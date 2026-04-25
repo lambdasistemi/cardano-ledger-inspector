@@ -7,6 +7,9 @@ build-wasm:
 build-ui:
     nix build .#packages.x86_64-linux.tx-inspector-ui
 
+build-openapi:
+    nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
+
 build-smokes:
     nix build .#packages.x86_64-linux.wasm-smoke
     nix build .#packages.x86_64-linux.wasm-ledger-smoke
@@ -19,10 +22,13 @@ ui-check:
 
 build-pages-site:
     nix build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
+    nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
     rm -rf _site
     nix develop --quiet -c mkdocs build --strict --site-dir _site
     mkdir -p _site/inspector
     cp -rL result-inspector/* _site/inspector/
+    mkdir -p _site/openapi
+    cp -rL result-openapi/* _site/openapi/
 
 deploy-surge-preview:
     nix build .#packages.x86_64-linux.tx-inspector-ui
