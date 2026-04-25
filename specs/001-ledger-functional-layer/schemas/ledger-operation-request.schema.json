@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/ledger-operation-request.schema.json",
+  "title": "Cardano Ledger WASI Ledger Operation Request",
+  "type": "object",
+  "required": ["tx_cbor", "op"],
+  "properties": {
+    "ledger_functional_layer": {
+      "type": "string",
+      "const": "cardano-ledger-functional/v1"
+    },
+    "tx_cbor": {
+      "type": "string",
+      "minLength": 2,
+      "pattern": "^[0-9A-Fa-f\\s]+$",
+      "description": "Hex-encoded transaction CBOR."
+    },
+    "op": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)+$",
+      "description": "Canonical ledger operation name."
+    },
+    "args": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": true
+    },
+    "method": {
+      "type": "string",
+      "deprecated": true,
+      "description": "Legacy operation field accepted by the current WASI executable."
+    },
+    "path": {
+      "$ref": "#/$defs/path",
+      "deprecated": true,
+      "description": "Legacy top-level browser path accepted by the current WASI executable."
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

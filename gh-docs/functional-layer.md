@@ -1,14 +1,17 @@
 # Functional Layer
 
 The functional layer is the boundary between host tools and ledger-backed
-WASI operations.
+WASI operations. It is a functional API, not a stateful RPC service: the host
+owns workspace state and passes the selected transaction CBOR into every
+operation.
 
 ## Request Shape
 
-Operations use a JSON control envelope. Transaction bytes remain CBOR.
+Operations use a JSON control envelope. Transaction bytes remain CBOR hex.
 
 ```json
 {
+  "ledger_functional_layer": "cardano-ledger-functional/v1",
   "tx_cbor": "84a4...",
   "op": "tx.inspect",
   "args": {
@@ -24,11 +27,14 @@ inspect it directly.
 
 ```json
 {
-  "ledger_functional_layer": "0.1",
+  "ledger_functional_layer": "cardano-ledger-functional/v1",
   "op": "tx.inspect",
   "result": {}
 }
 ```
+
+Transforming operations must return the resulting transaction as
+`result.tx_cbor`.
 
 ## Current Operations
 
@@ -41,9 +47,10 @@ inspect it directly.
 
 ## Contract Source
 
-The detailed contract is tracked in the repository:
+The readable API page and detailed contract are tracked here:
 
-[`specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
+- [API definition](api.md)
+- [`specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
 
 ## Direction
 
