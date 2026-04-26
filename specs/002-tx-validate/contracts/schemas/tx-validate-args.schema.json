@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-validate-args.schema.json",
+  "title": "Cardano Ledger WASI tx.validate Args",
+  "type": "object",
+  "properties": {
+    "input_policy": {
+      "type": "string",
+      "const": "preserve",
+      "default": "preserve",
+      "description": "tx.validate does not mutate the transaction; the initial contract only accepts preserve."
+    },
+    "context": {
+      "type": "object",
+      "description": "Explicit validation context supplied by the caller.",
+      "properties": {
+        "producer_txs": {
+          "type": "object",
+          "description": "Producer transaction CBOR keyed by transaction id.",
+          "propertyNames": {
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/producerTx"
+          }
+        },
+        "resolution": {
+          "type": "object",
+          "description": "Diagnostic metadata describing how producer transaction CBOR was fetched.",
+          "additionalProperties": true
+        },
+        "network": {
+          "type": "string",
+          "description": "Caller-supplied network label or identifier."
+        },
+        "slot": {
+          "$ref": "#/$defs/decimalString"
+        },
+        "epoch": {
+          "$ref": "#/$defs/decimalString"
+        },
+        "protocol_parameters": {
+          "type": "object",
+          "description": "Caller-supplied protocol parameters required by ledger checks.",
+          "additionalProperties": true
+        },
+        "governance_state": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "cert_state": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "stake_distribution": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "producerTx": {
+      "type": "object",
+      "required": ["tx_cbor"],
+      "properties": {
+        "tx_cbor": {
+          "type": "string",
+          "minLength": 2,
+          "pattern": "^[0-9A-Fa-f\\s]+$"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "decimalString": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    }
+  }
+}
