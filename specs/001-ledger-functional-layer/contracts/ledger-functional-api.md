@@ -69,6 +69,22 @@ Producer transaction data and live chain status are intentionally separate:
 - Live unspent status is mutable and must be checked again before submission or
   live-chain validation.
 
+## Provider Boundary
+
+Provider adapters are byte fetchers, not ledger interpreters. The current
+required provider capability is:
+
+```text
+fetchTxCbor(network, credentials, tx_id) -> tx_cbor
+```
+
+The same function opens the transaction selected by hash and fetches producer
+transactions for `context.producer_txs`. Provider modules MUST NOT expose
+provider-specific UTxO JSON as the core ledger interface. If later operations
+need additional mutable chain state, that capability must be added explicitly
+with a ledger-facing schema and must not replace transaction CBOR as the byte
+data plane.
+
 `input_policy` has three draft values:
 
 `preserve`

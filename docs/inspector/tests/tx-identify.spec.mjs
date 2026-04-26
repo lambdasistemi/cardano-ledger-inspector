@@ -144,6 +144,36 @@ test("passes producer transaction CBOR into witness planning", async ({
   expect(copied).toMatch(/^[0-9a-f]{64}#[0-9]+$/);
 });
 
+test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  let koiosCborRequests = 0;
+
+  await installClipboardMock(page);
+  await page.route("https://api.koios.rest/api/v1/tx_cbor", async (route) => {
+    koiosCborRequests += 1;
+    const requestBody = route.request().postDataJSON();
+    expect(requestBody._tx_hashes).toHaveLength(1);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([{ cbor: txCbor }]),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("radio", { name: "Koios" }).check();
+  await page.getByPlaceholder("eyJhbGciOi...").fill("koios-test-token");
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  await expect(
+    page.getByText("Producer transaction CBOR resolved every visible transaction input"),
+  ).toBeVisible();
+  await expect(page.getByText("Producer txs")).toBeVisible();
+  expect(koiosCborRequests).toBeGreaterThan(0);
+});
+
 test("opens browser rows in place without losing identity context", async ({
   page,
 }) => {

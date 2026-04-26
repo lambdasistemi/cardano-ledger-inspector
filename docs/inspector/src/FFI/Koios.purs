@@ -1,8 +1,7 @@
 module FFI.Koios
   ( fetchTxCbor
+  , fetchTxCborEffect
   ) where
-
-import Prelude
 
 import Control.Promise (Promise, toAffE)
 import Effect (Effect)
@@ -17,4 +16,8 @@ foreign import fetchTxCborImpl
 
 fetchTxCbor :: Network -> String -> String -> Aff String
 fetchTxCbor net bearer hash =
-  toAffE (fetchTxCborImpl (networkName net) bearer hash)
+  toAffE (fetchTxCborEffect net bearer hash)
+
+fetchTxCborEffect :: Network -> String -> String -> Effect (Promise String)
+fetchTxCborEffect net bearer hash =
+  fetchTxCborImpl (networkName net) bearer hash

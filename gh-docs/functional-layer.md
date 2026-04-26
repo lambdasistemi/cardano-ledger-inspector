@@ -51,6 +51,20 @@ Producer transaction CBOR is stable because transaction bytes are immutable.
 The ledger layer derives referenced outputs by `tx_id#index`. Current unspent
 status is not stable and belongs to live-chain validation or submission checks.
 
+## Provider Boundary
+
+Browser provider adapters expose one capability for the current 0.1 inspection
+path:
+
+```text
+fetchTxCbor(network, credentials, tx_id) -> tx_cbor
+```
+
+The same capability opens the user-selected transaction and fetches producer
+transactions needed for input context. Provider modules do not expose UTxO JSON
+projection or ledger reconstruction helpers; producer-context arguments are
+built by the host and interpreted by the Haskell ledger layer.
+
 ## Current Operations
 
 `tx.inspect`

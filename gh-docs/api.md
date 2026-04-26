@@ -51,6 +51,19 @@ decodes those producer transactions and derives referenced outputs by
 Producer transaction bytes are immutable. Live unspent status is mutable and
 must be checked again before submission or live-chain validation.
 
+## Provider Boundary
+
+Provider adapters expose the same byte-level function for opening a transaction
+and resolving producer context:
+
+```text
+fetchTxCbor(network, credentials, tx_id) -> tx_cbor
+```
+
+Provider-specific UTxO JSON is not part of the ledger functional interface.
+The host builds `context.producer_txs` from fetched transaction CBOR, and the
+Haskell ledger layer derives referenced outputs.
+
 ## Implemented Operations
 
 | Operation | Description |
