@@ -511,11 +511,20 @@
         font-weight: 700;
       }
 
+      .identity-row.is-copied {
+        border-color: var(--accent);
+        box-shadow: inset 0 0 0 1px rgba(10, 123, 131, 0.2);
+      }
+
       .identity-row code {
         display: block;
         min-height: 1.8rem;
         overflow-wrap: anywhere;
         white-space: normal;
+      }
+
+      .identity-value {
+        user-select: text;
       }
 
       .witness-plan {
@@ -646,6 +655,11 @@
         background: #f7fffd;
       }
 
+      .browser-row.is-copied {
+        border-color: var(--accent);
+        box-shadow: inset 0 0 0 1px rgba(10, 123, 131, 0.2);
+      }
+
       .browser-children {
         display: grid;
         gap: 8px;
@@ -678,6 +692,17 @@
 
       .browser-summary {
         overflow-wrap: anywhere;
+      }
+
+      .summary-copy-target {
+        cursor: copy;
+        border-radius: 6px;
+      }
+
+      .summary-copy-target:hover,
+      .identity-row.is-copied .summary-copy-target,
+      .browser-row.is-copied .summary-copy-target {
+        color: var(--accent-strong);
       }
 
       .kind-badge {

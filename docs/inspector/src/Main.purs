@@ -556,27 +556,35 @@ inspectorComponent initial =
       ]
 
   renderIdentityRow state row =
-    HH.div
-      [ classNames [ "identity-row" ] ]
-      [ HH.div
-          [ classNames [ "identity-copy" ] ]
-          [ HH.span
-              [ classNames [ "identity-label" ] ]
-              [ HH.text row.label ]
-          , HH.button
-              [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
-              , classNames [ "inline-action" ]
-              ]
-              [ HH.text
-                  ( if state.copiedPath == Just row.path then
-                      "Copied"
-                    else
-                      "Copy"
-                  )
-              ]
+    let
+      canCopy = identityRowCanCopy row.path
+      copied = state.copiedPath == Just row.path
+      rowClasses =
+        if copied then [ "identity-row", "is-copied" ]
+        else [ "identity-row" ]
+      valueClasses =
+        if canCopy then [ "identity-value", "summary-copy-target" ]
+        else [ "identity-value" ]
+      valueProps =
+        if canCopy then
+          [ classNames valueClasses
+          , HE.onClick (\_ -> CopyValue row.path row.copyValue)
+          , HP.title "Copy value"
           ]
-      , HH.code_ [ HH.text row.value ]
+        else
+          [ classNames valueClasses ]
+    in
+    HH.div
+      [ classNames rowClasses ]
+      [ HH.span
+          [ classNames [ "identity-label" ] ]
+          [ HH.text row.label ]
+      , HH.code valueProps [ HH.text row.value ]
       ]
+
+  identityRowCanCopy path =
+    path == "[\"identification\",\"tx_id\"]"
+      || path == "[\"identification\",\"body_hash\"]"
 
   renderBrowser state browser =
     HH.div
@@ -617,13 +625,16 @@ inspectorComponent initial =
     let
       expanded = isExpanded row.path state.expandedPaths
       child = browserAt row.path state.browserNodes
+      copied = state.copiedPath == Just row.path
     in
       [ HH.div
           [ classNames
               ( if expanded then
-                  [ "browser-row", "is-expanded" ]
+                  if copied then [ "browser-row", "is-expanded", "is-copied" ]
+                  else [ "browser-row", "is-expanded" ]
                 else
-                  [ "browser-row" ]
+                  if copied then [ "browser-row", "is-copied" ]
+                  else [ "browser-row" ]
               )
           ]
           [ HH.div
@@ -636,30 +647,23 @@ inspectorComponent initial =
                       [ HH.text row.kind ]
                   ]
               , HH.div
-                  [ classNames [ "browser-summary" ] ]
+                  [ classNames [ "browser-summary", "summary-copy-target" ]
+                  , HE.onClick (\_ -> CopyValue row.path row.copyValue)
+                  , HP.title "Copy value"
+                  ]
                   [ HH.text row.summary ]
               ]
-          , HH.div
-              [ classNames [ "browser-actions" ] ]
-              [ if row.canDive then
+          , if row.canDive then
+              HH.div
+                [ classNames [ "browser-actions" ] ]
+                [
                   HH.button
                     [ HE.onClick (\_ -> BrowseJson row.path)
                     , classNames [ "inline-action" ]
                     ]
                     [ HH.text (if expanded then "Close" else "Open") ]
-                else HH.text ""
-              , HH.button
-                  [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
-                  , classNames [ "inline-action" ]
-                  ]
-                  [ HH.text
-                      ( if state.copiedPath == Just row.path then
-                          "Copied"
-                        else
-                          "Copy"
-                      )
-                  ]
-              ]
+                ]
+            else HH.text ""
           ]
       ] <> if expanded then
         [ HH.div
