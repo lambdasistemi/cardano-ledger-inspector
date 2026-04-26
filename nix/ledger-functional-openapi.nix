@@ -80,7 +80,35 @@
                     ledger_functional_layer = "cardano-ledger-functional/v1";
                     tx_cbor = "84a4...";
                     op = "tx.witness.plan";
-                    args = { };
+                    args = {
+                      input_policy = "preserve";
+                      context = {
+                        utxo = {
+                          "0000000000000000000000000000000000000000000000000000000000000000#0" = {
+                            tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                            index = 0;
+                            address = "addr1...";
+                            lovelace = "10000000";
+                            assets = { };
+                            datum_hash = null;
+                            inline_datum_cbor = null;
+                            reference_script_hash = null;
+                            source = "blockfrost.txs.utxos.outputs";
+                            unspent_status = "not_checked";
+                          };
+                        };
+                        resolution = {
+                          provider = "blockfrost";
+                          source = "tx-input-producer-outputs";
+                          requested_input_count = 1;
+                          requested_reference_input_count = 0;
+                          resolved_count = 1;
+                          missing = [ ];
+                          errors = [ ];
+                          unspent_status = "not_checked";
+                        };
+                      };
+                    };
                   };
                 };
                 balance = {
@@ -207,6 +235,42 @@
                           ];
                           datums = [ ];
                           reference_inputs = [ ];
+                          resolved_inputs = [
+                            {
+                              key = "0000000000000000000000000000000000000000000000000000000000000000#0";
+                              tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                              index = 0;
+                              resolved = true;
+                              source = "blockfrost.txs.utxos.outputs";
+                              address = "addr1...";
+                              lovelace = "10000000";
+                              datum_hash = null;
+                              reference_script_hash = null;
+                            }
+                          ];
+                          resolved_reference_inputs = [ ];
+                          context = {
+                            input_policy = "preserve";
+                            utxo_count = 1;
+                            supplied = true;
+                            complete = true;
+                            input_count = 1;
+                            resolved_input_count = 1;
+                            missing_input_count = 0;
+                            reference_input_count = 0;
+                            resolved_reference_input_count = 0;
+                            missing_reference_input_count = 0;
+                            resolution = {
+                              provider = "blockfrost";
+                              source = "tx-input-producer-outputs";
+                              requested_input_count = 1;
+                              requested_reference_input_count = 0;
+                              resolved_count = 1;
+                              missing = [ ];
+                              errors = [ ];
+                              unspent_status = "not_checked";
+                            };
+                          };
                           summary = {
                             required_signer_count = 0;
                             present_vkey_witness_count = 1;
@@ -218,7 +282,7 @@
                             reference_input_count = 0;
                           };
                           warnings = [
-                            "Transaction-only witness plan: UTxO context was not supplied, so input address credentials, reference scripts, and datum requirements cannot be inferred."
+                            "UTxO context was supplied for every visible transaction input; live unspent status is not checked by this operation."
                           ];
                         };
                       };
@@ -281,6 +345,9 @@
       };
       TxWitnessPlanResult = {
         "$ref" = "tx-witness-plan-result.schema.json";
+      };
+      UtxoContext = {
+        "$ref" = "utxo-context.schema.json";
       };
       LedgerOperationError = {
         type = "object";

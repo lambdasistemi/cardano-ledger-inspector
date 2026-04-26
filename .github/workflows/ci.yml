@@ -40,6 +40,9 @@ jobs:
       - name: Smoke tx.witness.plan operation
         run: nix build --quiet .#checks.x86_64-linux.tx-witness-plan-smoke
 
+      - name: Smoke explicit UTxO input context
+        run: nix build --quiet .#checks.x86_64-linux.tx-input-context-smoke
+
       - name: Run inspector Playwright tests
         run: nix develop --quiet -c just test-playwright
 

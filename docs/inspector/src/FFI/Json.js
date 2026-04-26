@@ -8,6 +8,27 @@ export const prettyImpl = (text) => {
   }
 };
 
+export const operationArgsWithPathImpl = (argsText) => (pathText) => {
+  let args = {};
+  try {
+    const parsedArgs = JSON.parse(argsText);
+    if (parsedArgs && typeof parsedArgs === "object" && !Array.isArray(parsedArgs)) {
+      args = parsedArgs;
+    }
+  } catch (_err) {
+    args = {};
+  }
+
+  try {
+    const path = JSON.parse(pathText);
+    args.path = Array.isArray(path) ? path.map(String) : [];
+  } catch (_err) {
+    args.path = [];
+  }
+
+  return JSON.stringify(args);
+};
+
 const emptyInspection = (title, subtitle = "") => ({
   valid: false,
   title,
@@ -190,6 +211,22 @@ const signerRows = (items, pathRoot) =>
     )
   );
 
+const resolvedTxInRows = (items, pathRoot) =>
+  (Array.isArray(items) ? items : []).map((item, index) => {
+    const key = item?.key || `${item?.tx_id || ""}#${text(item?.index)}`;
+    const status = item?.resolved === true ? "resolved" : "missing";
+    const address = item?.address ? shortHex(item.address, 18, 10) : "";
+    const lovelace = item?.lovelace ? formatLovelace(item.lovelace) : "";
+    const detailParts = [status, lovelace, address].filter((part) => part !== "");
+    return witnessRow(
+      status,
+      key,
+      witnessPlanPath(pathRoot, `#${index}`, "key"),
+      key,
+      detailParts.join(" / ")
+    );
+  });
+
 const normalizeWitnessPlan = (plan) => {
   if (!plan || typeof plan !== "object") {
     return invalidWitnessPlan(
@@ -217,6 +254,13 @@ const normalizeWitnessPlan = (plan) => {
   const referenceInputs = Array.isArray(plan.reference_inputs)
     ? plan.reference_inputs
     : [];
+  const resolvedInputs = Array.isArray(plan.resolved_inputs)
+    ? plan.resolved_inputs
+    : [];
+  const resolvedReferenceInputs = Array.isArray(plan.resolved_reference_inputs)
+    ? plan.resolved_reference_inputs
+    : [];
+  const context = plan.context && typeof plan.context === "object" ? plan.context : {};
   const warnings = Array.isArray(plan.warnings) ? plan.warnings.map(text) : [];
 
   const missingCount = Number(summary.missing_vkey_witness_count ?? missingWitnesses.length);
@@ -243,6 +287,9 @@ const normalizeWitnessPlan = (plan) => {
       metric("Redeemers", summary.redeemer_count ?? redeemers.length),
       metric("Datums", summary.datum_count ?? datums.length),
       metric("Reference inputs", summary.reference_input_count ?? referenceInputs.length),
+      metric("Context UTxOs", context.utxo_count ?? 0),
+      metric("Resolved inputs", context.resolved_input_count ?? 0),
+      metric("Missing inputs", context.missing_input_count ?? 0),
     ],
     warnings,
     sections: [
@@ -273,6 +320,16 @@ const normalizeWitnessPlan = (plan) => {
         title: "Present bootstrap witnesses",
         empty: "None present.",
         rows: signerRows(bootstrapWitnesses, "present_bootstrap_witnesses"),
+      },
+      {
+        title: "Resolved inputs",
+        empty: "No input UTxO context supplied.",
+        rows: resolvedTxInRows(resolvedInputs, "resolved_inputs"),
+      },
+      {
+        title: "Resolved reference inputs",
+        empty: "No reference input UTxO context supplied.",
+        rows: resolvedTxInRows(resolvedReferenceInputs, "resolved_reference_inputs"),
       },
       {
         title: "Script witnesses",

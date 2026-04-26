@@ -12,6 +12,9 @@
     "redeemers",
     "datums",
     "reference_inputs",
+    "resolved_inputs",
+    "resolved_reference_inputs",
+    "context",
     "summary",
     "warnings"
   ],
@@ -134,6 +137,78 @@
         "additionalProperties": true
       }
     },
+    "resolved_inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resolvedTxIn"
+      }
+    },
+    "resolved_reference_inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resolvedTxIn"
+      }
+    },
+    "context": {
+      "type": "object",
+      "required": [
+        "input_policy",
+        "utxo_count",
+        "supplied",
+        "complete",
+        "input_count",
+        "resolved_input_count",
+        "missing_input_count",
+        "reference_input_count",
+        "resolved_reference_input_count",
+        "missing_reference_input_count",
+        "resolution"
+      ],
+      "properties": {
+        "input_policy": {
+          "type": "string",
+          "enum": ["preserve", "may_extend", "replace"]
+        },
+        "utxo_count": {
+          "$ref": "#/$defs/count"
+        },
+        "supplied": {
+          "type": "boolean"
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "resolved_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "missing_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "reference_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "resolved_reference_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "missing_reference_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
     "summary": {
       "type": "object",
       "required": [
@@ -192,6 +267,77 @@
         },
         "source": {
           "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "resolvedTxIn": {
+      "type": "object",
+      "required": ["key", "tx_id", "index", "resolved"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}#[0-9]+$"
+        },
+        "tx_id": {
+          "$ref": "#/$defs/hash32"
+        },
+        "index": {
+          "$ref": "#/$defs/count"
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lovelace": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "datum_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/hash32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reference_script_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scriptHash"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": true

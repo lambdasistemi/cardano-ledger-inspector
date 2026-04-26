@@ -31,6 +31,24 @@ Successful responses use the same versioned envelope:
 Transforming operations must return the new transaction bytes as
 `result.tx_cbor`.
 
+## Input Context
+
+The host workspace owns transaction state and any fetched chain context. For
+normal inspection and patch workflows, `TxIn`s are treated as the stable anchor:
+resolved historical outputs can be cached by `tx_id#index` and sent back on
+each ledger call through `args.context.utxo`.
+
+`args.input_policy` declares whether an operation may change inputs:
+
+| Policy | Meaning |
+| --- | --- |
+| `preserve` | Default. The operation must keep the input set unchanged. |
+| `may_extend` | The operation may add inputs and must report the additions. |
+| `replace` | The operation may rebuild the input set and must report added and removed inputs. |
+
+Resolved output data is immutable. Live unspent status is mutable and must be
+checked again before submission or live-chain validation.
+
 ## Implemented Operations
 
 | Operation | Description |
@@ -38,7 +56,7 @@ Transforming operations must return the new transaction bytes as
 | `tx.inspect` | Decode transaction CBOR with the Haskell ledger and return a compact summary plus the root browser view. |
 | `tx.browse` | Decode transaction CBOR and return a browser view at `args.path`. |
 | `tx.identify` | Return transaction id, body hash, era, byte size, fee, structural counts, and witness counts. |
-| `tx.witness.plan` | Return transaction-derived signer, witness, script, redeemer, datum, and reference-input planning data. |
+| `tx.witness.plan` | Return signer, witness, script, redeemer, datum, reference-input, and explicit UTxO-context coverage data. |
 
 `tx.browse` request paths are arrays of strings. Object fields use their key
 name and array indexes use `#<index>`, for example:
@@ -76,6 +94,7 @@ The detailed contract and schemas are tracked in the repository:
 - [OpenAPI document](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json)
 - [Request schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-request.schema.json)
 - [Response schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-response.schema.json)
+- [UTxO context schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/utxo-context.schema.json)
 - [Browser view schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/browser-view.schema.json)
 - [tx.identify result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-identify-result.schema.json)
 - [tx.witness.plan result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-witness-plan-result.schema.json)

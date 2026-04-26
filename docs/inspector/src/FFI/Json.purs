@@ -16,6 +16,7 @@ module FFI.Json
   , operationIdentification
   , operationInspection
   , operationWitnessPlan
+  , operationArgsWithPath
   , pretty
   ) where
 
@@ -25,6 +26,7 @@ foreign import operationInspectionImpl :: String -> String
 foreign import operationBrowserImpl :: String -> Browser
 foreign import operationIdentificationImpl :: String -> Identification
 foreign import operationWitnessPlanImpl :: String -> WitnessPlan
+foreign import operationArgsWithPathImpl :: String -> String -> String
 
 type Metric =
   { label :: String
@@ -137,3 +139,6 @@ operationIdentification = operationIdentificationImpl
 
 operationWitnessPlan :: String -> WitnessPlan
 operationWitnessPlan = operationWitnessPlanImpl
+
+operationArgsWithPath :: String -> String -> String
+operationArgsWithPath = operationArgsWithPathImpl
