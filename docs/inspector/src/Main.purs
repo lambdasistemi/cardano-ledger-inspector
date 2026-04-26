@@ -5,7 +5,8 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.String (trim) as String
+import Data.String (Pattern(..), Replacement(..), replaceAll, trim) as String
+import Data.String.CodeUnits as StringCodeUnits
 import Effect (Effect)
 import Effect.Aff (attempt)
 import Effect.Aff.Class (class MonadAff)
@@ -526,8 +527,59 @@ inspectorComponent initial =
           (map renderMetric validation.metrics)
       , renderWitnessWarnings validation.warnings
       , HH.div_
-          (map (renderWitnessSection state) validation.sections)
+          (map (renderValidationSection state) validation.sections)
       ]
+
+  renderValidationSection state section =
+    HH.div
+      [ classNames [ "witness-section" ] ]
+      [ HH.div
+          [ classNames [ "identity-section-title" ] ]
+          [ HH.text section.title ]
+      , if Array.null section.rows then
+          HH.div
+            [ classNames [ "witness-empty" ] ]
+            [ HH.text section.empty ]
+        else
+          HH.div
+            [ classNames [ "witness-row-list" ] ]
+            (map (renderValidationRow state section.title) section.rows)
+      ]
+
+  renderValidationRow state sectionTitle row =
+    renderWitnessRow state (presentValidationRow sectionTitle row)
+
+  presentValidationRow sectionTitle row =
+    case sectionTitle of
+      "Checks" ->
+        row
+          { value = presentValidationCheckStatus row.value row.detail
+          , detail = presentValidationCheckDetail row.detail
+          }
+      "Missing context" ->
+        row { label = readableValidationToken row.label }
+      _ -> row
+
+  presentValidationCheckStatus status detail =
+    if status == "not_evaluated" && StringCodeUnits.contains (String.Pattern "needs more explicit context") detail then
+      "needs context"
+    else
+      readableValidationToken status
+
+  presentValidationCheckDetail detail =
+    if StringCodeUnits.contains (String.Pattern "scope ledger / Ledger validation needs more explicit context before Conway applyTx can run.") detail then
+      "Missing source output, protocol parameters, slot, epoch, and network."
+    else if StringCodeUnits.contains (String.Pattern "scope ledger / Ledger validation was not run because the supplied context is invalid.") detail then
+      "Fix the context errors below."
+    else
+      stripValidationScope detail
+
+  stripValidationScope detail =
+    String.replaceAll (String.Pattern "scope ledger / ") (String.Replacement "")
+      (String.replaceAll (String.Pattern "scope context / ") (String.Replacement "") detail)
+
+  readableValidationToken token =
+    String.replaceAll (String.Pattern "_") (String.Replacement " ") token
 
   renderWitnessWarnings warnings =
     if Array.null warnings then
