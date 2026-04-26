@@ -2,7 +2,7 @@ module FFI.Blockfrost
   ( Network(..)
   , networkName
   , fetchTxCbor
-  , resolveInputContext
+  , fetchTxCborEffect
   ) where
 
 import Prelude
@@ -27,16 +27,10 @@ foreign import fetchTxCborImpl
   -> String -- tx hash
   -> Effect (Promise String)
 
-foreign import resolveInputContextImpl
-  :: String -- network
-  -> String -- projectId
-  -> String -- tx.inspect response
-  -> Effect (Promise String)
-
 fetchTxCbor :: Network -> String -> String -> Aff String
 fetchTxCbor net projectId hash =
-  toAffE (fetchTxCborImpl (networkName net) projectId hash)
+  toAffE (fetchTxCborEffect net projectId hash)
 
-resolveInputContext :: Network -> String -> String -> Aff String
-resolveInputContext net projectId inspectionResponse =
-  toAffE (resolveInputContextImpl (networkName net) projectId inspectionResponse)
+fetchTxCborEffect :: Network -> String -> String -> Effect (Promise String)
+fetchTxCborEffect net projectId hash =
+  fetchTxCborImpl (networkName net) projectId hash

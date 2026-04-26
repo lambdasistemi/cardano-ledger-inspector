@@ -3,10 +3,13 @@ module Provider
   , providerName
   , needsKey
   , fetchTxCbor
+  , resolveProducerTxContext
   ) where
 
 import Prelude
 
+import Control.Promise (Promise, toAffE)
+import Effect (Effect)
 import Effect.Aff (Aff)
 import FFI.Blockfrost (Network)
 import FFI.Blockfrost as Blockfrost
@@ -32,6 +35,37 @@ needsKey = case _ of
 -- | Unified fetch. `key` is the project ID for Blockfrost or an optional
 -- bearer token for Koios (empty string = no auth).
 fetchTxCbor :: Provider -> Network -> String -> String -> Aff String
-fetchTxCbor = case _ of
-  Blockfrost -> Blockfrost.fetchTxCbor
-  Koios      -> Koios.fetchTxCbor
+fetchTxCbor provider network key txId =
+  toAffE (fetchTxCborEffect provider network key txId)
+
+resolveProducerTxContext :: Provider -> Network -> String -> String -> Aff String
+resolveProducerTxContext provider network key inspectionResponse =
+  toAffE
+    ( resolveProducerTxContextImpl
+        (resolutionProvider provider)
+        (producerTxSource provider)
+        inspectionResponse
+        (\txId -> fetchTxCborEffect provider network key txId)
+    )
+
+fetchTxCborEffect :: Provider -> Network -> String -> String -> Effect (Promise String)
+fetchTxCborEffect = case _ of
+  Blockfrost -> Blockfrost.fetchTxCborEffect
+  Koios      -> Koios.fetchTxCborEffect
+
+resolutionProvider :: Provider -> String
+resolutionProvider = case _ of
+  Blockfrost -> "blockfrost"
+  Koios      -> "koios"
+
+producerTxSource :: Provider -> String
+producerTxSource = case _ of
+  Blockfrost -> "blockfrost.txs.cbor"
+  Koios      -> "koios.tx_cbor"
+
+foreign import resolveProducerTxContextImpl
+  :: String -- provider
+  -> String -- producer tx source
+  -> String -- tx.inspect response
+  -> (String -> Effect (Promise String)) -- fetchTxCbor by tx id
+  -> Effect (Promise String)

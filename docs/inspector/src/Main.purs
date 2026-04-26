@@ -12,7 +12,6 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
-import FFI.Blockfrost as BF
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
 import FFI.Json (Browser, Identification, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationWitnessPlan, pretty) as Json
@@ -822,14 +821,21 @@ inspectorComponent initial =
         Left err -> H.modify_ _ { running = false, fetchError = Just err, browserPath = "[]" }
         Right h -> do
           operationResult <- H.liftAff (runLedgerOperation h "tx.inspect" "{}")
-          inputContextArgs <- case st.provider of
-            Blockfrost | operationResult.exitOk && String.trim st.blockfrostKey /= "" -> do
+          let
+            providerKeyValue = case st.provider of
+              Blockfrost -> String.trim st.blockfrostKey
+              Koios      -> String.trim st.koiosBearer
+            canResolveContext =
+              operationResult.exitOk
+                && (not (Provider.needsKey st.provider) || providerKeyValue /= "")
+          inputContextArgs <-
+            if canResolveContext then do
               ctx <- H.liftAff
-                (attempt (BF.resolveInputContext st.network (String.trim st.blockfrostKey) operationResult.stdout))
+                (attempt (Provider.resolveProducerTxContext st.provider st.network providerKeyValue operationResult.stdout))
               case ctx of
                 Right args -> pure args
                 Left _     -> pure "{}"
-            _ -> pure "{}"
+            else pure "{}"
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
           let
