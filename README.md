@@ -48,6 +48,7 @@ just build-ui
 just check-openapi
 just check-swagger
 just check-identify
+just check-witness-plan
 just test-playwright
 just test
 ```
@@ -59,6 +60,8 @@ split `prebuiltDeps` path and rebuild much faster after the cache exists.
 through Nix and fail if it differs from the committed Swagger JSON.
 `just check-identify` runs the WASI executable against a committed Conway
 transaction fixture and verifies the `tx.identify` response shape.
+`just check-witness-plan` verifies the implemented `tx.witness.plan` response
+shape against the same fixture.
 `just test-playwright` runs the Playwright E2E suite against the packaged inspector UI.
 `just test` runs the feature smoke check plus the browser suite.
 

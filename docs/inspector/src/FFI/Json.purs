@@ -8,10 +8,14 @@ module FFI.Json
   , Metric
   , MintRow
   , OutputRow
+  , WitnessPlan
+  , WitnessPlanRow
+  , WitnessPlanSection
   , inspect
   , operationBrowser
   , operationIdentification
   , operationInspection
+  , operationWitnessPlan
   , pretty
   ) where
 
@@ -20,6 +24,7 @@ foreign import inspectImpl :: String -> Inspection
 foreign import operationInspectionImpl :: String -> String
 foreign import operationBrowserImpl :: String -> Browser
 foreign import operationIdentificationImpl :: String -> Identification
+foreign import operationWitnessPlanImpl :: String -> WitnessPlan
 
 type Metric =
   { label :: String
@@ -92,6 +97,29 @@ type Identification =
   , witnesses :: Array IdentificationRow
   }
 
+type WitnessPlanRow =
+  { label :: String
+  , value :: String
+  , copyValue :: String
+  , path :: String
+  , detail :: String
+  }
+
+type WitnessPlanSection =
+  { title :: String
+  , empty :: String
+  , rows :: Array WitnessPlanRow
+  }
+
+type WitnessPlan =
+  { valid :: Boolean
+  , title :: String
+  , subtitle :: String
+  , metrics :: Array Metric
+  , warnings :: Array String
+  , sections :: Array WitnessPlanSection
+  }
+
 pretty :: String -> String
 pretty = prettyImpl
 
@@ -106,3 +134,6 @@ operationBrowser = operationBrowserImpl
 
 operationIdentification :: String -> Identification
 operationIdentification = operationIdentificationImpl
+
+operationWitnessPlan :: String -> WitnessPlan
+operationWitnessPlan = operationWitnessPlanImpl

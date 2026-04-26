@@ -203,7 +203,7 @@ and null it is compact JSON.
 | `tx.inspect` | implemented | Decode transaction CBOR and return a compact summary plus root browser view. |
 | `tx.browse` | implemented | Decode transaction CBOR and return a browser view at a path. |
 | `tx.identify` | implemented | Return stable identifiers and metadata such as transaction id, body hash, era, size, and witness counts. |
-| `tx.witness.plan` | 0.1 target | Explain required signatures, scripts, redeemers, datums, and reference inputs. |
+| `tx.witness.plan` | implemented | Explain body-declared signer hashes, present witnesses, scripts, redeemers, datums, and reference inputs that are visible from the transaction alone. |
 | `tx.validate` | 0.1 target | Run ledger validation with explicit UTxO, protocol, epoch, slot, and network context. |
 | `tx.evaluate.scripts` | 0.1 target | Evaluate phase-2 scripts and report execution units or failures with explicit context. |
 | `tx.patch` | 0.1 target | Apply a controlled structural patch and return new transaction CBOR. |
@@ -289,37 +289,52 @@ identifiers plus byte-level metadata:
 
 Arguments: none.
 
+### `tx.witness.plan`
+
+Decode the supplied transaction CBOR with the Haskell ledger and return the
+transaction-derived witness plan:
+
+```json
+{
+  "witness_plan": {
+    "required_signers": [],
+    "present_vkey_witnesses": [],
+    "present_bootstrap_witnesses": [],
+    "missing_vkey_witnesses": [],
+    "scripts": [],
+    "redeemers": [],
+    "datums": [],
+    "reference_inputs": [],
+    "summary": {
+      "required_signer_count": 0,
+      "present_vkey_witness_count": 0,
+      "present_bootstrap_witness_count": 0,
+      "missing_vkey_witness_count": 0,
+      "script_count": 0,
+      "redeemer_count": 0,
+      "datum_count": 0,
+      "reference_input_count": 0
+    },
+    "warnings": []
+  }
+}
+```
+
+Arguments: none in the current implementation.
+
+The first implementation is intentionally transaction-only. It can compare
+`required_signers` from the transaction body with vkey/bootstrap witnesses
+already present in the witness set, and it can report script witnesses,
+redeemers, witness datums, and reference inputs. It cannot infer input address
+credentials, datum hashes needed by consumed UTxOs, or reference scripts without
+an explicit UTxO context, so it returns a warning when the plan is derived from
+the transaction alone.
+
 ## 0.1 Target Operations
 
 These operations define the next API surface. They are intentionally explicit
 about context because a transaction alone is not enough for full ledger checks
 or balancing.
-
-### `tx.witness.plan`
-
-Explain what witnesses are required or present. This is a planning operation,
-not signing.
-
-Arguments:
-
-`utxo`
-: Optional explicit UTxO set for referenced inputs when the plan needs output
-  addresses, scripts, datum hashes, or reference scripts.
-
-Result:
-
-```json
-{
-  "required_signers": [],
-  "present_vkey_witnesses": [],
-  "missing_vkey_witnesses": [],
-  "scripts": [],
-  "redeemers": [],
-  "datums": [],
-  "reference_inputs": [],
-  "warnings": []
-}
-```
 
 ### `tx.validate`
 
@@ -466,6 +481,7 @@ Machine-readable draft schemas are tracked next to this contract:
 - `../schemas/ledger-operation-response.schema.json`
 - `../schemas/browser-view.schema.json`
 - `../schemas/tx-identify-result.schema.json`
+- `../schemas/tx-witness-plan-result.schema.json`
 
 The OpenAPI document is packaged as the `ledger-functional-openapi` flake
 output and rendered by the published Swagger UI. The schemas describe the draft
@@ -485,3 +501,4 @@ Legacy operation names are normalized:
 | `inspect` | `tx.inspect` |
 | `browse` | `tx.browse` |
 | `identify` | `tx.identify` |
+| `witness.plan` | `tx.witness.plan` |
