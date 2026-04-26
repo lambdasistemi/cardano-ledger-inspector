@@ -23,6 +23,22 @@
     "args": {
       "type": "object",
       "default": {},
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path",
+          "description": "Browser path for tx.browse or tx.inspect."
+        },
+        "input_policy": {
+          "type": "string",
+          "enum": ["preserve", "may_extend", "replace"],
+          "default": "preserve",
+          "description": "Declares whether the operation may change the transaction input set. Normal patch/inspect operations should preserve inputs."
+        },
+        "context": {
+          "$ref": "utxo-context.schema.json",
+          "description": "Explicit external context owned by the host workspace."
+        }
+      },
       "additionalProperties": true
     },
     "method": {

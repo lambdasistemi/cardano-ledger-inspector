@@ -193,12 +193,92 @@
               and (.result.witness_plan.redeemers | type == "array")
               and (.result.witness_plan.datums | type == "array")
               and (.result.witness_plan.reference_inputs | type == "array")
+              and (.result.witness_plan.resolved_inputs | type == "array")
+              and (.result.witness_plan.resolved_reference_inputs | type == "array")
+              and .result.witness_plan.context.supplied == false
               and (.result.witness_plan.summary.required_signer_count >= 0)
               and (.result.witness_plan.summary.present_vkey_witness_count >= 0)
               and (.result.witness_plan.summary.missing_vkey_witness_count >= 0)
               and (.result.witness_plan.warnings | length >= 1)
             ' response.json
             cp request.json response.json $out/
+          '';
+
+          tx-input-context-smoke = pkgs.runCommand "tx-input-context-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.inspect",
+                args: {}
+              }' > inspect-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < inspect-request.json > inspect-response.json
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              --slurpfile inspect inspect-response.json \
+              '$inspect[0].result.inspection as $inspection
+              | ($inspection.inputs + $inspection.reference_inputs) as $inputs
+              | {
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.witness.plan",
+                args: {
+                  input_policy: "preserve",
+                  context: {
+                    utxo: (
+                      $inputs
+                      | map({
+                          key: (.tx_id + "#" + (.index | tostring)),
+                          value: {
+                            tx_id: .tx_id,
+                            index: .index,
+                            address: "addr_test1synthetic",
+                            lovelace: "0",
+                            assets: {},
+                            datum_hash: null,
+                            inline_datum_cbor: null,
+                            reference_script_hash: null,
+                            source: "smoke.synthetic",
+                            unspent_status: "not_checked"
+                          }
+                        })
+                      | from_entries
+                    ),
+                    resolution: {
+                      provider: "smoke",
+                      source: "decoded-fixture-inputs",
+                      requested_input_count: ($inspection.inputs | length),
+                      requested_reference_input_count: ($inspection.reference_inputs | length),
+                      resolved_count: ($inputs | length),
+                      missing: [],
+                      errors: [],
+                      unspent_status: "not_checked"
+                    }
+                  }
+                }
+              }' > request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < request.json > response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.witness_plan as $plan
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.witness.plan"
+              and $plan.context.input_policy == "preserve"
+              and $plan.context.supplied == true
+              and $plan.context.complete == true
+              and $plan.context.missing_input_count == 0
+              and ($plan.resolved_inputs | length == $plan.context.input_count)
+              and ([$plan.resolved_inputs[]? | select(.resolved != true)] | length == 0)
+            ' response.json
+            cp inspect-request.json inspect-response.json request.json response.json $out/
           '';
         in
         {
@@ -214,7 +294,7 @@
           };
 
           checks = {
-            inherit ledger-functional-openapi-check tx-identify-smoke tx-witness-plan-smoke;
+            inherit ledger-functional-openapi-check tx-identify-smoke tx-witness-plan-smoke tx-input-context-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 

@@ -63,6 +63,7 @@ data InspectError
 data LedgerOperationRequest = LedgerOperationRequest
     { lorTxCbor :: T.Text
     , lorOperation :: T.Text
+    , lorArgs :: Aeson.Value
     , lorPath :: [T.Text]
     }
 
@@ -77,6 +78,7 @@ instance Aeson.FromJSON LedgerOperationRequest where
             LedgerOperationRequest
                 { lorTxCbor = txCbor
                 , lorOperation = normalizeOperation operation
+                , lorArgs = args
                 , lorPath = path
                 }
       where
@@ -156,7 +158,7 @@ runLedgerOperation request = do
             pure $
                 ledgerOperationResponse
                     (lorOperation request)
-                    [ "witness_plan" .= witnessPlanJson tx
+                    [ "witness_plan" .= witnessPlanJson (lorArgs request) tx
                     ]
         other -> Left (UnknownLedgerOperation other)
 
@@ -372,11 +374,17 @@ identifyJson txBytes tx =
             ]
 
 witnessPlanJson ::
+    Aeson.Value ->
     L.Tx TopTx Conway.ConwayEra ->
     Aeson.Value
-witnessPlanJson tx =
+witnessPlanJson args tx =
     let body = tx ^. L.bodyTxL
         wits = tx ^. Core.witsTxL
+        context = utxoContextFromArgs args
+        inputPolicy = inputPolicyFromArgs args
+        inputs = toList (body ^. L.inputsTxBodyL)
+        referenceInputs =
+            toList (body ^. L.referenceInputsTxBodyL)
         requiredSignerHexes =
             keyHashHex <$> toList (body ^. L.reqSignerHashesTxBodyL)
         presentVKeyHexes =
@@ -394,10 +402,15 @@ witnessPlanJson tx =
             Map.toList (L.unRedeemers (wits ^. L.rdmrsTxWitsL))
         datums =
             Map.toList (L.unTxDats (wits ^. L.datsTxWitsL))
-        referenceInputs =
-            toList (body ^. L.referenceInputsTxBodyL)
+        missingContextInputs =
+            missingContextTxIns context inputs
+        missingContextReferenceInputs =
+            missingContextTxIns context referenceInputs
         warnings =
-            transactionOnlyWitnessPlanWarning
+            contextWarnings
+                context
+                missingContextInputs
+                missingContextReferenceInputs
                 : if null missingSignerHexes
                     then []
                     else
@@ -416,6 +429,18 @@ witnessPlanJson tx =
             , "redeemers" .= map redeemerJson redeemers
             , "datums" .= map datumWitnessJson datums
             , "reference_inputs" .= map txInJson referenceInputs
+            , "resolved_inputs"
+                .= map (resolvedTxInJson context) inputs
+            , "resolved_reference_inputs"
+                .= map (resolvedTxInJson context) referenceInputs
+            , "context"
+                .= contextSummaryJson
+                    inputPolicy
+                    context
+                    inputs
+                    referenceInputs
+                    missingContextInputs
+                    missingContextReferenceInputs
             , "summary"
                 .= Aeson.object
                     [ "required_signer_count" .= length requiredSignerHexes
@@ -433,6 +458,145 @@ witnessPlanJson tx =
 transactionOnlyWitnessPlanWarning :: T.Text
 transactionOnlyWitnessPlanWarning =
     "Transaction-only witness plan: UTxO context was not supplied, so input address credentials, reference scripts, and datum requirements cannot be inferred."
+
+partialUtxoContextWarning :: T.Text
+partialUtxoContextWarning =
+    "UTxO context was supplied but does not cover every transaction input."
+
+completeUtxoContextWarning :: T.Text
+completeUtxoContextWarning =
+    "UTxO context was supplied for every visible transaction input; live unspent status is not checked by this operation."
+
+contextWarnings ::
+    UtxoContext ->
+    [TxIn.TxIn] ->
+    [TxIn.TxIn] ->
+    T.Text
+contextWarnings context missingInputs missingReferenceInputs
+    | not (utxoContextSupplied context) = transactionOnlyWitnessPlanWarning
+    | null missingInputs && null missingReferenceInputs = completeUtxoContextWarning
+    | otherwise = partialUtxoContextWarning
+
+data UtxoContext = UtxoContext
+    { ucUtxos :: Map.Map T.Text Aeson.Value
+    , ucResolution :: Maybe Aeson.Value
+    }
+
+utxoContextFromArgs :: Aeson.Value -> UtxoContext
+utxoContextFromArgs args =
+    UtxoContext
+        { ucUtxos =
+            case argsObject args
+                >>= lookupObjectValue "context"
+                >>= lookupValue "utxo" of
+                Just (Aeson.Object utxos) ->
+                    Map.fromList
+                        [ (AesonKey.toText key, value)
+                        | (key, value) <- KeyMap.toList utxos
+                        ]
+                _ -> Map.empty
+        , ucResolution =
+            argsObject args
+                >>= lookupObjectValue "context"
+                >>= lookupValue "resolution"
+        }
+
+utxoContextSupplied :: UtxoContext -> Bool
+utxoContextSupplied =
+    not . Map.null . ucUtxos
+
+inputPolicyFromArgs :: Aeson.Value -> T.Text
+inputPolicyFromArgs args =
+    case argsObject args >>= lookupObjectValue "input_policy" of
+        Just (Aeson.String policy) -> policy
+        _ -> "preserve"
+
+missingContextTxIns :: UtxoContext -> [TxIn.TxIn] -> [TxIn.TxIn]
+missingContextTxIns context =
+    filter (\txIn -> Map.notMember (txInKey txIn) (ucUtxos context))
+
+contextSummaryJson ::
+    T.Text ->
+    UtxoContext ->
+    [TxIn.TxIn] ->
+    [TxIn.TxIn] ->
+    [TxIn.TxIn] ->
+    [TxIn.TxIn] ->
+    Aeson.Value
+contextSummaryJson
+    inputPolicy
+    context
+    inputs
+    referenceInputs
+    missingInputs
+    missingReferenceInputs =
+        let supplied = utxoContextSupplied context
+            resolvedInputs =
+                length inputs - length missingInputs
+            resolvedReferenceInputs =
+                length referenceInputs - length missingReferenceInputs
+         in Aeson.object
+                [ "input_policy" .= inputPolicy
+                , "utxo_count" .= Map.size (ucUtxos context)
+                , "supplied" .= supplied
+                , "complete"
+                    .= (supplied && null missingInputs && null missingReferenceInputs)
+                , "input_count" .= length inputs
+                , "resolved_input_count" .= resolvedInputs
+                , "missing_input_count" .= length missingInputs
+                , "reference_input_count" .= length referenceInputs
+                , "resolved_reference_input_count" .= resolvedReferenceInputs
+                , "missing_reference_input_count" .= length missingReferenceInputs
+                , "resolution" .= fromMaybe Aeson.Null (ucResolution context)
+                ]
+
+resolvedTxInJson :: UtxoContext -> TxIn.TxIn -> Aeson.Value
+resolvedTxInJson context txIn =
+    let key = txInKey txIn
+        baseFields =
+            [ "key" .= key
+            , "tx_id" .= txInTxIdHex txIn
+            , "index" .= txInIndex txIn
+            ]
+     in case Map.lookup key (ucUtxos context) of
+            Nothing ->
+                Aeson.object $
+                    baseFields
+                        <> [ "resolved" .= False
+                           ]
+            Just value ->
+                Aeson.object $
+                    baseFields
+                        <> [ "resolved" .= True
+                           , "source" .= contextTextField "source" value
+                           , "address" .= contextTextField "address" value
+                           , "lovelace" .= contextTextField "lovelace" value
+                           , "datum_hash" .= contextTextField "datum_hash" value
+                           , "reference_script_hash"
+                                .= contextTextField "reference_script_hash" value
+                           ]
+
+contextTextField :: AesonKey.Key -> Aeson.Value -> Aeson.Value
+contextTextField field value =
+    case lookupValue field value of
+        Just (Aeson.String t) -> Aeson.String t
+        Just Aeson.Null -> Aeson.Null
+        Just other -> Aeson.String (copyText other)
+        Nothing -> Aeson.Null
+
+argsObject :: Aeson.Value -> Maybe Aeson.Object
+argsObject (Aeson.Object obj) = Just obj
+argsObject _ = Nothing
+
+lookupValue :: AesonKey.Key -> Aeson.Value -> Maybe Aeson.Value
+lookupValue key (Aeson.Object obj) =
+    KeyMap.lookup key obj
+lookupValue _ _ =
+    Nothing
+
+lookupObjectValue :: AesonKey.Key -> Aeson.Object -> Maybe Aeson.Value
+lookupObjectValue =
+    KeyMap.lookup
 
 requiredSignerJson :: T.Text -> Aeson.Value
 requiredSignerJson signerHash =
@@ -629,6 +793,18 @@ txInJson (TxIn.TxIn (TxIn.TxId safeHash) (BaseTypes.TxIx ix)) =
         [ "tx_id" .= hashHex (Hashes.extractHash safeHash)
         , "index" .= fromEnum ix
         ]
+
+txInKey :: TxIn.TxIn -> T.Text
+txInKey txIn =
+    txInTxIdHex txIn <> "#" <> T.pack (show (txInIndex txIn))
+
+txInTxIdHex :: TxIn.TxIn -> T.Text
+txInTxIdHex (TxIn.TxIn (TxIn.TxId safeHash) _) =
+    hashHex (Hashes.extractHash safeHash)
+
+txInIndex :: TxIn.TxIn -> Int
+txInIndex (TxIn.TxIn _ (BaseTypes.TxIx ix)) =
+    fromEnum ix
 
 txIdHex :: TxIn.TxId -> T.Text
 txIdHex (TxIn.TxId safeHash) =

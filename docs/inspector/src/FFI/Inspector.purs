@@ -23,4 +23,4 @@ runInspector :: String -> Aff InspectorResult
 runInspector = toAffE <<< runInspectorImpl
 
 runLedgerOperation :: String -> String -> String -> Aff InspectorResult
-runLedgerOperation txCbor op path = toAffE (runLedgerOperationImpl txCbor op path)
+runLedgerOperation txCbor op args = toAffE (runLedgerOperationImpl txCbor op args)

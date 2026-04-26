@@ -15,6 +15,19 @@ const fixturePath =
 async function decodeFixture(page) {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
 
+  await installClipboardMock(page);
+
+  await page.goto("/");
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Conway transaction identity" }),
+  ).toBeVisible();
+}
+
+async function installClipboardMock(page) {
   await page.addInitScript(() => {
     let copied = "";
     Object.defineProperty(navigator, "clipboard", {
@@ -27,15 +40,32 @@ async function decodeFixture(page) {
       },
     });
   });
+}
 
-  await page.goto("/");
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
-  await page.getByRole("button", { name: "Decode" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: "Conway transaction identity" }),
-  ).toBeVisible();
+function blockfrostUtxoResponse(txHash) {
+  const indexesByTx = {
+    "42ceabd168faa7e7bbe10d8e72e6ba0e71886bf3537ea88bd098782e1df1c1e9": [2],
+    "1ef2797c28a7679ca8e62693642513a44bed07bc37cdef73d4cd29956b4f83a5": [0],
+    "87daf43c764260d9ad00342fcb0d444c15752c9215f43c6b8e74189e7ba99397": [0],
+  };
+  const indexes = indexesByTx[txHash] || [0];
+  return {
+    hash: txHash,
+    inputs: [],
+    outputs: indexes.map((index) => ({
+      address: `addr_test1resolved${txHash.slice(0, 16)}${index}`,
+      amount: [
+        {
+          unit: "lovelace",
+          quantity: "1234567",
+        },
+      ],
+      output_index: index,
+      data_hash: null,
+      inline_datum: null,
+      reference_script_hash: null,
+    })),
+  };
 }
 
 test("decodes a Conway transaction and exposes copyable identity values", async ({
@@ -73,6 +103,48 @@ test("shows transaction-derived witness plan values", async ({ page }) => {
 
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^[0-9a-f]{64}$/);
+});
+
+test("passes resolved Blockfrost input context into witness planning", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+
+  await installClipboardMock(page);
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/utxos", async (route) => {
+    const match = route.request().url().match(/\/txs\/([^/]+)\/utxos$/);
+    const txHash = match ? match[1] : "";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(blockfrostUtxoResponse(txHash)),
+    });
+  });
+
+  await page.goto("/");
+  await page
+    .getByPlaceholder("mainnet... / preprod... / preview...")
+    .fill("mainnet-test-project");
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  await expect(
+    page.getByText("UTxO context was supplied for every visible transaction input"),
+  ).toBeVisible();
+  await expect(page.getByText("Context UTxOs")).toBeVisible();
+  await expect(
+    page.locator(".identity-section-title", { hasText: "Resolved inputs" }),
+  ).toBeVisible();
+
+  const resolvedRow = page
+    .locator(".witness-plan .witness-row")
+    .filter({ hasText: "resolved" })
+    .first();
+  await resolvedRow.getByRole("button", { name: "Copy" }).click();
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toMatch(/^[0-9a-f]{64}#[0-9]+$/);
 });
 
 test("opens browser rows in place without losing identity context", async ({

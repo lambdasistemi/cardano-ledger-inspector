@@ -3,20 +3,24 @@
 export const runInspectorImpl = (stdinText) => () =>
   globalThis.runInspector(stdinText);
 
-export const runLedgerOperationImpl = (txCbor) => (op) => (pathText) => () => {
-  let path = [];
+export const runLedgerOperationImpl = (txCbor) => (op) => (argsText) => () => {
+  let args = {};
   try {
-    const parsed = JSON.parse(pathText);
-    if (Array.isArray(parsed)) path = parsed.map(String);
+    const parsed = JSON.parse(argsText);
+    if (Array.isArray(parsed)) {
+      args = { path: parsed.map(String) };
+    } else if (parsed && typeof parsed === "object") {
+      args = parsed;
+    }
   } catch (_err) {
-    path = [];
+    args = {};
   }
 
   return globalThis.runInspector(
     JSON.stringify({
       tx_cbor: txCbor,
       op,
-      args: { path },
+      args,
     })
   );
 };

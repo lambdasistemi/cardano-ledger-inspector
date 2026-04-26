@@ -49,6 +49,7 @@ just check-openapi
 just check-swagger
 just check-identify
 just check-witness-plan
+just check-input-context
 just test-playwright
 just test
 ```
@@ -62,6 +63,8 @@ through Nix and fail if it differs from the committed Swagger JSON.
 transaction fixture and verifies the `tx.identify` response shape.
 `just check-witness-plan` verifies the implemented `tx.witness.plan` response
 shape against the same fixture.
+`just check-input-context` verifies that explicit `args.context.utxo` entries
+are parsed and reported as complete witness-plan input context.
 `just test-playwright` runs the Playwright E2E suite against the packaged inspector UI.
 `just test` runs the feature smoke check plus the browser suite.
 

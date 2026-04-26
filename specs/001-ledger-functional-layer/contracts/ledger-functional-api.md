@@ -23,6 +23,69 @@ transaction CBOR plus operation arguments and returns explicit JSON results.
   external context explicitly in `args`.
 - Operations that transform a transaction MUST return the resulting
   transaction as `result.tx_cbor`.
+- Normal inspection and patch operations SHOULD preserve the transaction input
+  set. Operations that may extend or replace inputs MUST declare that through
+  `args.input_policy` and MUST report the input diff in their result.
+
+## Input Context Model
+
+For most edit workflows, transaction inputs are the stable anchor. A `TxIn`
+references an immutable historical output, so the resolved output data can be
+cached by the host workspace and reused while the candidate transaction changes.
+
+The ledger layer still receives that context explicitly on each call:
+
+```json
+{
+  "input_policy": "preserve",
+  "context": {
+    "utxo": {
+      "<tx_id>#<index>": {
+        "tx_id": "<64 hex chars>",
+        "index": 0,
+        "address": "addr1...",
+        "lovelace": "10000000",
+        "assets": {},
+        "datum_hash": null,
+        "inline_datum_cbor": null,
+        "reference_script_hash": null,
+        "source": "blockfrost.txs.utxos.outputs",
+        "unspent_status": "not_checked"
+      }
+    },
+    "resolution": {
+      "provider": "blockfrost",
+      "source": "tx-input-producer-outputs",
+      "requested_input_count": 1,
+      "requested_reference_input_count": 0,
+      "resolved_count": 1,
+      "missing": [],
+      "errors": [],
+      "unspent_status": "not_checked"
+    }
+  }
+}
+```
+
+Resolved output data and live chain status are intentionally separate:
+
+- Resolved output data is immutable and safe to cache by `TxIn`.
+- Live unspent status is mutable and must be checked again before submission or
+  live-chain validation.
+
+`input_policy` has three draft values:
+
+`preserve`
+: The operation must not change the input set. This is the default for
+  inspection, witness planning, and ordinary patch operations.
+
+`may_extend`
+: The operation may add inputs, for example when balancing needs extra slack.
+  It must report exactly which inputs were added.
+
+`replace`
+: The operation may rebuild the input set, for example coin selection. It must
+  report added and removed inputs.
 
 ## Invocation Model
 
@@ -67,6 +130,15 @@ Fields:
 `args`
 : Optional. Operation-specific JSON arguments. Omitted `args` is equivalent to
   `{}`.
+
+Common argument fields:
+
+`input_policy`
+: Optional. Defaults to `preserve`.
+
+`context.utxo`
+: Optional resolved UTxO map keyed by `tx_id#index`. The host workspace owns
+  this state and sends it with operations that need input context.
 
 Browser navigation example:
 
@@ -320,15 +392,26 @@ transaction-derived witness plan:
 }
 ```
 
-Arguments: none in the current implementation.
+Arguments:
 
-The first implementation is intentionally transaction-only. It can compare
-`required_signers` from the transaction body with vkey/bootstrap witnesses
-already present in the witness set, and it can report script witnesses,
-redeemers, witness datums, and reference inputs. It cannot infer input address
-credentials, datum hashes needed by consumed UTxOs, or reference scripts without
-an explicit UTxO context, so it returns a warning when the plan is derived from
-the transaction alone.
+`input_policy`
+: Optional. Defaults to `preserve`.
+
+`context.utxo`
+: Optional. Resolved UTxO map keyed by `tx_id#index`.
+
+When `context.utxo` is absent, the operation remains transaction-only. It can
+compare `required_signers` from the transaction body with vkey/bootstrap
+witnesses already present in the witness set, and it can report script
+witnesses, redeemers, witness datums, and reference inputs. It cannot infer
+input address credentials, datum hashes needed by consumed UTxOs, or reference
+scripts without explicit UTxO context, so it returns a transaction-only warning.
+
+When `context.utxo` is present, the operation reports coverage in
+`witness_plan.context`, plus `resolved_inputs` and
+`resolved_reference_inputs`. This first context-aware slice verifies that every
+visible input has immutable resolved-output context; deeper ledger TxOut
+reconstruction and credential inference are follow-up work.
 
 ## 0.1 Target Operations
 
@@ -479,6 +562,7 @@ Machine-readable draft schemas are tracked next to this contract:
 - `../openapi/cardano-ledger-functional.openapi.json`
 - `../schemas/ledger-operation-request.schema.json`
 - `../schemas/ledger-operation-response.schema.json`
+- `../schemas/utxo-context.schema.json`
 - `../schemas/browser-view.schema.json`
 - `../schemas/tx-identify-result.schema.json`
 - `../schemas/tx-witness-plan-result.schema.json`

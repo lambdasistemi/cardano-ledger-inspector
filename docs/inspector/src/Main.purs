@@ -12,9 +12,10 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
+import FFI.Blockfrost as BF
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, WitnessPlan, inspect, operationBrowser, operationIdentification, operationInspection, operationWitnessPlan, pretty) as Json
+import FFI.Json (Browser, Identification, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationWitnessPlan, pretty) as Json
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
@@ -79,6 +80,7 @@ type State =
   , txHex :: String
   , result :: Maybe InspectorResult
   , txCbor :: Maybe String
+  , operationArgs :: String
   , browser :: Maybe Json.Browser
   , identification :: Maybe Json.Identification
   , witnessPlan :: Maybe Json.WitnessPlan
@@ -135,6 +137,7 @@ inspectorComponent initial =
         , txHex: ""
         , result: Nothing
         , txCbor: Nothing
+        , operationArgs: "{}"
         , browser: Nothing
         , identification: Nothing
         , witnessPlan: Nothing
@@ -775,6 +778,7 @@ inspectorComponent initial =
           { running = true
           , result = Nothing
           , txCbor = Nothing
+          , operationArgs = "{}"
           , browser = Nothing
           , identification = Nothing
           , witnessPlan = Nothing
@@ -813,9 +817,17 @@ inspectorComponent initial =
       case hexE of
         Left err -> H.modify_ _ { running = false, fetchError = Just err, browserPath = "[]" }
         Right h -> do
-          operationResult <- H.liftAff (runLedgerOperation h "tx.inspect" "[]")
-          identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" "[]")
-          witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" "[]")
+          operationResult <- H.liftAff (runLedgerOperation h "tx.inspect" "{}")
+          inputContextArgs <- case st.provider of
+            Blockfrost | operationResult.exitOk && String.trim st.blockfrostKey /= "" -> do
+              ctx <- H.liftAff
+                (attempt (BF.resolveInputContext st.network (String.trim st.blockfrostKey) operationResult.stdout))
+              case ctx of
+                Right args -> pure args
+                Left _     -> pure "{}"
+            _ -> pure "{}"
+          identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
+          witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
@@ -826,6 +838,7 @@ inspectorComponent initial =
               { running = false
               , result = Just inspectionResult
               , txCbor = Just h
+              , operationArgs = inputContextArgs
               , browser = if operationResult.exitOk && browser.valid then Just browser else Nothing
               , identification =
                   if identifyResult.exitOk && identification.valid then Just identification
@@ -859,7 +872,8 @@ inspectorComponent initial =
             H.modify_ _ { browserPath = path, copiedPath = Nothing }
           Just txCbor -> do
             H.modify_ _ { browserPath = path, copiedPath = Nothing }
-            operationResult <- H.liftAff (runLedgerOperation txCbor "tx.browse" path)
+            let args = Json.operationArgsWithPath st.operationArgs path
+            operationResult <- H.liftAff (runLedgerOperation txCbor "tx.browse" args)
             let browser = Json.operationBrowser operationResult.stdout
             H.modify_
               _
