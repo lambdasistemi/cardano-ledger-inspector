@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-validate-result.schema.json",
+  "title": "Cardano Ledger WASI tx.validate Result",
+  "type": "object",
+  "required": [
+    "status",
+    "valid_for_supplied_context",
+    "complete",
+    "checks",
+    "failures",
+    "missing_context",
+    "resolved_inputs",
+    "resolved_reference_inputs",
+    "context",
+    "warnings",
+    "errors"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["valid", "invalid", "incomplete", "rejected"]
+    },
+    "valid_for_supplied_context": {
+      "type": ["boolean", "null"]
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "tx_id": {
+      "$ref": "#/$defs/hash32"
+    },
+    "body_hash": {
+      "$ref": "#/$defs/hash32"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/failure"
+      }
+    },
+    "missing_context": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/missingContext"
+      }
+    },
+    "resolved_inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resolvedInput"
+      }
+    },
+    "resolved_reference_inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resolvedInput"
+      }
+    },
+    "context": {
+      "$ref": "#/$defs/contextSummary"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/contextError"
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "hash32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": ["id", "title", "status", "scope"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "not_evaluated", "warning"]
+        },
+        "scope": {
+          "type": "string"
+        },
+        "required_context": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "failure": {
+      "type": "object",
+      "required": ["code", "severity", "check", "message"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning"]
+        },
+        "check": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "related_inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "missingContext": {
+      "type": "object",
+      "required": ["kind", "message", "required_for"],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "tx_id": {
+          "$ref": "#/$defs/hash32"
+        },
+        "index": {
+          "$ref": "#/$defs/count"
+        },
+        "required_for": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "resolvedInput": {
+      "type": "object",
+      "required": ["key", "tx_id", "index", "kind", "path", "resolved"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}#[0-9]+$"
+        },
+        "tx_id": {
+          "$ref": "#/$defs/hash32"
+        },
+        "index": {
+          "$ref": "#/$defs/count"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["input", "reference_input"]
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "tx_out": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "contextSummary": {
+      "type": "object",
+      "required": [
+        "input_policy",
+        "producer_tx_count",
+        "decoded_producer_tx_count",
+        "input_count",
+        "resolved_input_count",
+        "missing_input_count",
+        "reference_input_count",
+        "resolved_reference_input_count",
+        "missing_reference_input_count"
+      ],
+      "properties": {
+        "input_policy": {
+          "type": "string",
+          "const": "preserve"
+        },
+        "producer_tx_count": {
+          "$ref": "#/$defs/count"
+        },
+        "decoded_producer_tx_count": {
+          "$ref": "#/$defs/count"
+        },
+        "input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "resolved_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "missing_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "reference_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "resolved_reference_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "missing_reference_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "network": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "epoch": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "unspent_status": {
+          "type": "string",
+          "enum": ["not_checked", "checked"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "contextError": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

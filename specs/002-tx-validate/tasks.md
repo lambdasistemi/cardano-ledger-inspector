@@ -18,12 +18,12 @@ implemented and tested independently after the foundational contract work.
 **Purpose**: Promote the planned `tx.validate` contract into the public API
 surface before implementation depends on it.
 
-- [ ] T001 Copy the planned result schema from `specs/002-tx-validate/contracts/schemas/tx-validate-result.schema.json` to `specs/001-ledger-functional-layer/schemas/tx-validate-result.schema.json`
-- [ ] T002 Add `tx.validate` request and response examples to `nix/ledger-functional-openapi.nix`
-- [ ] T003 Register `TxValidateResult` in OpenAPI components in `nix/ledger-functional-openapi.nix`
-- [ ] T004 Update the operation registry and `tx.validate` section in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
-- [ ] T005 Regenerate committed OpenAPI JSON in `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
-- [ ] T006 Add the `tx.validate` schema link to `gh-docs/api.md`
+- [X] T001 Copy the planned result schema from `specs/002-tx-validate/contracts/schemas/tx-validate-result.schema.json` to `specs/001-ledger-functional-layer/schemas/tx-validate-result.schema.json`
+- [X] T002 Add `tx.validate` request and response examples to `nix/ledger-functional-openapi.nix`
+- [X] T003 Register `TxValidateResult` in OpenAPI components in `nix/ledger-functional-openapi.nix`
+- [X] T004 Update the operation registry and `tx.validate` section in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
+- [X] T005 Regenerate committed OpenAPI JSON in `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
+- [X] T006 Add the `tx.validate` schema link to `gh-docs/api.md`
 
 ---
 
@@ -32,13 +32,13 @@ surface before implementation depends on it.
 **Purpose**: Prepare shared code and checks used by all validation stories.
 No user story work should begin until this phase is complete.
 
-- [ ] T007 [P] Add `tx.validate` contract-shape assertions to a new Nix check in `flake.nix`
-- [ ] T008 [P] Add `just check-validate` to `justfile`
+- [X] T007 [P] Add `tx.validate` contract-shape assertions to a new Nix check in `flake.nix`
+- [X] T008 [P] Add `just check-validate` to `justfile`
 - [ ] T009 Extract producer context and input-resolution helpers from `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs` into a shared section or module
-- [ ] T010 Add validation result helper constructors in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T011 Add `normalizeOperation "validate" = "tx.validate"` and dispatch plumbing in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T010 Add validation result helper constructors in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T011 Add `normalizeOperation "validate" = "tx.validate"` and dispatch plumbing in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
 - [ ] T012 Invoke upstream Conway ledger validation/checking functions and map ledger failures in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T013 Run `just check-openapi` and `just check-swagger` to verify `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
+- [X] T013 Run `just check-openapi` and `just check-swagger` to verify `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
 
 **Checkpoint**: Contract artifacts and operation dispatch are ready for user
 story implementation.
@@ -58,19 +58,19 @@ returned.
 
 ### Tests for User Story 1
 
-- [ ] T014 [US1] Establish whether complete ledger context is available for `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`; if not, document blocked context categories in `specs/002-tx-validate/quickstart.md`
+- [X] T014 [US1] Establish whether complete ledger context is available for `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`; if not, document blocked context categories in `specs/002-tx-validate/quickstart.md`
 - [ ] T015 [P] [US1] Add a `tx.validate` complete-context smoke request fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`
 - [ ] T016 [US1] Add jq assertions for valid/invalid validation result shape in `flake.nix`
 - [ ] T017 [US1] Add determinism assertions for repeated `tx.validate` runs in `flake.nix`
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Implement `validateTxJson` result rendering in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T019 [US1] Populate candidate `tx_id`, `body_hash`, `complete`, and `valid_for_supplied_context` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T020 [US1] Add evaluated validation check groups and failure rendering in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T018 [US1] Implement `validateTxJson` result rendering in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T019 [US1] Populate candidate `tx_id`, `body_hash`, `complete`, and `valid_for_supplied_context` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T020 [US1] Add evaluated validation check groups and failure rendering in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
 - [ ] T021 [US1] Attach `path` or related input/location metadata to every validation failure in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T022 [US1] Ensure `tx.validate` never returns `result.tx_cbor` or mutating changes in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T023 [US1] Run `just check-validate` and record any fixture limitations in `specs/002-tx-validate/quickstart.md`
+- [X] T022 [US1] Ensure `tx.validate` never returns `result.tx_cbor` or mutating changes in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T023 [US1] Run `just check-validate` and record any fixture limitations in `specs/002-tx-validate/quickstart.md`
 
 **Checkpoint**: User Story 1 works independently as the MVP validation surface.
 
@@ -89,18 +89,18 @@ next when validation cannot complete.
 
 - [ ] T024 [P] [US2] Add a missing-context smoke request fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-missing-context-request.json`
 - [ ] T025 [P] [US2] Add malformed `tx.validate` request fixtures in `specs/001-ledger-functional-layer/fixtures/tx-validate-malformed-requests.json`
-- [ ] T026 [US2] Add jq assertions for `status == "incomplete"` and actionable `missing_context` entries in `flake.nix`
-- [ ] T027 [US2] Add jq assertions that missing context is reported separately from `failures` in `flake.nix`
+- [X] T026 [US2] Add jq assertions for `status == "incomplete"` and actionable `missing_context` entries in `flake.nix`
+- [X] T027 [US2] Add jq assertions that missing context is reported separately from `failures` in `flake.nix`
 - [ ] T028 [US2] Add assertions that malformed hex, malformed CBOR, and malformed operation envelopes remain command-level errors in `flake.nix`
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Implement missing source-output diagnostics in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T030 [US2] Implement missing network, slot, epoch, and protocol-parameter diagnostics in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T031 [US2] Add path fields for every missing-context item in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T032 [US2] Reject or explicitly label caller-provided non-CBOR UTxO context in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T029 [US2] Implement missing source-output diagnostics in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T030 [US2] Implement missing network, slot, epoch, and protocol-parameter diagnostics in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T031 [US2] Add path fields for every missing-context item in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T032 [US2] Reject or explicitly label caller-provided non-CBOR UTxO context in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
 - [ ] T033 [US2] Ensure partially evaluated checks can return both `failures` and `missing_context` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T034 [US2] Run `just check-validate` and verify the missing-context fixture output in `result-validate-smoke/response.json`
+- [X] T034 [US2] Run `just check-validate` and verify the missing-context fixture output in `result-validate-smoke/response.json`
 
 **Checkpoint**: User Story 2 works independently and incomplete validation is
 actionable.
@@ -119,17 +119,17 @@ unresolved input reporting.
 ### Tests for User Story 3
 
 - [ ] T035 [P] [US3] Add a producer-context validation smoke request fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-producer-context-request.json`
-- [ ] T036 [US3] Add jq assertions for `resolved_inputs` and `resolved_reference_inputs` in `flake.nix`
+- [X] T036 [US3] Add jq assertions for `resolved_inputs` and `resolved_reference_inputs` in `flake.nix`
 - [ ] T037 [P] [US3] Add a producer-id mismatch fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-producer-mismatch-request.json`
 - [ ] T038 [US3] Add jq assertions that mismatched producer evidence produces `status == "rejected"` or invalid-context errors in `flake.nix`
 
 ### Implementation for User Story 3
 
-- [ ] T039 [US3] Reuse producer transaction decoding to fill `resolved_inputs` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T040 [US3] Reuse producer transaction decoding to fill `resolved_reference_inputs` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T041 [US3] Validate producer map keys against decoded producer transaction ids in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T042 [US3] Report missing output indexes as invalid context in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T043 [US3] Run `just check-input-context` and `just check-validate` to verify input-resolution behavior in `result-input-context-smoke/response.json`
+- [X] T039 [US3] Reuse producer transaction decoding to fill `resolved_inputs` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T040 [US3] Reuse producer transaction decoding to fill `resolved_reference_inputs` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T041 [US3] Validate producer map keys against decoded producer transaction ids in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T042 [US3] Report missing output indexes as invalid context in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T043 [US3] Run `just check-input-context` and `just check-validate` to verify input-resolution behavior in `result-input-context-smoke/response.json`
 
 **Checkpoint**: User Story 3 works independently and producer transaction
 evidence is explicit, stable, and navigable.
@@ -143,9 +143,9 @@ surface.
 
 - [ ] T044 [P] Update implemented operation docs in `gh-docs/functional-layer.md`
 - [ ] T045 [P] Update developer commands and CI artifact notes in `README.md`
-- [ ] T046 [P] Add `tx.validate` to the implemented operations table in `gh-docs/api.md`
-- [ ] T047 Add `tx-validate-result.schema.json` to the public schema list in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
-- [ ] T048 Run Fourmolu formatting check with `just format-check` for `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T046 [P] Add `tx.validate` to the implemented operations table in `gh-docs/api.md`
+- [X] T047 Add `tx-validate-result.schema.json` to the public schema list in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
+- [X] T048 Run Fourmolu formatting check with `just format-check` for `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
 - [ ] T049 Run PureScript compile with `just ui-check` for `docs/inspector/src/Main.purs`
 - [ ] T050 Run full repository verification with `just test` for `flake.nix`
 - [ ] T051 [P] If a browser validation panel is added, implement result decoding in `docs/inspector/src/FFI/Json.js`

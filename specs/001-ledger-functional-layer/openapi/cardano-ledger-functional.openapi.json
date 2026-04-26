@@ -49,6 +49,9 @@
       "TxIdentifyResult": {
         "$ref": "tx-identify-result.schema.json"
       },
+      "TxValidateResult": {
+        "$ref": "tx-validate-result.schema.json"
+      },
       "TxWitnessPlanResult": {
         "$ref": "tx-witness-plan-result.schema.json"
       }
@@ -131,6 +134,31 @@
                     "args": {},
                     "ledger_functional_layer": "cardano-ledger-functional/v1",
                     "op": "tx.inspect",
+                    "tx_cbor": "84a4..."
+                  }
+                },
+                "validate": {
+                  "summary": "Validate a transaction or report missing context",
+                  "value": {
+                    "args": {
+                      "context": {
+                        "epoch": "507",
+                        "network": "mainnet",
+                        "producer_txs": {
+                          "0000000000000000000000000000000000000000000000000000000000000000": {
+                            "source": "blockfrost.txs.cbor",
+                            "tx_cbor": "84a4..."
+                          }
+                        },
+                        "protocol_parameters": {
+                          "_shape": "complete Cardano.Ledger.Core.PParams ConwayEra JSON"
+                        },
+                        "slot": "123456789"
+                      },
+                      "input_policy": "preserve"
+                    },
+                    "ledger_functional_layer": "cardano-ledger-functional/v1",
+                    "op": "tx.validate",
                     "tx_cbor": "84a4..."
                   }
                 },
@@ -245,6 +273,86 @@
                         "changes": [],
                         "tx_cbor": "84a4...",
                         "warnings": []
+                      }
+                    }
+                  },
+                  "validate": {
+                    "summary": "Validation response envelope",
+                    "value": {
+                      "ledger_functional_layer": "cardano-ledger-functional/v1",
+                      "op": "tx.validate",
+                      "result": {
+                        "validation": {
+                          "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "checks": [
+                            {
+                              "id": "ledger.apply_tx",
+                              "message": "Validation needs explicit context before Conway applyTx can run.",
+                              "path": [
+                                "args",
+                                "context"
+                              ],
+                              "required_context": [
+                                "source_output",
+                                "protocol_parameters",
+                                "slot",
+                                "epoch",
+                                "network"
+                              ],
+                              "scope": "ledger",
+                              "status": "not_evaluated",
+                              "title": "Conway ledger validation"
+                            }
+                          ],
+                          "complete": false,
+                          "context": {
+                            "decoded_producer_tx_count": 0,
+                            "input_count": 1,
+                            "input_policy": "preserve",
+                            "missing_input_count": 1,
+                            "missing_reference_input_count": 0,
+                            "producer_tx_count": 0,
+                            "reference_input_count": 0,
+                            "resolved_input_count": 0,
+                            "resolved_reference_input_count": 0,
+                            "unspent_status": "not_checked"
+                          },
+                          "errors": [],
+                          "failures": [
+                            {
+                              "index": 0,
+                              "kind": "ledger_failure",
+                              "message": "Transaction witness or UTxO validation failed: <ledger predicate>",
+                              "path": [
+                                "body"
+                              ],
+                              "predicate": "<raw Conway ledger predicate>",
+                              "rule": "UTXOW"
+                            }
+                          ],
+                          "missing_context": [
+                            {
+                              "index": 0,
+                              "kind": "source_output",
+                              "message": "Supply producer transaction CBOR for the referenced transaction input.",
+                              "path": [
+                                "args",
+                                "context",
+                                "producer_txs"
+                              ],
+                              "required_for": [
+                                "ledger.apply_tx"
+                              ],
+                              "tx_id": "0000000000000000000000000000000000000000000000000000000000000000"
+                            }
+                          ],
+                          "resolved_inputs": [],
+                          "resolved_reference_inputs": [],
+                          "status": "incomplete",
+                          "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "valid_for_supplied_context": null,
+                          "warnings": []
+                        }
                       }
                     }
                   },

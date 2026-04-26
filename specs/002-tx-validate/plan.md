@@ -130,3 +130,19 @@ planning artifacts stay under `specs/002-tx-validate`.
 ## Complexity Tracking
 
 No constitution violations or complexity exceptions are required.
+
+## Status
+
+2026-04-26:
+
+- Public `tx.validate` schema, contract docs, generated OpenAPI source, and
+  GitHub docs are wired.
+- WASI dispatch now accepts `tx.validate`/legacy `validate` and returns the
+  planned `result.validation` shape for missing or malformed context.
+- The current implementation reports source-output coverage from
+  `context.producer_txs`, rejects provider-style `context.utxo` JSON, and never
+  returns `tx_cbor`.
+- Full Conway `applyTx` execution is being wired through the Shelley mempool API.
+  The WASM dependency rebuild is accepted for this feature.
+- `just check-validate`, existing operation smokes, OpenAPI/Swagger checks, and
+  Haskell format check must pass for the applyTx-backed slice.

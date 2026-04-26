@@ -72,6 +72,7 @@ Haskell ledger layer derives referenced outputs.
 | `tx.browse` | Decode transaction CBOR and return a browser view at `args.path`. |
 | `tx.identify` | Return transaction id, body hash, era, byte size, fee, structural counts, and witness counts. |
 | `tx.witness.plan` | Return signer, witness, script, redeemer, datum, reference-input, and explicit producer-transaction context coverage data. |
+| `tx.validate` | Decode explicit context, build a Conway ledger environment, run `applyTx` when context is complete, and report ledger failures without mutating CBOR. |
 
 `tx.browse` request paths are arrays of strings. Object fields use their key
 name and array indexes use `#<index>`, for example:
@@ -93,7 +94,6 @@ wallets, inspectors, and transaction builders:
 
 | Operation | Description |
 | --- | --- |
-| `tx.validate` | Full ledger validation with explicit UTxO, protocol, epoch, slot, governance, and network context. |
 | `tx.evaluate.scripts` | Phase-2 script evaluation and execution-unit reporting with explicit context. |
 | `tx.patch` | Ledger-aware structural patches that return new transaction CBOR. |
 | `tx.balance` | Best-effort balancing of fees, change, collateral, and return value when the supplied context gives enough slack. |
@@ -113,6 +113,7 @@ The detailed contract and schemas are tracked in the repository:
 - [Browser view schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/browser-view.schema.json)
 - [tx.identify result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-identify-result.schema.json)
 - [tx.witness.plan result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-witness-plan-result.schema.json)
+- [tx.validate result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-validate-result.schema.json)
 
 The same OpenAPI bundle is a flake output:
 

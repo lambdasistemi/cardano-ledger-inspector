@@ -18,11 +18,8 @@ module Conway.Inspector (
     InspectError (..),
 ) where
 
-import qualified Cardano.Crypto.Hash as Crypto
-import qualified Cardano.Ledger.Address as Addr
 import qualified Cardano.Ledger.Api as L
 import qualified Cardano.Ledger.BaseTypes as BaseTypes
-import qualified Cardano.Ledger.Binary as Binary
 import qualified Cardano.Ledger.Coin as Coin
 import qualified Cardano.Ledger.Conway as Conway
 import qualified Cardano.Ledger.Conway.Scripts as ConwayScripts
@@ -30,35 +27,49 @@ import Cardano.Ledger.Core (TxLevel (..))
 import qualified Cardano.Ledger.Core as Core
 import qualified Cardano.Ledger.Hashes as Hashes
 import qualified Cardano.Ledger.Keys as Keys
-import qualified Cardano.Ledger.Mary.Value as Mary
 import qualified Cardano.Ledger.Plutus.Data as PData
 import qualified Cardano.Ledger.Plutus.ExUnits as ExUnits
 import qualified Cardano.Ledger.TxIn as TxIn
 import Control.Monad ((>=>))
+import Conway.Inspector.Common (
+    InspectError (..),
+    decodeTx,
+    decodeTxWithBytes,
+    keyHashHex,
+    listAt,
+    multiAssetJson,
+    safeHashHex,
+    scriptHashHex,
+    txIdHex,
+    txInJson,
+    txOutJson,
+    withdrawalsCount,
+ )
+import Conway.Inspector.Context (
+    ProducerContext,
+    contextSummaryJson,
+    inputPolicyFromArgs,
+    missingContextTxIns,
+    producerContextFromArgs,
+    producerContextSupplied,
+    resolvedTxInJson,
+ )
+import Conway.Inspector.Validation (validateTxJson)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.ByteString.Short as SBS
 import Data.Foldable (toList)
 import Data.List (foldl', stripPrefix)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Lens.Micro ((^.))
 import Text.Read (readMaybe)
-
-data InspectError
-    = MalformedHex String
-    | MalformedCbor String
-    | MalformedLedgerOperation String
-    | UnknownLedgerOperation T.Text
-    deriving (Show)
 
 data LedgerOperationRequest = LedgerOperationRequest
     { lorTxCbor :: T.Text
@@ -104,6 +115,7 @@ instance Aeson.FromJSON LedgerOperationRequest where
         normalizeOperation "browse" = "tx.browse"
         normalizeOperation "identify" = "tx.identify"
         normalizeOperation "witness.plan" = "tx.witness.plan"
+        normalizeOperation "validate" = "tx.validate"
         normalizeOperation op = op
 
 -- | Hex → bytes → Conway tx → JSON.
@@ -160,6 +172,12 @@ runLedgerOperation request = do
                     (lorOperation request)
                     [ "witness_plan" .= witnessPlanJson (lorArgs request) tx
                     ]
+        "tx.validate" ->
+            pure $
+                ledgerOperationResponse
+                    (lorOperation request)
+                    [ "validation" .= validateTxJson txBytes (lorArgs request) tx
+                    ]
         other -> Left (UnknownLedgerOperation other)
 
 ledgerOperationResponse :: T.Text -> [(AesonKey.Key, Aeson.Value)] -> Aeson.Value
@@ -169,34 +187,6 @@ ledgerOperationResponse operation resultFields =
         , "op" .= operation
         , "result" .= Aeson.object resultFields
         ]
-
-decodeTx ::
-    BS.ByteString ->
-    Either InspectError (L.Tx TopTx Conway.ConwayEra)
-decodeTx =
-    fmap snd . decodeTxWithBytes
-
-decodeTxWithBytes ::
-    BS.ByteString ->
-    Either InspectError (BS.ByteString, L.Tx TopTx Conway.ConwayEra)
-decodeTxWithBytes hexBytes = do
-    txBytes <- hexDecode hexBytes
-    tx <- decodeConway (BSL.fromStrict txBytes)
-    pure (txBytes, tx)
-
-hexDecode :: BS.ByteString -> Either InspectError BS.ByteString
-hexDecode bs =
-    case B16.decode (BS.filter (not . isHexWhitespace) bs) of
-        Left err -> Left (MalformedHex err)
-        Right ok -> Right ok
-  where
-    isHexWhitespace c = c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d
-
-decodeConway :: BSL.ByteString -> Either InspectError (L.Tx TopTx Conway.ConwayEra)
-decodeConway bs =
-    case Binary.decodeFullAnnotator (Binary.natVersion @11) "Tx" Binary.decCBOR bs of
-        Left err -> Left (MalformedCbor (show err))
-        Right tx -> Right tx
 
 browserJson ::
     L.Tx TopTx Conway.ConwayEra ->
@@ -238,13 +228,6 @@ valueAt = foldl step . Just
         ix <- pathIndex key
         listAt ix (toList a)
     step _ _ = Nothing
-
-listAt :: Int -> [a] -> Maybe a
-listAt index xs
-    | index < 0 = Nothing
-    | otherwise = case drop index xs of
-        value : _ -> Just value
-        [] -> Nothing
 
 pathIndex :: T.Text -> Maybe Int
 pathIndex =
@@ -477,209 +460,6 @@ contextWarnings context missingInputs missingReferenceInputs
     | null missingInputs && null missingReferenceInputs = completeProducerContextWarning
     | otherwise = partialProducerContextWarning
 
-data ProducerContext = ProducerContext
-    { pcProducerTxs :: Map.Map T.Text ProducerTx
-    , ucResolution :: Maybe Aeson.Value
-    }
-
-data ProducerTx = ProducerTx
-    { ptSource :: T.Text
-    , ptDecoded :: Either T.Text (L.Tx TopTx Conway.ConwayEra)
-    }
-
-producerContextFromArgs :: Aeson.Value -> ProducerContext
-producerContextFromArgs args =
-    ProducerContext
-        { pcProducerTxs =
-            case argsObject args
-                >>= lookupObjectValue "context"
-                >>= lookupValue "producer_txs" of
-                Just (Aeson.Object producerTxs) ->
-                    Map.fromList
-                        [ ( AesonKey.toText key
-                          , producerTxFromValue value
-                          )
-                        | (key, value) <- KeyMap.toList producerTxs
-                        ]
-                _ -> Map.empty
-        , ucResolution =
-            argsObject args
-                >>= lookupObjectValue "context"
-                >>= lookupValue "resolution"
-        }
-
-producerTxFromValue :: Aeson.Value -> ProducerTx
-producerTxFromValue value =
-    let source =
-            case lookupValue "source" value of
-                Just (Aeson.String s) -> s
-                _ -> "context.producer_txs"
-     in ProducerTx
-            { ptSource = source
-            , ptDecoded =
-                case producerTxCbor value of
-                    Nothing -> Left "producer transaction is missing tx_cbor"
-                    Just txCbor ->
-                        case decodeTx (T.encodeUtf8 txCbor) of
-                            Left err -> Left (inspectErrorText err)
-                            Right tx -> Right tx
-            }
-
-producerTxCbor :: Aeson.Value -> Maybe T.Text
-producerTxCbor (Aeson.String txCbor) =
-    Just txCbor
-producerTxCbor (Aeson.Object obj) =
-    case KeyMap.lookup "tx_cbor" obj of
-        Just (Aeson.String txCbor) -> Just txCbor
-        _ -> Nothing
-producerTxCbor _ =
-    Nothing
-
-inspectErrorText :: InspectError -> T.Text
-inspectErrorText =
-    T.pack . show
-
-producerContextSupplied :: ProducerContext -> Bool
-producerContextSupplied =
-    not . Map.null . pcProducerTxs
-
-inputPolicyFromArgs :: Aeson.Value -> T.Text
-inputPolicyFromArgs args =
-    case argsObject args >>= lookupObjectValue "input_policy" of
-        Just (Aeson.String policy) -> policy
-        _ -> "preserve"
-
-missingContextTxIns :: ProducerContext -> [TxIn.TxIn] -> [TxIn.TxIn]
-missingContextTxIns context =
-    filter (not . isJust . producerTxOutput context)
-
-contextSummaryJson ::
-    T.Text ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    Aeson.Value
-contextSummaryJson
-    inputPolicy
-    context
-    inputs
-    referenceInputs
-    missingInputs
-    missingReferenceInputs =
-        let supplied = producerContextSupplied context
-            resolvedInputs =
-                length inputs - length missingInputs
-            resolvedReferenceInputs =
-                length referenceInputs - length missingReferenceInputs
-         in Aeson.object
-                [ "input_policy" .= inputPolicy
-                , "producer_tx_count" .= Map.size (pcProducerTxs context)
-                , "decoded_producer_tx_count" .= decodedProducerTxCount context
-                , "producer_tx_errors" .= producerTxErrors context
-                , "supplied" .= supplied
-                , "complete"
-                    .= (supplied && null missingInputs && null missingReferenceInputs)
-                , "input_count" .= length inputs
-                , "resolved_input_count" .= resolvedInputs
-                , "missing_input_count" .= length missingInputs
-                , "reference_input_count" .= length referenceInputs
-                , "resolved_reference_input_count" .= resolvedReferenceInputs
-                , "missing_reference_input_count" .= length missingReferenceInputs
-                , "resolution" .= fromMaybe Aeson.Null (ucResolution context)
-                ]
-
-decodedProducerTxCount :: ProducerContext -> Int
-decodedProducerTxCount context =
-    length
-        [ ()
-        | ProducerTx{ptDecoded = Right _} <- Map.elems (pcProducerTxs context)
-        ]
-
-producerTxErrors :: ProducerContext -> [Aeson.Value]
-producerTxErrors context =
-    [ Aeson.object
-        [ "tx_id" .= txId
-        , "error" .= err
-        ]
-    | (txId, ProducerTx{ptDecoded = Left err}) <-
-        Map.toList (pcProducerTxs context)
-    ]
-
-resolvedTxInJson :: ProducerContext -> TxIn.TxIn -> Aeson.Value
-resolvedTxInJson context txIn =
-    let key = txInKey txIn
-        baseFields =
-            [ "key" .= key
-            , "tx_id" .= txInTxIdHex txIn
-            , "index" .= txInIndex txIn
-            ]
-     in case producerTxLookup context txIn of
-            Nothing ->
-                Aeson.object $
-                    baseFields
-                        <> [ "resolved" .= False
-                           , "reason" .= ("producer transaction CBOR not supplied" :: T.Text)
-                           ]
-            Just (ProducerTx{ptDecoded = Left err}) ->
-                Aeson.object $
-                    baseFields
-                        <> [ "resolved" .= False
-                           , "source" .= ("context.producer_txs" :: T.Text)
-                           , "reason" .= err
-                           ]
-            Just producerTx@ProducerTx{ptDecoded = Right producer} ->
-                case producerOutputAt txIn producer of
-                    Nothing ->
-                        Aeson.object $
-                            baseFields
-                                <> [ "resolved" .= False
-                                   , "source" .= ptSource producerTx
-                                   , "reason" .= ("producer transaction output index not found" :: T.Text)
-                                   ]
-                    Just txOut ->
-                        Aeson.object $
-                            baseFields
-                                <> [ "resolved" .= True
-                                   , "source" .= ptSource producerTx
-                                   , "tx_out" .= txOutJson txOut
-                                   ]
-
-producerTxLookup :: ProducerContext -> TxIn.TxIn -> Maybe ProducerTx
-producerTxLookup context txIn =
-    Map.lookup (txInTxIdHex txIn) (pcProducerTxs context)
-
-producerTxOutput ::
-    ProducerContext ->
-    TxIn.TxIn ->
-    Maybe (L.TxOut Conway.ConwayEra)
-producerTxOutput context txIn = do
-    ProducerTx{ptDecoded = Right producer} <- producerTxLookup context txIn
-    producerOutputAt txIn producer
-
-producerOutputAt ::
-    TxIn.TxIn ->
-    L.Tx TopTx Conway.ConwayEra ->
-    Maybe (L.TxOut Conway.ConwayEra)
-producerOutputAt txIn producer =
-    listAt (txInIndex txIn) $
-        toList ((producer ^. L.bodyTxL) ^. L.outputsTxBodyL)
-
-argsObject :: Aeson.Value -> Maybe Aeson.Object
-argsObject (Aeson.Object obj) = Just obj
-argsObject _ = Nothing
-
-lookupValue :: AesonKey.Key -> Aeson.Value -> Maybe Aeson.Value
-lookupValue key (Aeson.Object obj) =
-    KeyMap.lookup key obj
-lookupValue _ _ =
-    Nothing
-
-lookupObjectValue :: AesonKey.Key -> Aeson.Object -> Maybe Aeson.Value
-lookupObjectValue =
-    KeyMap.lookup
-
 requiredSignerJson :: T.Text -> Aeson.Value
 requiredSignerJson signerHash =
     Aeson.object
@@ -812,98 +592,3 @@ validityJson (L.ValidityInterval before hereafter) =
     renderSlot :: BaseTypes.StrictMaybe BaseTypes.SlotNo -> Aeson.Value
     renderSlot BaseTypes.SNothing = Aeson.Null
     renderSlot (BaseTypes.SJust s) = Aeson.toJSON (T.pack (show (BaseTypes.unSlotNo s)))
-
-{- | Withdrawals are wrapped in a newtype; reach into the Map and count.
-  Ledger versions differ on the exact constructor / accessor; use Show
-  to bootstrap — replaceable with a proper accessor later.
--}
-withdrawalsCount :: L.Withdrawals -> Int
-withdrawalsCount (L.Withdrawals m) = Map.size m
-
--- | Render a Conway TxOut with address, value (coin + assets), and datum.
-txOutJson :: L.TxOut Conway.ConwayEra -> Aeson.Value
-txOutJson txOut =
-    let value = txOut ^. L.valueTxOutL
-        Mary.MaryValue c m = value
-     in Aeson.object
-            [ "address_hex" .= T.decodeUtf8 (B16.encode (Addr.serialiseAddr (txOut ^. L.addrTxOutL)))
-            , "coin_lovelace" .= T.pack (show (Coin.unCoin c))
-            , "assets" .= multiAssetJson m
-            , "datum" .= datumJson (txOut ^. L.datumTxOutL)
-            ]
-
-multiAssetJson :: Mary.MultiAsset -> Aeson.Value
-multiAssetJson (Mary.MultiAsset m) =
-    Aeson.Object $
-        KeyMap.fromList
-            [ ( AesonKey.fromText (policyHex pid)
-              , Aeson.Object $
-                    KeyMap.fromList
-                        [ ( AesonKey.fromText (assetNameHex an)
-                          , Aeson.String (T.pack (show q))
-                          )
-                        | (an, q) <- Map.toList assetMap
-                        ]
-              )
-            | (pid, assetMap) <- Map.toList m
-            ]
-  where
-    policyHex :: Mary.PolicyID -> T.Text
-    policyHex (Mary.PolicyID (Hashes.ScriptHash h)) =
-        T.decodeUtf8 (B16.encode (Crypto.hashToBytes h))
-    assetNameHex :: Mary.AssetName -> T.Text
-    assetNameHex (Mary.AssetName sbs) = T.decodeUtf8 (B16.encode (SBS.fromShort sbs))
-
--- | Render TxOut datum state. The ledger's `Datum era` is three-cased.
-datumJson :: PData.Datum Conway.ConwayEra -> Aeson.Value
-datumJson PData.NoDatum =
-    Aeson.object ["kind" .= ("no_datum" :: T.Text)]
-datumJson (PData.DatumHash h) =
-    Aeson.object
-        [ "kind" .= ("datum_hash" :: T.Text)
-        , "hash" .= T.decodeUtf8 (B16.encode (Crypto.hashToBytes (Hashes.extractHash h)))
-        ]
-datumJson (PData.Datum _) =
-    Aeson.object
-        [ "kind" .= ("inline_datum" :: T.Text)
-        , "note" .= ("Plutus Data AST rendering deferred" :: T.Text)
-        ]
-
-txInJson :: TxIn.TxIn -> Aeson.Value
-txInJson (TxIn.TxIn (TxIn.TxId safeHash) (BaseTypes.TxIx ix)) =
-    Aeson.object
-        [ "tx_id" .= hashHex (Hashes.extractHash safeHash)
-        , "index" .= fromEnum ix
-        ]
-
-txInKey :: TxIn.TxIn -> T.Text
-txInKey txIn =
-    txInTxIdHex txIn <> "#" <> T.pack (show (txInIndex txIn))
-
-txInTxIdHex :: TxIn.TxIn -> T.Text
-txInTxIdHex (TxIn.TxIn (TxIn.TxId safeHash) _) =
-    hashHex (Hashes.extractHash safeHash)
-
-txInIndex :: TxIn.TxIn -> Int
-txInIndex (TxIn.TxIn _ (BaseTypes.TxIx ix)) =
-    fromEnum ix
-
-txIdHex :: TxIn.TxId -> T.Text
-txIdHex (TxIn.TxId safeHash) =
-    hashHex (Hashes.extractHash safeHash)
-
-keyHashHex :: Hashes.KeyHash r -> T.Text
-keyHashHex (Hashes.KeyHash h) =
-    hashHex h
-
-scriptHashHex :: Hashes.ScriptHash -> T.Text
-scriptHashHex (Hashes.ScriptHash h) =
-    hashHex h
-
-safeHashHex :: Hashes.SafeHash i -> T.Text
-safeHashHex safeHash =
-    hashHex (Hashes.extractHash safeHash)
-
-hashHex :: Crypto.Hash h a -> T.Text
-hashHex =
-    T.decodeUtf8 . B16.encode . Crypto.hashToBytes
