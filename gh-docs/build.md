@@ -36,12 +36,13 @@ nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.tx-insp
 
 ## Download CI Artifacts
 
-Every `CI` workflow run uploads two downloadable artifacts:
+Every `CI` workflow run uploads downloadable artifacts:
 
 | Artifact | Contents |
 | --- | --- |
 | `wasm-tx-inspector` | `wasm-tx-inspector.wasm`, `SHA256SUMS` |
 | `tx-inspector-ui` | `index.html`, `index.js`, `SHA256SUMS` |
+| `ledger-functional-openapi` | OpenAPI JSON, referenced schemas, `SHA256SUMS` |
 
 Download them from the artifact section of a CI run:
 

@@ -50,6 +50,7 @@ just check-swagger
 just check-identify
 just check-witness-plan
 just check-input-context
+just check-validate
 just test-playwright
 just test
 ```
@@ -66,6 +67,8 @@ shape against the same fixture.
 `just check-input-context` verifies that explicit `args.context.producer_txs`
 entries are decoded by Haskell and reported as complete witness-plan input
 context.
+`just check-validate` verifies the implemented `tx.validate` response shape,
+including incomplete-context diagnostics and producer transaction coverage.
 `just test-playwright` runs the Playwright E2E suite against the packaged inspector UI.
 `just test` runs the feature smoke check plus the browser suite.
 
