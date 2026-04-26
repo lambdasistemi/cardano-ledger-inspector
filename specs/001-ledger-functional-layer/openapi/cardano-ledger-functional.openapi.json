@@ -43,14 +43,14 @@
       "LedgerOperationResponse": {
         "$ref": "ledger-operation-response.schema.json"
       },
+      "ProducerTxContext": {
+        "$ref": "producer-tx-context.schema.json"
+      },
       "TxIdentifyResult": {
         "$ref": "tx-identify-result.schema.json"
       },
       "TxWitnessPlanResult": {
         "$ref": "tx-witness-plan-result.schema.json"
-      },
-      "UtxoContext": {
-        "$ref": "utxo-context.schema.json"
       }
     }
   },
@@ -139,29 +139,22 @@
                   "value": {
                     "args": {
                       "context": {
+                        "producer_txs": {
+                          "0000000000000000000000000000000000000000000000000000000000000000": {
+                            "source": "blockfrost.txs.cbor",
+                            "tx_cbor": "84a4..."
+                          }
+                        },
                         "resolution": {
                           "errors": [],
                           "missing": [],
                           "provider": "blockfrost",
                           "requested_input_count": 1,
                           "requested_reference_input_count": 0,
+                          "requested_tx_count": 1,
                           "resolved_count": 1,
-                          "source": "tx-input-producer-outputs",
+                          "source": "tx-cbor",
                           "unspent_status": "not_checked"
-                        },
-                        "utxo": {
-                          "0000000000000000000000000000000000000000000000000000000000000000#0": {
-                            "address": "addr1...",
-                            "assets": {},
-                            "datum_hash": null,
-                            "index": 0,
-                            "inline_datum_cbor": null,
-                            "lovelace": "10000000",
-                            "reference_script_hash": null,
-                            "source": "blockfrost.txs.utxos.outputs",
-                            "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
-                            "unspent_status": "not_checked"
-                          }
                         }
                       },
                       "input_policy": "preserve"
@@ -264,10 +257,13 @@
                         "witness_plan": {
                           "context": {
                             "complete": true,
+                            "decoded_producer_tx_count": 1,
                             "input_count": 1,
                             "input_policy": "preserve",
                             "missing_input_count": 0,
                             "missing_reference_input_count": 0,
+                            "producer_tx_count": 1,
+                            "producer_tx_errors": [],
                             "reference_input_count": 0,
                             "resolution": {
                               "errors": [],
@@ -275,14 +271,14 @@
                               "provider": "blockfrost",
                               "requested_input_count": 1,
                               "requested_reference_input_count": 0,
+                              "requested_tx_count": 1,
                               "resolved_count": 1,
-                              "source": "tx-input-producer-outputs",
+                              "source": "tx-cbor",
                               "unspent_status": "not_checked"
                             },
                             "resolved_input_count": 1,
                             "resolved_reference_input_count": 0,
-                            "supplied": true,
-                            "utxo_count": 1
+                            "supplied": true
                           },
                           "datums": [],
                           "missing_vkey_witnesses": [],
@@ -307,15 +303,19 @@
                           "required_signers": [],
                           "resolved_inputs": [
                             {
-                              "address": "addr1...",
-                              "datum_hash": null,
                               "index": 0,
                               "key": "0000000000000000000000000000000000000000000000000000000000000000#0",
-                              "lovelace": "10000000",
-                              "reference_script_hash": null,
                               "resolved": true,
-                              "source": "blockfrost.txs.utxos.outputs",
-                              "tx_id": "0000000000000000000000000000000000000000000000000000000000000000"
+                              "source": "blockfrost.txs.cbor",
+                              "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                              "tx_out": {
+                                "address_hex": "01...",
+                                "assets": {},
+                                "coin_lovelace": "10000000",
+                                "datum": {
+                                  "kind": "no_datum"
+                                }
+                              }
                             }
                           ],
                           "resolved_reference_inputs": [],
@@ -331,7 +331,7 @@
                             "script_count": 0
                           },
                           "warnings": [
-                            "UTxO context was supplied for every visible transaction input; live unspent status is not checked by this operation."
+                            "Producer transaction CBOR resolved every visible transaction input; live unspent status is not checked by this operation."
                           ]
                         }
                       }

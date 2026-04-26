@@ -46,7 +46,7 @@ import qualified Data.ByteString.Short as SBS
 import Data.Foldable (toList)
 import Data.List (foldl', stripPrefix)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -380,7 +380,7 @@ witnessPlanJson ::
 witnessPlanJson args tx =
     let body = tx ^. L.bodyTxL
         wits = tx ^. Core.witsTxL
-        context = utxoContextFromArgs args
+        context = producerContextFromArgs args
         inputPolicy = inputPolicyFromArgs args
         inputs = toList (body ^. L.inputsTxBodyL)
         referenceInputs =
@@ -457,42 +457,49 @@ witnessPlanJson args tx =
 
 transactionOnlyWitnessPlanWarning :: T.Text
 transactionOnlyWitnessPlanWarning =
-    "Transaction-only witness plan: UTxO context was not supplied, so input address credentials, reference scripts, and datum requirements cannot be inferred."
+    "Transaction-only witness plan: producer transaction CBOR was not supplied, so input address credentials, reference scripts, and datum requirements cannot be inferred."
 
-partialUtxoContextWarning :: T.Text
-partialUtxoContextWarning =
-    "UTxO context was supplied but does not cover every transaction input."
+partialProducerContextWarning :: T.Text
+partialProducerContextWarning =
+    "Producer transaction context was supplied but does not resolve every transaction input."
 
-completeUtxoContextWarning :: T.Text
-completeUtxoContextWarning =
-    "UTxO context was supplied for every visible transaction input; live unspent status is not checked by this operation."
+completeProducerContextWarning :: T.Text
+completeProducerContextWarning =
+    "Producer transaction CBOR resolved every visible transaction input; live unspent status is not checked by this operation."
 
 contextWarnings ::
-    UtxoContext ->
+    ProducerContext ->
     [TxIn.TxIn] ->
     [TxIn.TxIn] ->
     T.Text
 contextWarnings context missingInputs missingReferenceInputs
-    | not (utxoContextSupplied context) = transactionOnlyWitnessPlanWarning
-    | null missingInputs && null missingReferenceInputs = completeUtxoContextWarning
-    | otherwise = partialUtxoContextWarning
+    | not (producerContextSupplied context) = transactionOnlyWitnessPlanWarning
+    | null missingInputs && null missingReferenceInputs = completeProducerContextWarning
+    | otherwise = partialProducerContextWarning
 
-data UtxoContext = UtxoContext
-    { ucUtxos :: Map.Map T.Text Aeson.Value
+data ProducerContext = ProducerContext
+    { pcProducerTxs :: Map.Map T.Text ProducerTx
     , ucResolution :: Maybe Aeson.Value
     }
 
-utxoContextFromArgs :: Aeson.Value -> UtxoContext
-utxoContextFromArgs args =
-    UtxoContext
-        { ucUtxos =
+data ProducerTx = ProducerTx
+    { ptSource :: T.Text
+    , ptDecoded :: Either T.Text (L.Tx TopTx Conway.ConwayEra)
+    }
+
+producerContextFromArgs :: Aeson.Value -> ProducerContext
+producerContextFromArgs args =
+    ProducerContext
+        { pcProducerTxs =
             case argsObject args
                 >>= lookupObjectValue "context"
-                >>= lookupValue "utxo" of
-                Just (Aeson.Object utxos) ->
+                >>= lookupValue "producer_txs" of
+                Just (Aeson.Object producerTxs) ->
                     Map.fromList
-                        [ (AesonKey.toText key, value)
-                        | (key, value) <- KeyMap.toList utxos
+                        [ ( AesonKey.toText key
+                          , producerTxFromValue value
+                          )
+                        | (key, value) <- KeyMap.toList producerTxs
                         ]
                 _ -> Map.empty
         , ucResolution =
@@ -501,9 +508,40 @@ utxoContextFromArgs args =
                 >>= lookupValue "resolution"
         }
 
-utxoContextSupplied :: UtxoContext -> Bool
-utxoContextSupplied =
-    not . Map.null . ucUtxos
+producerTxFromValue :: Aeson.Value -> ProducerTx
+producerTxFromValue value =
+    let source =
+            case lookupValue "source" value of
+                Just (Aeson.String s) -> s
+                _ -> "context.producer_txs"
+     in ProducerTx
+            { ptSource = source
+            , ptDecoded =
+                case producerTxCbor value of
+                    Nothing -> Left "producer transaction is missing tx_cbor"
+                    Just txCbor ->
+                        case decodeTx (T.encodeUtf8 txCbor) of
+                            Left err -> Left (inspectErrorText err)
+                            Right tx -> Right tx
+            }
+
+producerTxCbor :: Aeson.Value -> Maybe T.Text
+producerTxCbor (Aeson.String txCbor) =
+    Just txCbor
+producerTxCbor (Aeson.Object obj) =
+    case KeyMap.lookup "tx_cbor" obj of
+        Just (Aeson.String txCbor) -> Just txCbor
+        _ -> Nothing
+producerTxCbor _ =
+    Nothing
+
+inspectErrorText :: InspectError -> T.Text
+inspectErrorText =
+    T.pack . show
+
+producerContextSupplied :: ProducerContext -> Bool
+producerContextSupplied =
+    not . Map.null . pcProducerTxs
 
 inputPolicyFromArgs :: Aeson.Value -> T.Text
 inputPolicyFromArgs args =
@@ -511,13 +549,13 @@ inputPolicyFromArgs args =
         Just (Aeson.String policy) -> policy
         _ -> "preserve"
 
-missingContextTxIns :: UtxoContext -> [TxIn.TxIn] -> [TxIn.TxIn]
+missingContextTxIns :: ProducerContext -> [TxIn.TxIn] -> [TxIn.TxIn]
 missingContextTxIns context =
-    filter (\txIn -> Map.notMember (txInKey txIn) (ucUtxos context))
+    filter (not . isJust . producerTxOutput context)
 
 contextSummaryJson ::
     T.Text ->
-    UtxoContext ->
+    ProducerContext ->
     [TxIn.TxIn] ->
     [TxIn.TxIn] ->
     [TxIn.TxIn] ->
@@ -530,14 +568,16 @@ contextSummaryJson
     referenceInputs
     missingInputs
     missingReferenceInputs =
-        let supplied = utxoContextSupplied context
+        let supplied = producerContextSupplied context
             resolvedInputs =
                 length inputs - length missingInputs
             resolvedReferenceInputs =
                 length referenceInputs - length missingReferenceInputs
          in Aeson.object
                 [ "input_policy" .= inputPolicy
-                , "utxo_count" .= Map.size (ucUtxos context)
+                , "producer_tx_count" .= Map.size (pcProducerTxs context)
+                , "decoded_producer_tx_count" .= decodedProducerTxCount context
+                , "producer_tx_errors" .= producerTxErrors context
                 , "supplied" .= supplied
                 , "complete"
                     .= (supplied && null missingInputs && null missingReferenceInputs)
@@ -550,7 +590,24 @@ contextSummaryJson
                 , "resolution" .= fromMaybe Aeson.Null (ucResolution context)
                 ]
 
-resolvedTxInJson :: UtxoContext -> TxIn.TxIn -> Aeson.Value
+decodedProducerTxCount :: ProducerContext -> Int
+decodedProducerTxCount context =
+    length
+        [ ()
+        | ProducerTx{ptDecoded = Right _} <- Map.elems (pcProducerTxs context)
+        ]
+
+producerTxErrors :: ProducerContext -> [Aeson.Value]
+producerTxErrors context =
+    [ Aeson.object
+        [ "tx_id" .= txId
+        , "error" .= err
+        ]
+    | (txId, ProducerTx{ptDecoded = Left err}) <-
+        Map.toList (pcProducerTxs context)
+    ]
+
+resolvedTxInJson :: ProducerContext -> TxIn.TxIn -> Aeson.Value
 resolvedTxInJson context txIn =
     let key = txInKey txIn
         baseFields =
@@ -558,31 +615,56 @@ resolvedTxInJson context txIn =
             , "tx_id" .= txInTxIdHex txIn
             , "index" .= txInIndex txIn
             ]
-     in case Map.lookup key (ucUtxos context) of
+     in case producerTxLookup context txIn of
             Nothing ->
                 Aeson.object $
                     baseFields
                         <> [ "resolved" .= False
+                           , "reason" .= ("producer transaction CBOR not supplied" :: T.Text)
                            ]
-            Just value ->
+            Just (ProducerTx{ptDecoded = Left err}) ->
                 Aeson.object $
                     baseFields
-                        <> [ "resolved" .= True
-                           , "source" .= contextTextField "source" value
-                           , "address" .= contextTextField "address" value
-                           , "lovelace" .= contextTextField "lovelace" value
-                           , "datum_hash" .= contextTextField "datum_hash" value
-                           , "reference_script_hash"
-                                .= contextTextField "reference_script_hash" value
+                        <> [ "resolved" .= False
+                           , "source" .= ("context.producer_txs" :: T.Text)
+                           , "reason" .= err
                            ]
+            Just producerTx@ProducerTx{ptDecoded = Right producer} ->
+                case producerOutputAt txIn producer of
+                    Nothing ->
+                        Aeson.object $
+                            baseFields
+                                <> [ "resolved" .= False
+                                   , "source" .= ptSource producerTx
+                                   , "reason" .= ("producer transaction output index not found" :: T.Text)
+                                   ]
+                    Just txOut ->
+                        Aeson.object $
+                            baseFields
+                                <> [ "resolved" .= True
+                                   , "source" .= ptSource producerTx
+                                   , "tx_out" .= txOutJson txOut
+                                   ]
 
-contextTextField :: AesonKey.Key -> Aeson.Value -> Aeson.Value
-contextTextField field value =
-    case lookupValue field value of
-        Just (Aeson.String t) -> Aeson.String t
-        Just Aeson.Null -> Aeson.Null
-        Just other -> Aeson.String (copyText other)
-        Nothing -> Aeson.Null
+producerTxLookup :: ProducerContext -> TxIn.TxIn -> Maybe ProducerTx
+producerTxLookup context txIn =
+    Map.lookup (txInTxIdHex txIn) (pcProducerTxs context)
+
+producerTxOutput ::
+    ProducerContext ->
+    TxIn.TxIn ->
+    Maybe (L.TxOut Conway.ConwayEra)
+producerTxOutput context txIn = do
+    ProducerTx{ptDecoded = Right producer} <- producerTxLookup context txIn
+    producerOutputAt txIn producer
+
+producerOutputAt ::
+    TxIn.TxIn ->
+    L.Tx TopTx Conway.ConwayEra ->
+    Maybe (L.TxOut Conway.ConwayEra)
+producerOutputAt txIn producer =
+    listAt (txInIndex txIn) $
+        toList ((producer ^. L.bodyTxL) ^. L.outputsTxBodyL)
 
 argsObject :: Aeson.Value -> Maybe Aeson.Object
 argsObject (Aeson.Object obj) = Just obj

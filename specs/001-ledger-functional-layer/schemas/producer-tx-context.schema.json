@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/producer-tx-context.schema.json",
+  "title": "Cardano Ledger WASI Producer Transaction Context",
+  "type": "object",
+  "properties": {
+    "producer_txs": {
+      "type": "object",
+      "description": "Producer transaction CBOR keyed by transaction id. The ledger layer derives referenced TxOuts by indexing decoded producer transaction outputs.",
+      "propertyNames": {
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/producerTx"
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "description": "Host/provider metadata describing how producer transaction CBOR was fetched.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "requested_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "requested_reference_input_count": {
+          "$ref": "#/$defs/count"
+        },
+        "requested_tx_count": {
+          "$ref": "#/$defs/count"
+        },
+        "resolved_count": {
+          "$ref": "#/$defs/count"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hash32"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unspent_status": {
+          "type": "string",
+          "enum": ["not_checked", "checked"]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "producerTx": {
+      "type": "object",
+      "required": ["tx_cbor"],
+      "properties": {
+        "tx_cbor": {
+          "type": "string",
+          "minLength": 2,
+          "pattern": "^[0-9A-Fa-f\\s]+$"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "hash32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

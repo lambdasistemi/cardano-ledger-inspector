@@ -153,7 +153,9 @@
       "type": "object",
       "required": [
         "input_policy",
-        "utxo_count",
+        "producer_tx_count",
+        "decoded_producer_tx_count",
+        "producer_tx_errors",
         "supplied",
         "complete",
         "input_count",
@@ -169,8 +171,27 @@
           "type": "string",
           "enum": ["preserve", "may_extend", "replace"]
         },
-        "utxo_count": {
+        "producer_tx_count": {
           "$ref": "#/$defs/count"
+        },
+        "decoded_producer_tx_count": {
+          "$ref": "#/$defs/count"
+        },
+        "producer_tx_errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tx_id", "error"],
+            "properties": {
+              "tx_id": {
+                "$ref": "#/$defs/hash32"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
         },
         "supplied": {
           "type": "boolean"
@@ -298,7 +319,7 @@
             }
           ]
         },
-        "address": {
+        "reason": {
           "anyOf": [
             {
               "type": "string"
@@ -308,36 +329,9 @@
             }
           ]
         },
-        "lovelace": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^[0-9]*$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "datum_hash": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/hash32"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "reference_script_hash": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/scriptHash"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "tx_out": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       "additionalProperties": true
