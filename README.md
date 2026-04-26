@@ -69,6 +69,8 @@ entries are decoded by Haskell and reported as complete witness-plan input
 context.
 `just check-validate` verifies the implemented `tx.validate` response shape,
 including incomplete-context diagnostics and producer transaction coverage.
+The positive validation fixture is
+`specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`.
 `just test-playwright` runs the Playwright E2E suite against the packaged inspector UI.
 `just test` runs the feature smoke check plus the browser suite.
 

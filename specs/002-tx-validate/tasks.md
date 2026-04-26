@@ -59,9 +59,9 @@ returned.
 ### Tests for User Story 1
 
 - [X] T014 [US1] Establish whether complete ledger context is available for `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`; if not, document blocked context categories in `specs/002-tx-validate/quickstart.md`
-- [ ] T015 [P] [US1] Add a `tx.validate` complete-context smoke request fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`
-- [ ] T016 [US1] Add jq assertions for valid/invalid validation result shape in `flake.nix`
-- [ ] T017 [US1] Add determinism assertions for repeated `tx.validate` runs in `flake.nix`
+- [X] T015 [P] [US1] Add a `tx.validate` complete-context smoke request fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`
+- [X] T016 [US1] Add jq assertions for valid/invalid validation result shape in `flake.nix`
+- [X] T017 [US1] Add determinism assertions for repeated `tx.validate` runs in `flake.nix`
 
 ### Implementation for User Story 1
 
@@ -118,7 +118,7 @@ unresolved input reporting.
 
 ### Tests for User Story 3
 
-- [ ] T035 [P] [US3] Add a producer-context validation smoke request fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-producer-context-request.json`
+- [X] T035 [P] [US3] Add a producer-context validation smoke request fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`
 - [X] T036 [US3] Add jq assertions for `resolved_inputs` and `resolved_reference_inputs` in `flake.nix`
 - [ ] T037 [P] [US3] Add a producer-id mismatch fixture in `specs/001-ledger-functional-layer/fixtures/tx-validate-producer-mismatch-request.json`
 - [ ] T038 [US3] Add jq assertions that mismatched producer evidence produces `status == "rejected"` or invalid-context errors in `flake.nix`

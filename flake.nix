@@ -346,8 +346,57 @@
               and ($v.failures | length == 0)
               and (.result | has("tx_cbor") | not)
             ' malformed-context-response.json
+
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} > complete-context-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.validation as $v
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.validate"
+              and $v.status == "valid"
+              and $v.valid_for_supplied_context == true
+              and $v.complete == true
+              and ($v.errors | length == 0)
+              and ($v.failures | length == 0)
+              and ($v.missing_context | length == 0)
+              and $v.context.complete == true
+              and $v.context.resolved_input_count == $v.context.input_count
+              and $v.context.resolved_reference_input_count == $v.context.reference_input_count
+              and ([$v.checks[]? | select(.id == "ledger.apply_tx" and .status == "passed")] | length == 1)
+              and (.result | has("tx_cbor") | not)
+            ' complete-context-response.json
+
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} > complete-context-response-2.json
+            ${pkgs.jq}/bin/jq -s -e '
+              .[0].result.validation == .[1].result.validation
+            ' complete-context-response.json complete-context-response-2.json
+
+            ${pkgs.jq}/bin/jq '.args.context.network = "testnet"' \
+              ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > invalid-network-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < invalid-network-request.json > invalid-network-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.validation as $v
+              | .op == "tx.validate"
+              and $v.status == "invalid"
+              and $v.valid_for_supplied_context == false
+              and $v.complete == true
+              and ($v.errors | length == 0)
+              and ($v.missing_context | length == 0)
+              and ($v.failures | length > 0)
+              and ([$v.checks[]? | select(.id == "ledger.apply_tx" and .status == "failed")] | length == 1)
+              and (.result | has("tx_cbor") | not)
+            ' invalid-network-response.json
             cp missing-context-request.json missing-context-response.json \
-              malformed-context-request.json malformed-context-response.json $out/
+              malformed-context-request.json malformed-context-response.json \
+              ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              complete-context-response.json complete-context-response-2.json \
+              invalid-network-request.json invalid-network-response.json $out/
           '';
         in
         {

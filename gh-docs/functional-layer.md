@@ -101,6 +101,12 @@ transaction id is passed as explicit `args.context.producer_txs`; missing time,
 network, protocol, governance, or certificate context remains visible as
 validation diagnostics rather than being guessed by the UI.
 
+A complete positive request is committed at
+[`specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json).
+It validates the current mainnet fixture with producer transaction CBOR,
+network, slot, epoch, and protocol parameters, and the smoke check asserts
+`status: "valid"` and `valid_for_supplied_context: true`.
+
 ## Contract Source
 
 The readable API page and detailed contract are tracked here:

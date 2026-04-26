@@ -112,13 +112,21 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
     }),
   ).toBeVisible();
   await expect(validationPanel.getByText("Conway ledger validation")).toBeVisible();
+  await expect(validationPanel.getByText("needs context")).toBeVisible();
+  await expect(validationPanel.getByText("scope ledger")).toHaveCount(0);
   await expect(
-    validationPanel.locator(".witness-row").filter({ hasText: "protocol_parameters" }).first(),
+    validationPanel.getByText("Ledger validation needs more explicit context"),
+  ).toHaveCount(0);
+  await expect(
+    validationPanel.locator(".witness-row").filter({ hasText: "protocol parameters" }).first(),
   ).toBeVisible();
 
-  const sourceOutputRow = validationPanel
+  const missingContextSection = validationPanel
+    .locator(".witness-section")
+    .filter({ hasText: "Missing context" });
+  const sourceOutputRow = missingContextSection
     .locator(".witness-row")
-    .filter({ hasText: "source_output" })
+    .filter({ hasText: "source output" })
     .first();
   await sourceOutputRow.getByRole("button", { name: "Copy" }).click();
   await expect(sourceOutputRow.getByRole("button", { name: "Copied" })).toBeVisible();

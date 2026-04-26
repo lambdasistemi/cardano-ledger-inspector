@@ -87,6 +87,27 @@ If a required item is absent, the operation returns:
 - a `missing_context` item naming what to provide next
 - `checks[*].status: "not_evaluated"` for blocked checks
 
+Positive fixture: `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`
+contains a mainnet Conway transaction, the consumed input producer transaction,
+both reference-input producer transactions, network/slot/epoch, and the Koios
+CLI protocol parameters used for the supplied slot. Running it through the WASI
+operation returns:
+
+```json
+{
+  "status": "valid",
+  "complete": true,
+  "valid_for_supplied_context": true,
+  "errors": [],
+  "missing_context": [],
+  "failures": []
+}
+```
+
+The fixture is a validation example, not a submission guarantee. Live unspent
+status is still outside this operation unless supplied by a separate live-chain
+check.
+
 ## 5. Verify Contracts and CI Checks
 
 Implementation tasks should add these commands:
