@@ -128,9 +128,14 @@ let
     EOF
   '';
 
-  # Metadata-only filter: .cabal files + the wasm project file.
-  # Deliberately excludes .hs sources so the derivation hash of anything
-  # consuming `srcMetadata` is stable across Haskell edits.
+  # Metadata-only tree used by dependency-cache derivations.
+  #
+  # This intentionally does not pass the raw cabal files through to
+  # prebuiltDeps. Module inventory fields (`exposed-modules`, `other-modules`,
+  # etc.) and source directory layout do not affect the external dependency
+  # closure, but they used to change the prebuiltDeps derivation and trigger a
+  # full ledger rebuild. Build-dependency fields still remain in the generated
+  # cabal files, so real dependency changes continue to invalidate the cache.
   #
   # CRITICAL: set `name` to match the underlying src's final path component
   # so the extracted sandbox path (`/build/<name>`) is identical between
@@ -141,16 +146,80 @@ let
   # `cleanSourceWith` defaults `name` to "source" when not set, regardless
   # of the underlying src's directory name — that's what broke the cache in
   # the first attempt.
-  srcMetadata = lib.cleanSourceWith {
-    name = builtins.baseNameOf (toString src);
-    inherit src;
-    filter = name: type:
-      let baseName = baseNameOf (toString name);
-      in type == "directory"
-         || lib.hasSuffix ".cabal" baseName
-         || baseName == projectFile
-         || baseName == "cabal.project";
-  };
+  sourceTreeNames = [ "app" "src" "test" "tests" "bench" "benchmarks" ];
+  moduleInventoryFields =
+    [ "exposed-modules" "other-modules" "autogen-modules" "signatures" ];
+
+  isCabalFieldLine = line:
+    builtins.match "[ \t]*[A-Za-z][A-Za-z0-9-]*:.*" line != null;
+  isModuleInventoryField = line:
+    lib.any
+      (field: builtins.match "[ \t]*${field}:.*" line != null)
+      moduleInventoryFields;
+  stripModuleInventory = text:
+    let
+      step = state: line:
+        if isModuleInventoryField line then
+          { skipping = true; lines = state.lines; }
+        else if state.skipping && !(isCabalFieldLine line) then
+          state
+        else
+          { skipping = false; lines = state.lines ++ [ line ]; };
+      result =
+        builtins.foldl' step { skipping = false; lines = []; }
+          (lib.splitString "\n" text);
+    in lib.concatStringsSep "\n" result.lines;
+
+  collectMetadataFiles = prefix: path:
+    lib.concatLists (
+      lib.mapAttrsToList
+        (name: type:
+          let
+            relPath = if prefix == "" then name else "${prefix}/${name}";
+            childPath = path + "/${name}";
+          in
+          if type == "directory" then
+            if builtins.elem name sourceTreeNames
+            then []
+            else collectMetadataFiles relPath childPath
+          else if relPath == projectFile
+               || relPath == "cabal.project"
+               || lib.hasSuffix ".cabal" name
+          then [ { inherit relPath; path = childPath; } ]
+          else []
+        )
+        (builtins.readDir path)
+    );
+
+  metadataFiles =
+    map
+      (file:
+        let
+          rawText = builtins.readFile file.path;
+        in
+        {
+          inherit (file) relPath;
+          text =
+            if lib.hasSuffix ".cabal" file.relPath
+            then stripModuleInventory rawText
+            else rawText;
+        })
+      (collectMetadataFiles "" src);
+
+  srcMetadata = pkgs.runCommand (builtins.baseNameOf (toString src)) {} (
+    lib.concatMapStringsSep "\n"
+      (file:
+        let
+          dir = builtins.dirOf file.relPath;
+          fileText = pkgs.writeText
+            "wasm-dependency-metadata-${builtins.baseNameOf file.relPath}"
+            file.text;
+        in ''
+          mkdir -p "$out/${dir}"
+          cp ${fileText} "$out/${file.relPath}"
+        '')
+      metadataFiles
+  );
 
   buildTargetsArg = lib.concatStringsSep " \\\n      " packages;
 
