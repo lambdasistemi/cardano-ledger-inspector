@@ -75,6 +75,12 @@ Full validation requires more than producer transaction bytes. Provide explicit
 network, slot/epoch, protocol parameters, and any certificate, stake, script, or
 governance state required by the transaction.
 
+Implementation status: `tx.validate` reports missing/invalid context before
+validation. When the modeled context is complete, it builds the Conway
+`LedgerState`/`LedgerEnv` from producer transaction outputs, protocol
+parameters, network, slot, and epoch, then calls upstream `applyTx`. Ledger
+rejections are returned in `failures` with the raw predicate text preserved.
+
 If a required item is absent, the operation returns:
 
 - `status: "incomplete"`

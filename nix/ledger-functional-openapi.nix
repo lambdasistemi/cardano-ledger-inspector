@@ -104,6 +104,31 @@
                     };
                   };
                 };
+                validate = {
+                  summary = "Validate a transaction or report missing context";
+                  value = {
+                    ledger_functional_layer = "cardano-ledger-functional/v1";
+                    tx_cbor = "84a4...";
+                    op = "tx.validate";
+                    args = {
+                      input_policy = "preserve";
+                      context = {
+                        producer_txs = {
+                          "0000000000000000000000000000000000000000000000000000000000000000" = {
+                            tx_cbor = "84a4...";
+                            source = "blockfrost.txs.cbor";
+                          };
+                        };
+                        network = "mainnet";
+                        slot = "123456789";
+                        epoch = "507";
+                        protocol_parameters = {
+                          "_shape" = "complete Cardano.Ledger.Core.PParams ConwayEra JSON";
+                        };
+                      };
+                    };
+                  };
+                };
                 balance = {
                   summary = "Target shape for best-effort balancing";
                   value = {
@@ -300,6 +325,75 @@
                       };
                     };
                   };
+                  validate = {
+                    summary = "Validation response envelope";
+                    value = {
+                      ledger_functional_layer = "cardano-ledger-functional/v1";
+                      op = "tx.validate";
+                      result = {
+                        validation = {
+                          status = "incomplete";
+                          valid_for_supplied_context = null;
+                          complete = false;
+                          tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                          body_hash = "1111111111111111111111111111111111111111111111111111111111111111";
+                          checks = [
+                            {
+                              id = "ledger.apply_tx";
+                              title = "Conway ledger validation";
+                              status = "not_evaluated";
+                              scope = "ledger";
+                              required_context = [
+                                "source_output"
+                                "protocol_parameters"
+                                "slot"
+                                "epoch"
+                                "network"
+                              ];
+                              path = [ "args" "context" ];
+                              message = "Validation needs explicit context before Conway applyTx can run.";
+                            }
+                          ];
+                          failures = [
+                            {
+                              kind = "ledger_failure";
+                              rule = "UTXOW";
+                              index = 0;
+                              message = "Transaction witness or UTxO validation failed: <ledger predicate>";
+                              predicate = "<raw Conway ledger predicate>";
+                              path = [ "body" ];
+                            }
+                          ];
+                          missing_context = [
+                            {
+                              kind = "source_output";
+                              message = "Supply producer transaction CBOR for the referenced transaction input.";
+                              path = [ "args" "context" "producer_txs" ];
+                              tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                              index = 0;
+                              required_for = [ "ledger.apply_tx" ];
+                            }
+                          ];
+                          resolved_inputs = [ ];
+                          resolved_reference_inputs = [ ];
+                          context = {
+                            input_policy = "preserve";
+                            producer_tx_count = 0;
+                            decoded_producer_tx_count = 0;
+                            input_count = 1;
+                            resolved_input_count = 0;
+                            missing_input_count = 1;
+                            reference_input_count = 0;
+                            resolved_reference_input_count = 0;
+                            missing_reference_input_count = 0;
+                            unspent_status = "not_checked";
+                          };
+                          warnings = [ ];
+                          errors = [ ];
+                        };
+                      };
+                    };
+                  };
                 };
               };
             };
@@ -345,6 +439,9 @@
       };
       TxWitnessPlanResult = {
         "$ref" = "tx-witness-plan-result.schema.json";
+      };
+      TxValidateResult = {
+        "$ref" = "tx-validate-result.schema.json";
       };
       ProducerTxContext = {
         "$ref" = "producer-tx-context.schema.json";

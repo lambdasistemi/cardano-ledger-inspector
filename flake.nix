@@ -277,6 +277,78 @@
             ' response.json
             cp inspect-request.json inspect-response.json request.json response.json $out/
           '';
+
+          tx-validate-smoke = pkgs.runCommand "tx-validate-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.validate",
+                args: {
+                  input_policy: "preserve",
+                  context: {}
+                }
+              }' > missing-context-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < missing-context-request.json > missing-context-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.validation as $v
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.validate"
+              and $v.status == "incomplete"
+              and $v.valid_for_supplied_context == null
+              and $v.complete == false
+              and ($v.tx_id | test("^[0-9a-f]{64}$"))
+              and ($v.body_hash | test("^[0-9a-f]{64}$"))
+              and ($v.checks | type == "array")
+              and ([$v.checks[]? | select(.id == "ledger.apply_tx" and .status == "not_evaluated")] | length == 1)
+              and ($v.failures | type == "array")
+              and ($v.failures | length == 0)
+              and ($v.missing_context | type == "array")
+              and ($v.missing_context | length >= 1)
+              and ([$v.missing_context[]? | select(.kind == "source_output")] | length >= 1)
+              and ($v.resolved_inputs | type == "array")
+              and ($v.resolved_reference_inputs | type == "array")
+              and $v.context.input_policy == "preserve"
+              and $v.context.producer_tx_count == 0
+              and (.result | has("tx_cbor") | not)
+            ' missing-context-response.json
+
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.validate",
+                args: {
+                  input_policy: "preserve",
+                  context: {
+                    utxo: {}
+                  }
+                }
+              }' > malformed-context-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < malformed-context-request.json > malformed-context-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.validation as $v
+              | .op == "tx.validate"
+              and $v.status == "rejected"
+              and $v.valid_for_supplied_context == null
+              and ($v.errors | type == "array")
+              and ([$v.errors[]? | select(.code == "unsupported_utxo_json")] | length == 1)
+              and ($v.failures | length == 0)
+              and (.result | has("tx_cbor") | not)
+            ' malformed-context-response.json
+            cp missing-context-request.json missing-context-response.json \
+              malformed-context-request.json malformed-context-response.json $out/
+          '';
         in
         {
           packages = {
@@ -291,7 +363,7 @@
           };
 
           checks = {
-            inherit ledger-functional-openapi-check tx-identify-smoke tx-witness-plan-smoke tx-input-context-smoke;
+            inherit ledger-functional-openapi-check tx-identify-smoke tx-witness-plan-smoke tx-input-context-smoke tx-validate-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
