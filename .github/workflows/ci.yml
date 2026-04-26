@@ -37,6 +37,9 @@ jobs:
       - name: Smoke tx.identify operation
         run: nix build --quiet .#checks.x86_64-linux.tx-identify-smoke
 
+      - name: Smoke tx.witness.plan operation
+        run: nix build --quiet .#checks.x86_64-linux.tx-witness-plan-smoke
+
       - name: Run inspector Playwright tests
         run: nix develop --quiet -c just test-playwright
 

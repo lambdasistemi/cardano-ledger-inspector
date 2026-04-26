@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-witness-plan-result.schema.json",
+  "title": "Cardano Ledger WASI tx.witness.plan Result",
+  "type": "object",
+  "required": [
+    "required_signers",
+    "present_vkey_witnesses",
+    "present_bootstrap_witnesses",
+    "missing_vkey_witnesses",
+    "scripts",
+    "redeemers",
+    "datums",
+    "reference_inputs",
+    "summary",
+    "warnings"
+  ],
+  "properties": {
+    "required_signers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/signer"
+      }
+    },
+    "present_vkey_witnesses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/signer"
+      }
+    },
+    "present_bootstrap_witnesses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/signer"
+      }
+    },
+    "missing_vkey_witnesses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["hash", "reason"],
+        "properties": {
+          "hash": {
+            "$ref": "#/$defs/keyHash"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "scripts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["hash", "language", "source"],
+        "properties": {
+          "hash": {
+            "$ref": "#/$defs/scriptHash"
+          },
+          "language": {
+            "type": "string",
+            "enum": ["native_script", "plutus_v1", "plutus_v2", "plutus_v3"]
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "redeemers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["purpose", "redeemer_data_hash", "ex_units"],
+        "properties": {
+          "purpose": {
+            "type": "string"
+          },
+          "redeemer_data_hash": {
+            "$ref": "#/$defs/hash32"
+          },
+          "ex_units": {
+            "type": "object",
+            "required": ["memory", "steps"],
+            "properties": {
+              "memory": {
+                "$ref": "#/$defs/count"
+              },
+              "steps": {
+                "$ref": "#/$defs/count"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "datums": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["hash", "computed_hash", "source"],
+        "properties": {
+          "hash": {
+            "$ref": "#/$defs/hash32"
+          },
+          "computed_hash": {
+            "$ref": "#/$defs/hash32"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "reference_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tx_id", "index"],
+        "properties": {
+          "tx_id": {
+            "$ref": "#/$defs/hash32"
+          },
+          "index": {
+            "$ref": "#/$defs/count"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "required_signer_count",
+        "present_vkey_witness_count",
+        "present_bootstrap_witness_count",
+        "missing_vkey_witness_count",
+        "script_count",
+        "redeemer_count",
+        "datum_count",
+        "reference_input_count"
+      ],
+      "properties": {
+        "required_signer_count": {
+          "$ref": "#/$defs/count"
+        },
+        "present_vkey_witness_count": {
+          "$ref": "#/$defs/count"
+        },
+        "present_bootstrap_witness_count": {
+          "$ref": "#/$defs/count"
+        },
+        "missing_vkey_witness_count": {
+          "$ref": "#/$defs/count"
+        },
+        "script_count": {
+          "$ref": "#/$defs/count"
+        },
+        "redeemer_count": {
+          "$ref": "#/$defs/count"
+        },
+        "datum_count": {
+          "$ref": "#/$defs/count"
+        },
+        "reference_input_count": {
+          "$ref": "#/$defs/count"
+        }
+      },
+      "additionalProperties": true
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "signer": {
+      "type": "object",
+      "required": ["hash", "source"],
+      "properties": {
+        "hash": {
+          "$ref": "#/$defs/keyHash"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "keyHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{56}$"
+    },
+    "scriptHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{56}$"
+    },
+    "hash32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

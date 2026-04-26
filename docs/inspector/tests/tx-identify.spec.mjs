@@ -46,11 +46,33 @@ test("decodes a Conway transaction and exposes copyable identity values", async 
   await expect(page.getByText("Transaction ID", { exact: true })).toBeVisible();
   await expect(page.getByText("Body hash", { exact: true })).toBeVisible();
   await expect(page.getByText("Witnesses", { exact: true })).toBeVisible();
-  await expect(page.getByText("Redeemers", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .locator(".identity-panel:not(.witness-plan)")
+      .getByText("Redeemers", { exact: true }),
+  ).toBeVisible();
 
   const txIdRow = page.locator(".identity-row", { hasText: "Transaction ID" });
   await txIdRow.getByRole("button", { name: "Copy" }).click();
   await expect(txIdRow.getByRole("button", { name: "Copied" })).toBeVisible();
+});
+
+test("shows transaction-derived witness plan values", async ({ page }) => {
+  await decodeFixture(page);
+
+  await expect(page.getByRole("heading", { name: "Witness plan" })).toBeVisible();
+  await expect(page.getByText("Transaction-only witness plan")).toBeVisible();
+  await expect(page.getByText("Present vkey witnesses")).toBeVisible();
+
+  const redeemerRow = page
+    .locator(".witness-plan .witness-row")
+    .filter({ hasText: "ConwayMinting" })
+    .first();
+  await redeemerRow.getByRole("button", { name: "Copy" }).click();
+  await expect(redeemerRow.getByRole("button", { name: "Copied" })).toBeVisible();
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toMatch(/^[0-9a-f]{64}$/);
 });
 
 test("opens browser rows in place without losing identity context", async ({
@@ -65,7 +87,7 @@ test("opens browser rows in place without losing identity context", async ({
   await inputsRow.getByRole("button", { name: "Open" }).click();
 
   await expect(page.locator(".browser-children").first()).toBeVisible();
-  await expect(page.locator(".identity-panel")).toBeVisible();
+  await expect(page.locator(".identity-panel:not(.witness-plan)")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Conway transaction identity" }),
   ).toBeVisible();

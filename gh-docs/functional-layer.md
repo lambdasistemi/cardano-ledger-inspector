@@ -49,6 +49,12 @@ Transforming operations must return the resulting transaction as
 : Return stable transaction identifiers, byte-level metadata, and witness
   counts from the ledger-decoded transaction.
 
+`tx.witness.plan`
+: Return transaction-derived signer, witness, script, redeemer, datum, and
+  reference-input planning data. The current result warns when UTxO context is
+  not supplied because input address credentials and reference scripts cannot be
+  inferred from transaction CBOR alone.
+
 ## Contract Source
 
 The readable API page and detailed contract are tracked here:

@@ -165,6 +165,41 @@
             ' response.json
             cp request.json response.json $out/
           '';
+
+          tx-witness-plan-smoke = pkgs.runCommand "tx-witness-plan-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.witness.plan",
+                args: {}
+              }' > request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < request.json > response.json
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.witness.plan"
+              and (.result.witness_plan.required_signers | type == "array")
+              and (.result.witness_plan.present_vkey_witnesses | type == "array")
+              and (.result.witness_plan.present_bootstrap_witnesses | type == "array")
+              and (.result.witness_plan.missing_vkey_witnesses | type == "array")
+              and (.result.witness_plan.scripts | type == "array")
+              and (.result.witness_plan.redeemers | type == "array")
+              and (.result.witness_plan.datums | type == "array")
+              and (.result.witness_plan.reference_inputs | type == "array")
+              and (.result.witness_plan.summary.required_signer_count >= 0)
+              and (.result.witness_plan.summary.present_vkey_witness_count >= 0)
+              and (.result.witness_plan.summary.missing_vkey_witness_count >= 0)
+              and (.result.witness_plan.warnings | length >= 1)
+            ' response.json
+            cp request.json response.json $out/
+          '';
         in
         {
           packages = {
@@ -179,7 +214,7 @@
           };
 
           checks = {
-            inherit ledger-functional-openapi-check tx-identify-smoke;
+            inherit ledger-functional-openapi-check tx-identify-smoke tx-witness-plan-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 

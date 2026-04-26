@@ -19,11 +19,15 @@ check-swagger:
 check-identify:
     nix build .#checks.x86_64-linux.tx-identify-smoke -o result-identify-smoke
 
+check-witness-plan:
+    nix build .#checks.x86_64-linux.tx-witness-plan-smoke -o result-witness-plan-smoke
+
 test-playwright: build-ui
     nix develop --quiet -c sh -c 'cd docs/inspector && ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules && TX_INSPECTOR_SITE_DIR=../../result playwright test --reporter=list'
 
 test:
     just check-identify
+    just check-witness-plan
     just test-playwright
 
 build-smokes:

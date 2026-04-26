@@ -74,6 +74,15 @@
                     args = { };
                   };
                 };
+                witnessPlan = {
+                  summary = "Plan transaction witnesses";
+                  value = {
+                    ledger_functional_layer = "cardano-ledger-functional/v1";
+                    tx_cbor = "84a4...";
+                    op = "tx.witness.plan";
+                    args = { };
+                  };
+                };
                 balance = {
                   summary = "Target shape for best-effort balancing";
                   value = {
@@ -169,6 +178,52 @@
                       };
                     };
                   };
+                  witnessPlan = {
+                    summary = "Witness plan response envelope";
+                    value = {
+                      ledger_functional_layer = "cardano-ledger-functional/v1";
+                      op = "tx.witness.plan";
+                      result = {
+                        witness_plan = {
+                          required_signers = [ ];
+                          present_vkey_witnesses = [
+                            {
+                              hash = "00000000000000000000000000000000000000000000000000000000";
+                              source = "witness_set.vkey";
+                            }
+                          ];
+                          present_bootstrap_witnesses = [ ];
+                          missing_vkey_witnesses = [ ];
+                          scripts = [ ];
+                          redeemers = [
+                            {
+                              purpose = "ConwayMinting (AsIx {unAsIx = 0})";
+                              redeemer_data_hash = "2222222222222222222222222222222222222222222222222222222222222222";
+                              ex_units = {
+                                memory = 1;
+                                steps = 1;
+                              };
+                            }
+                          ];
+                          datums = [ ];
+                          reference_inputs = [ ];
+                          summary = {
+                            required_signer_count = 0;
+                            present_vkey_witness_count = 1;
+                            present_bootstrap_witness_count = 0;
+                            missing_vkey_witness_count = 0;
+                            script_count = 0;
+                            redeemer_count = 1;
+                            datum_count = 0;
+                            reference_input_count = 0;
+                          };
+                          warnings = [
+                            "Transaction-only witness plan: UTxO context was not supplied, so input address credentials, reference scripts, and datum requirements cannot be inferred."
+                          ];
+                        };
+                      };
+                    };
+                  };
                   patch = {
                     summary = "Target shape for a transforming operation";
                     value = {
@@ -223,6 +278,9 @@
       };
       TxIdentifyResult = {
         "$ref" = "tx-identify-result.schema.json";
+      };
+      TxWitnessPlanResult = {
+        "$ref" = "tx-witness-plan-result.schema.json";
       };
       LedgerOperationError = {
         type = "object";

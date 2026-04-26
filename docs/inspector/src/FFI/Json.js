@@ -58,6 +58,7 @@ const invalidIdentification = (title, subtitle) => ({
 });
 
 const identifyPath = (...segments) => JSON.stringify(["identification", ...segments]);
+const witnessPlanPath = (...segments) => JSON.stringify(["witness_plan", ...segments]);
 
 const identityRow = (label, value, path, copyValue = value) => ({
   label,
@@ -155,6 +156,181 @@ const normalizeIdentification = (identification) => {
         identifyPath("witness_counts", "redeemer")
       ),
       identityRow("Datums", witnessCount(counts, "datum"), identifyPath("witness_counts", "datum")),
+    ],
+  };
+};
+
+const invalidWitnessPlan = (title, subtitle) => ({
+  valid: false,
+  title,
+  subtitle,
+  metrics: [],
+  warnings: [],
+  sections: [],
+});
+
+const witnessRow = (label, value, path, copyValue = value, detail = "") => ({
+  label,
+  value: text(value),
+  copyValue: text(copyValue),
+  path,
+  detail: text(detail),
+});
+
+const sourceDetail = (item) => text(item && item.source ? item.source : "");
+
+const signerRows = (items, pathRoot) =>
+  (Array.isArray(items) ? items : []).map((item, index) =>
+    witnessRow(
+      sourceDetail(item) || `#${index}`,
+      item?.hash,
+      witnessPlanPath(pathRoot, `#${index}`, "hash"),
+      item?.hash,
+      sourceDetail(item)
+    )
+  );
+
+const normalizeWitnessPlan = (plan) => {
+  if (!plan || typeof plan !== "object") {
+    return invalidWitnessPlan(
+      "Witness plan",
+      "Ledger operation response missing witness_plan."
+    );
+  }
+
+  const summary = plan.summary && typeof plan.summary === "object" ? plan.summary : {};
+  const requiredSigners = Array.isArray(plan.required_signers)
+    ? plan.required_signers
+    : [];
+  const vkeyWitnesses = Array.isArray(plan.present_vkey_witnesses)
+    ? plan.present_vkey_witnesses
+    : [];
+  const bootstrapWitnesses = Array.isArray(plan.present_bootstrap_witnesses)
+    ? plan.present_bootstrap_witnesses
+    : [];
+  const missingWitnesses = Array.isArray(plan.missing_vkey_witnesses)
+    ? plan.missing_vkey_witnesses
+    : [];
+  const scripts = Array.isArray(plan.scripts) ? plan.scripts : [];
+  const redeemers = Array.isArray(plan.redeemers) ? plan.redeemers : [];
+  const datums = Array.isArray(plan.datums) ? plan.datums : [];
+  const referenceInputs = Array.isArray(plan.reference_inputs)
+    ? plan.reference_inputs
+    : [];
+  const warnings = Array.isArray(plan.warnings) ? plan.warnings.map(text) : [];
+
+  const missingCount = Number(summary.missing_vkey_witness_count ?? missingWitnesses.length);
+  const subtitle =
+    missingCount > 0
+      ? `${missingCount} missing declared signer${missingCount === 1 ? "" : "s"}`
+      : `${vkeyWitnesses.length + bootstrapWitnesses.length} present key witness${
+          vkeyWitnesses.length + bootstrapWitnesses.length === 1 ? "" : "es"
+        }`;
+
+  return {
+    valid: true,
+    title: "Witness plan",
+    subtitle,
+    metrics: [
+      metric("Required signers", summary.required_signer_count ?? requiredSigners.length),
+      metric("VKey witnesses", summary.present_vkey_witness_count ?? vkeyWitnesses.length),
+      metric(
+        "Bootstrap witnesses",
+        summary.present_bootstrap_witness_count ?? bootstrapWitnesses.length
+      ),
+      metric("Missing signers", summary.missing_vkey_witness_count ?? missingWitnesses.length),
+      metric("Scripts", summary.script_count ?? scripts.length),
+      metric("Redeemers", summary.redeemer_count ?? redeemers.length),
+      metric("Datums", summary.datum_count ?? datums.length),
+      metric("Reference inputs", summary.reference_input_count ?? referenceInputs.length),
+    ],
+    warnings,
+    sections: [
+      {
+        title: "Required signers",
+        empty: "None declared.",
+        rows: signerRows(requiredSigners, "required_signers"),
+      },
+      {
+        title: "Missing declared signers",
+        empty: "None missing.",
+        rows: missingWitnesses.map((item, index) =>
+          witnessRow(
+            item?.reason || `#${index}`,
+            item?.hash,
+            witnessPlanPath("missing_vkey_witnesses", `#${index}`, "hash"),
+            item?.hash,
+            item?.reason
+          )
+        ),
+      },
+      {
+        title: "Present vkey witnesses",
+        empty: "None present.",
+        rows: signerRows(vkeyWitnesses, "present_vkey_witnesses"),
+      },
+      {
+        title: "Present bootstrap witnesses",
+        empty: "None present.",
+        rows: signerRows(bootstrapWitnesses, "present_bootstrap_witnesses"),
+      },
+      {
+        title: "Script witnesses",
+        empty: "None in the witness set.",
+        rows: scripts.map((item, index) =>
+          witnessRow(
+            item?.language || `#${index}`,
+            item?.hash,
+            witnessPlanPath("scripts", `#${index}`, "hash"),
+            item?.hash,
+            sourceDetail(item)
+          )
+        ),
+      },
+      {
+        title: "Redeemers",
+        empty: "None present.",
+        rows: redeemers.map((item, index) => {
+          const exUnits =
+            item?.ex_units && typeof item.ex_units === "object" ? item.ex_units : {};
+          const detail = `mem ${text(exUnits.memory ?? 0)} / steps ${text(
+            exUnits.steps ?? 0
+          )}`;
+          return witnessRow(
+            item?.purpose || `#${index}`,
+            item?.redeemer_data_hash,
+            witnessPlanPath("redeemers", `#${index}`, "redeemer_data_hash"),
+            item?.redeemer_data_hash,
+            detail
+          );
+        }),
+      },
+      {
+        title: "Datums",
+        empty: "None in the witness set.",
+        rows: datums.map((item, index) =>
+          witnessRow(
+            sourceDetail(item) || `#${index}`,
+            item?.hash,
+            witnessPlanPath("datums", `#${index}`, "hash"),
+            item?.hash,
+            item?.computed_hash ? `computed ${shortHex(item.computed_hash)}` : sourceDetail(item)
+          )
+        ),
+      },
+      {
+        title: "Reference inputs",
+        empty: "None referenced.",
+        rows: referenceInputs.map((item, index) =>
+          witnessRow(
+            `#${index}`,
+            `${shortHex(item?.tx_id)}#${text(item?.index)}`,
+            witnessPlanPath("reference_inputs", `#${index}`, "tx_id"),
+            item?.tx_id,
+            `index ${text(item?.index)}`
+          )
+        ),
+      },
     ],
   };
 };
@@ -364,5 +540,14 @@ export const operationIdentificationImpl = (raw) => {
       "Transaction identity",
       "Ledger operation response was not JSON."
     );
+  }
+};
+
+export const operationWitnessPlanImpl = (raw) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return normalizeWitnessPlan(operationResult(parsed)?.witness_plan);
+  } catch (_err) {
+    return invalidWitnessPlan("Witness plan", "Ledger operation response was not JSON.");
   }
 };

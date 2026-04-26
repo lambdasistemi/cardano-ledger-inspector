@@ -14,7 +14,7 @@ import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, inspect, operationBrowser, operationIdentification, operationInspection, pretty) as Json
+import FFI.Json (Browser, Identification, WitnessPlan, inspect, operationBrowser, operationIdentification, operationInspection, operationWitnessPlan, pretty) as Json
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
@@ -81,6 +81,7 @@ type State =
   , txCbor :: Maybe String
   , browser :: Maybe Json.Browser
   , identification :: Maybe Json.Identification
+  , witnessPlan :: Maybe Json.WitnessPlan
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , running :: Boolean
@@ -136,6 +137,7 @@ inspectorComponent initial =
         , txCbor: Nothing
         , browser: Nothing
         , identification: Nothing
+        , witnessPlan: Nothing
         , browserNodes: []
         , expandedPaths: []
         , running: false
@@ -422,6 +424,7 @@ inspectorComponent initial =
                      else []
                  )
               <> renderIdentificationMaybe state
+              <> renderWitnessPlanMaybe state
               <> renderBrowserMaybe state r.exitOk
               <> [ renderRawJson r.stdout ]
               <> renderStderr r.stderr
@@ -431,6 +434,13 @@ inspectorComponent initial =
     case state.identification of
       Just identification ->
         if identification.valid then [ renderIdentification state identification ]
+        else []
+      Nothing -> []
+
+  renderWitnessPlanMaybe state =
+    case state.witnessPlan of
+      Just witnessPlan ->
+        if witnessPlan.valid then [ renderWitnessPlan state witnessPlan ]
         else []
       Nothing -> []
 
@@ -469,6 +479,77 @@ inspectorComponent initial =
       , HH.div
           [ classNames [ "witness-grid" ] ]
           (map (renderIdentityRow state) identification.witnesses)
+      ]
+
+  renderWitnessPlan state witnessPlan =
+    HH.div
+      [ classNames [ "identity-panel", "witness-plan" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text witnessPlan.title ]
+              , HH.p_ [ HH.text witnessPlan.subtitle ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "metric-grid" ] ]
+          (map renderMetric witnessPlan.metrics)
+      , renderWitnessWarnings witnessPlan.warnings
+      , HH.div_
+          (map (renderWitnessSection state) witnessPlan.sections)
+      ]
+
+  renderWitnessWarnings warnings =
+    if Array.null warnings then
+      HH.text ""
+    else
+      HH.div
+        [ classNames [ "witness-warnings" ] ]
+        (map (\warning -> HH.p_ [ HH.text warning ]) warnings)
+
+  renderWitnessSection state section =
+    HH.div
+      [ classNames [ "witness-section" ] ]
+      [ HH.div
+          [ classNames [ "identity-section-title" ] ]
+          [ HH.text section.title ]
+      , if Array.null section.rows then
+          HH.div
+            [ classNames [ "witness-empty" ] ]
+            [ HH.text section.empty ]
+        else
+          HH.div
+            [ classNames [ "witness-row-list" ] ]
+            (map (renderWitnessRow state) section.rows)
+      ]
+
+  renderWitnessRow state row =
+    HH.div
+      [ classNames [ "identity-row", "witness-row" ] ]
+      [ HH.div
+          [ classNames [ "identity-copy" ] ]
+          [ HH.span
+              [ classNames [ "identity-label" ] ]
+              [ HH.text row.label ]
+          , HH.button
+              [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
+              , classNames [ "inline-action" ]
+              ]
+              [ HH.text
+                  ( if state.copiedPath == Just row.path then
+                      "Copied"
+                    else
+                      "Copy"
+                  )
+              ]
+          ]
+      , HH.code_ [ HH.text row.value ]
+      , if row.detail == "" then
+          HH.text ""
+        else
+          HH.span
+            [ classNames [ "witness-detail" ] ]
+            [ HH.text row.detail ]
       ]
 
   renderIdentityRow state row =
@@ -696,6 +777,7 @@ inspectorComponent initial =
           , txCbor = Nothing
           , browser = Nothing
           , identification = Nothing
+          , witnessPlan = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -733,10 +815,12 @@ inspectorComponent initial =
         Right h -> do
           operationResult <- H.liftAff (runLedgerOperation h "tx.inspect" "[]")
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" "[]")
+          witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" "[]")
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
             identification = Json.operationIdentification identifyResult.stdout
+            witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
           H.modify_
             _
               { running = false
@@ -745,6 +829,9 @@ inspectorComponent initial =
               , browser = if operationResult.exitOk && browser.valid then Just browser else Nothing
               , identification =
                   if identifyResult.exitOk && identification.valid then Just identification
+                  else Nothing
+              , witnessPlan =
+                  if witnessPlanResult.exitOk && witnessPlan.valid then Just witnessPlan
                   else Nothing
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser

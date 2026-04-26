@@ -29,8 +29,10 @@ import qualified Cardano.Ledger.Conway.Scripts as ConwayScripts
 import Cardano.Ledger.Core (TxLevel (..))
 import qualified Cardano.Ledger.Core as Core
 import qualified Cardano.Ledger.Hashes as Hashes
+import qualified Cardano.Ledger.Keys as Keys
 import qualified Cardano.Ledger.Mary.Value as Mary
 import qualified Cardano.Ledger.Plutus.Data as PData
+import qualified Cardano.Ledger.Plutus.ExUnits as ExUnits
 import qualified Cardano.Ledger.TxIn as TxIn
 import Control.Monad ((>=>))
 import Data.Aeson ((.=))
@@ -99,6 +101,7 @@ instance Aeson.FromJSON LedgerOperationRequest where
         normalizeOperation "inspect" = "tx.inspect"
         normalizeOperation "browse" = "tx.browse"
         normalizeOperation "identify" = "tx.identify"
+        normalizeOperation "witness.plan" = "tx.witness.plan"
         normalizeOperation op = op
 
 -- | Hex → bytes → Conway tx → JSON.
@@ -148,6 +151,12 @@ runLedgerOperation request = do
                 ledgerOperationResponse
                     (lorOperation request)
                     [ "identification" .= identifyJson txBytes tx
+                    ]
+        "tx.witness.plan" ->
+            pure $
+                ledgerOperationResponse
+                    (lorOperation request)
+                    [ "witness_plan" .= witnessPlanJson tx
                     ]
         other -> Left (UnknownLedgerOperation other)
 
@@ -362,6 +371,143 @@ identifyJson txBytes tx =
                     ]
             ]
 
+witnessPlanJson ::
+    L.Tx TopTx Conway.ConwayEra ->
+    Aeson.Value
+witnessPlanJson tx =
+    let body = tx ^. L.bodyTxL
+        wits = tx ^. Core.witsTxL
+        requiredSignerHexes =
+            keyHashHex <$> toList (body ^. L.reqSignerHashesTxBodyL)
+        presentVKeyHexes =
+            keyHashHex . Keys.witVKeyHash <$> toList (wits ^. Core.addrTxWitsL)
+        presentBootstrapHexes =
+            keyHashHex . Keys.bootstrapWitKeyHash
+                <$> toList (wits ^. Core.bootAddrTxWitsL)
+        presentSignerHexSet =
+            Set.fromList (presentVKeyHexes <> presentBootstrapHexes)
+        missingSignerHexes =
+            filter (`Set.notMember` presentSignerHexSet) requiredSignerHexes
+        scriptWitnesses =
+            Map.toList (wits ^. Core.scriptTxWitsL)
+        redeemers =
+            Map.toList (L.unRedeemers (wits ^. L.rdmrsTxWitsL))
+        datums =
+            Map.toList (L.unTxDats (wits ^. L.datsTxWitsL))
+        referenceInputs =
+            toList (body ^. L.referenceInputsTxBodyL)
+        warnings =
+            transactionOnlyWitnessPlanWarning
+                : if null missingSignerHexes
+                    then []
+                    else
+                        [ "Declared required signer hashes are absent from the witness set." ::
+                            T.Text
+                        ]
+     in Aeson.object
+            [ "required_signers" .= map requiredSignerJson requiredSignerHexes
+            , "present_vkey_witnesses"
+                .= map presentVKeyWitnessJson presentVKeyHexes
+            , "present_bootstrap_witnesses"
+                .= map presentBootstrapWitnessJson presentBootstrapHexes
+            , "missing_vkey_witnesses"
+                .= map missingSignerJson missingSignerHexes
+            , "scripts" .= map scriptWitnessJson scriptWitnesses
+            , "redeemers" .= map redeemerJson redeemers
+            , "datums" .= map datumWitnessJson datums
+            , "reference_inputs" .= map txInJson referenceInputs
+            , "summary"
+                .= Aeson.object
+                    [ "required_signer_count" .= length requiredSignerHexes
+                    , "present_vkey_witness_count" .= length presentVKeyHexes
+                    , "present_bootstrap_witness_count" .= length presentBootstrapHexes
+                    , "missing_vkey_witness_count" .= length missingSignerHexes
+                    , "script_count" .= length scriptWitnesses
+                    , "redeemer_count" .= length redeemers
+                    , "datum_count" .= length datums
+                    , "reference_input_count" .= length referenceInputs
+                    ]
+            , "warnings" .= warnings
+            ]
+
+transactionOnlyWitnessPlanWarning :: T.Text
+transactionOnlyWitnessPlanWarning =
+    "Transaction-only witness plan: UTxO context was not supplied, so input address credentials, reference scripts, and datum requirements cannot be inferred."
+
+requiredSignerJson :: T.Text -> Aeson.Value
+requiredSignerJson signerHash =
+    Aeson.object
+        [ "hash" .= signerHash
+        , "source" .= ("tx_body.required_signers" :: T.Text)
+        ]
+
+presentVKeyWitnessJson :: T.Text -> Aeson.Value
+presentVKeyWitnessJson signerHash =
+    Aeson.object
+        [ "hash" .= signerHash
+        , "source" .= ("witness_set.vkey" :: T.Text)
+        ]
+
+presentBootstrapWitnessJson :: T.Text -> Aeson.Value
+presentBootstrapWitnessJson signerHash =
+    Aeson.object
+        [ "hash" .= signerHash
+        , "source" .= ("witness_set.bootstrap" :: T.Text)
+        ]
+
+missingSignerJson :: T.Text -> Aeson.Value
+missingSignerJson signerHash =
+    Aeson.object
+        [ "hash" .= signerHash
+        , "reason"
+            .= ( "declared required signer not present in vkey or bootstrap witnesses" ::
+                    T.Text
+               )
+        ]
+
+scriptWitnessJson ::
+    (Hashes.ScriptHash, ConwayScripts.AlonzoScript Conway.ConwayEra) ->
+    Aeson.Value
+scriptWitnessJson (scriptHash, script) =
+    Aeson.object
+        [ "hash" .= scriptHashHex scriptHash
+        , "language" .= scriptWitnessLanguage script
+        , "source" .= ("witness_set.scripts" :: T.Text)
+        ]
+
+scriptWitnessLanguage ::
+    ConwayScripts.AlonzoScript Conway.ConwayEra ->
+    T.Text
+scriptWitnessLanguage = \case
+    ConwayScripts.NativeScript _ -> "native_script"
+    ConwayScripts.PlutusScript plutusScript ->
+        case plutusScript of
+            ConwayScripts.ConwayPlutusV1 _ -> "plutus_v1"
+            ConwayScripts.ConwayPlutusV2 _ -> "plutus_v2"
+            ConwayScripts.ConwayPlutusV3 _ -> "plutus_v3"
+
+redeemerJson ::
+    ( L.PlutusPurpose L.AsIx Conway.ConwayEra
+    , (PData.Data Conway.ConwayEra, ExUnits.ExUnits)
+    ) ->
+    Aeson.Value
+redeemerJson (purpose, (redeemerData, exUnits)) =
+    Aeson.object
+        [ "purpose" .= T.pack (show purpose)
+        , "redeemer_data_hash" .= safeHashHex (PData.hashData redeemerData)
+        , "ex_units" .= Aeson.toJSON exUnits
+        ]
+
+datumWitnessJson ::
+    (Hashes.DataHash, PData.Data Conway.ConwayEra) ->
+    Aeson.Value
+datumWitnessJson (dataHash, datumValue) =
+    Aeson.object
+        [ "hash" .= safeHashHex dataHash
+        , "computed_hash" .= safeHashHex (PData.hashData datumValue)
+        , "source" .= ("witness_set.datums" :: T.Text)
+        ]
+
 scriptWitnessCounts ::
     [ConwayScripts.AlonzoScript Conway.ConwayEra] ->
     (Int, Int, Int, Int)
@@ -486,6 +632,18 @@ txInJson (TxIn.TxIn (TxIn.TxId safeHash) (BaseTypes.TxIx ix)) =
 
 txIdHex :: TxIn.TxId -> T.Text
 txIdHex (TxIn.TxId safeHash) =
+    hashHex (Hashes.extractHash safeHash)
+
+keyHashHex :: Hashes.KeyHash r -> T.Text
+keyHashHex (Hashes.KeyHash h) =
+    hashHex h
+
+scriptHashHex :: Hashes.ScriptHash -> T.Text
+scriptHashHex (Hashes.ScriptHash h) =
+    hashHex h
+
+safeHashHex :: Hashes.SafeHash i -> T.Text
+safeHashHex safeHash =
     hashHex (Hashes.extractHash safeHash)
 
 hashHex :: Crypto.Hash h a -> T.Text
