@@ -8,6 +8,7 @@ module FFI.Json
   , Metric
   , MintRow
   , OutputRow
+  , Validation
   , WitnessPlan
   , WitnessPlanRow
   , WitnessPlanSection
@@ -15,6 +16,7 @@ module FFI.Json
   , operationBrowser
   , operationIdentification
   , operationInspection
+  , operationValidation
   , operationWitnessPlan
   , operationArgsWithPath
   , pretty
@@ -25,6 +27,7 @@ foreign import inspectImpl :: String -> Inspection
 foreign import operationInspectionImpl :: String -> String
 foreign import operationBrowserImpl :: String -> Browser
 foreign import operationIdentificationImpl :: String -> Identification
+foreign import operationValidationImpl :: String -> Validation
 foreign import operationWitnessPlanImpl :: String -> WitnessPlan
 foreign import operationArgsWithPathImpl :: String -> String -> String
 
@@ -122,6 +125,15 @@ type WitnessPlan =
   , sections :: Array WitnessPlanSection
   }
 
+type Validation =
+  { valid :: Boolean
+  , title :: String
+  , subtitle :: String
+  , metrics :: Array Metric
+  , warnings :: Array String
+  , sections :: Array WitnessPlanSection
+  }
+
 pretty :: String -> String
 pretty = prettyImpl
 
@@ -136,6 +148,9 @@ operationBrowser = operationBrowserImpl
 
 operationIdentification :: String -> Identification
 operationIdentification = operationIdentificationImpl
+
+operationValidation :: String -> Validation
+operationValidation = operationValidationImpl
 
 operationWitnessPlan :: String -> WitnessPlan
 operationWitnessPlan = operationWitnessPlanImpl

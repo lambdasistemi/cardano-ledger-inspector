@@ -52,12 +52,14 @@ test("decodes a Conway transaction and exposes compact identity values", async (
   await expect(page.getByText("Witnesses", { exact: true })).toBeVisible();
   await expect(
     page
-      .locator(".identity-panel:not(.witness-plan)")
+      .locator(".identity-panel:not(.witness-plan):not(.validation-panel)")
       .getByText("Redeemers", { exact: true }),
   ).toBeVisible();
 
   await expect(
-    page.locator(".identity-panel:not(.witness-plan)").getByRole("button"),
+    page
+      .locator(".identity-panel:not(.witness-plan):not(.validation-panel)")
+      .getByRole("button"),
   ).toHaveCount(0);
 
   const txIdRow = page.locator(".identity-row", { hasText: "Transaction ID" });
@@ -90,6 +92,36 @@ test("shows transaction-derived witness plan values", async ({ page }) => {
     .first();
   await redeemerRow.getByRole("button", { name: "Copy" }).click();
   await expect(redeemerRow.getByRole("button", { name: "Copied" })).toBeVisible();
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toMatch(/^[0-9a-f]{64}$/);
+});
+
+test("surfaces ledger validation diagnostics", async ({ page }) => {
+  await decodeFixture(page);
+
+  const validationPanel = page.locator(".validation-panel");
+  await expect(
+    validationPanel.getByRole("heading", { name: "Ledger validation" }),
+  ).toBeVisible();
+  await expect(validationPanel.getByText("Status")).toBeVisible();
+  await expect(validationPanel.getByText("incomplete")).toBeVisible();
+  await expect(
+    validationPanel.locator(".identity-section-title", {
+      hasText: "Missing context",
+    }),
+  ).toBeVisible();
+  await expect(validationPanel.getByText("Conway ledger validation")).toBeVisible();
+  await expect(
+    validationPanel.locator(".witness-row").filter({ hasText: "protocol_parameters" }).first(),
+  ).toBeVisible();
+
+  const sourceOutputRow = validationPanel
+    .locator(".witness-row")
+    .filter({ hasText: "source_output" })
+    .first();
+  await sourceOutputRow.getByRole("button", { name: "Copy" }).click();
+  await expect(sourceOutputRow.getByRole("button", { name: "Copied" })).toBeVisible();
 
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^[0-9a-f]{64}$/);
@@ -129,7 +161,14 @@ test("passes producer transaction CBOR into witness planning", async ({
   ).toBeVisible();
   await expect(page.getByText("Producer txs")).toBeVisible();
   await expect(
-    page.locator(".identity-section-title", { hasText: "Resolved inputs" }),
+    page.locator(".witness-plan .identity-section-title", {
+      hasText: "Resolved inputs",
+    }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator(".validation-panel .identity-section-title", { hasText: "Resolved inputs" })
+      .first(),
   ).toBeVisible();
   expect(producerCborRequests).toBeGreaterThan(0);
   expect(utxoRequests).toBe(0);
@@ -191,7 +230,9 @@ test("opens browser rows in place without losing identity context", async ({
   await inputsRow.getByRole("button", { name: "Open" }).click();
 
   await expect(page.locator(".browser-children").first()).toBeVisible();
-  await expect(page.locator(".identity-panel:not(.witness-plan)")).toBeVisible();
+  await expect(
+    page.locator(".identity-panel:not(.witness-plan):not(.validation-panel)"),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Conway transaction identity" }),
   ).toBeVisible();

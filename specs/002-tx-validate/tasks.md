@@ -146,11 +146,11 @@ surface.
 - [X] T046 [P] Add `tx.validate` to the implemented operations table in `gh-docs/api.md`
 - [X] T047 Add `tx-validate-result.schema.json` to the public schema list in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
 - [X] T048 Run Fourmolu formatting check with `just format-check` for `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T049 Run PureScript compile with `just ui-check` for `docs/inspector/src/Main.purs`
-- [ ] T050 Run full repository verification with `just test` for `flake.nix`
-- [ ] T051 [P] If a browser validation panel is added, implement result decoding in `docs/inspector/src/FFI/Json.js`
-- [ ] T052 [P] If a browser validation panel is added, implement UI rendering in `docs/inspector/src/Main.purs`
-- [ ] T053 If browser validation UI is added, verify it with Playwright in `docs/inspector/tests/tx-identify.spec.mjs`
+- [X] T049 Run PureScript compile with `just ui-check` for `docs/inspector/src/Main.purs`
+- [X] T050 Run full repository verification with `just test` for `flake.nix`
+- [X] T051 [P] If a browser validation panel is added, implement result decoding in `docs/inspector/src/FFI/Json.js`
+- [X] T052 [P] If a browser validation panel is added, implement UI rendering in `docs/inspector/src/Main.purs`
+- [X] T053 If browser validation UI is added, verify it with Playwright in `docs/inspector/tests/tx-identify.spec.mjs`
 
 ---
 

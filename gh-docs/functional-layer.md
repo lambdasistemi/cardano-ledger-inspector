@@ -86,6 +86,21 @@ built by the host and interpreted by the Haskell ledger layer.
   input address credentials and reference scripts cannot be inferred from
   transaction CBOR alone.
 
+`tx.validate`
+: Return structured validation status for the selected transaction and explicit
+  context. The operation reports `valid`, `invalid`, `incomplete`, or
+  `rejected`, lists ledger check groups, preserves missing-context diagnostics,
+  and runs Conway `applyTx` when producer transactions, network, slot, epoch,
+  and protocol parameters are complete. It never mutates or returns transaction
+  CBOR.
+
+The browser inspector now calls `tx.inspect`, `tx.identify`,
+`tx.witness.plan`, and `tx.validate` from the same selected transaction CBOR.
+When provider credentials are available, producer transaction CBOR fetched by
+transaction id is passed as explicit `args.context.producer_txs`; missing time,
+network, protocol, governance, or certificate context remains visible as
+validation diagnostics rather than being guessed by the UI.
+
 ## Contract Source
 
 The readable API page and detailed contract are tracked here:
@@ -95,8 +110,8 @@ The readable API page and detailed contract are tracked here:
 
 ## Direction
 
-The 0.1 surface should grow around useful ledger operations: inspection,
-validation, verification, transformation, patching, and eventually balancing
+The 0.1 surface should keep growing around useful ledger operations: script
+evaluation, verification, transformation, patching, and eventually balancing
 where the transaction has enough slack. Each operation should keep the same
 boundary discipline: explicit inputs, ledger-owned semantics, CBOR for
 transaction bytes, JSON for control and results.

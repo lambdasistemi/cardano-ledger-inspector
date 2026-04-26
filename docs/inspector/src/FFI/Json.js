@@ -190,6 +190,15 @@ const invalidWitnessPlan = (title, subtitle) => ({
   sections: [],
 });
 
+const invalidValidation = (title, subtitle) => ({
+  valid: false,
+  title,
+  subtitle,
+  metrics: [],
+  warnings: [],
+  sections: [],
+});
+
 const witnessRow = (label, value, path, copyValue = value, detail = "") => ({
   label,
   value: text(value),
@@ -199,6 +208,7 @@ const witnessRow = (label, value, path, copyValue = value, detail = "") => ({
 });
 
 const sourceDetail = (item) => text(item && item.source ? item.source : "");
+const validationPath = (...segments) => JSON.stringify(["validation", ...segments]);
 
 const signerRows = (items, pathRoot) =>
   (Array.isArray(items) ? items : []).map((item, index) =>
@@ -211,9 +221,11 @@ const signerRows = (items, pathRoot) =>
     )
   );
 
+const resolvedTxInLabel = (item) => item?.key || `${item?.tx_id || ""}#${text(item?.index)}`;
+
 const resolvedTxInRows = (items, pathRoot) =>
   (Array.isArray(items) ? items : []).map((item, index) => {
-    const key = item?.key || `${item?.tx_id || ""}#${text(item?.index)}`;
+    const key = resolvedTxInLabel(item);
     const status = item?.resolved === true ? "resolved" : "missing";
     const txOut = item?.tx_out && typeof item.tx_out === "object" ? item.tx_out : {};
     const address = txOut.address_hex ? shortHex(txOut.address_hex, 18, 10) : "";
@@ -224,6 +236,24 @@ const resolvedTxInRows = (items, pathRoot) =>
       status,
       key,
       witnessPlanPath(pathRoot, `#${index}`, "key"),
+      key,
+      detailParts.join(" / ")
+    );
+  });
+
+const validationResolvedTxInRows = (items, pathRoot) =>
+  (Array.isArray(items) ? items : []).map((item, index) => {
+    const key = resolvedTxInLabel(item);
+    const status = item?.resolved === true ? "resolved" : "missing";
+    const txOut = item?.tx_out && typeof item.tx_out === "object" ? item.tx_out : {};
+    const address = txOut.address_hex ? shortHex(txOut.address_hex, 18, 10) : "";
+    const lovelace = txOut.coin_lovelace ? formatLovelace(txOut.coin_lovelace) : "";
+    const reason = item?.reason ? text(item.reason) : "";
+    const detailParts = [status, lovelace, address, reason].filter((part) => part !== "");
+    return witnessRow(
+      status,
+      key,
+      validationPath(pathRoot, `#${index}`, "key"),
       key,
       detailParts.join(" / ")
     );
@@ -440,6 +470,166 @@ const validityLabel = (slot) => (slot === null || slot === undefined ? "open" : 
 
 const metric = (label, value) => ({ label, value: text(value) });
 
+const yesNo = (value) => (value === true ? "yes" : value === false ? "no" : "n/a");
+
+const jsonCopy = (value) => {
+  try {
+    return JSON.stringify(value);
+  } catch (_err) {
+    return text(value);
+  }
+};
+
+const validationStatusSubtitle = (status, failures, missingContext, errors) => {
+  switch (status) {
+    case "valid":
+      return "accepted for supplied context";
+    case "invalid":
+      return plural(failures.length, "ledger failure");
+    case "incomplete":
+      return plural(missingContext.length, "missing context item");
+    case "rejected":
+      return plural(errors.length, "context error");
+    default:
+      return "validation response";
+  }
+};
+
+const validationCheckRows = (checks) =>
+  (Array.isArray(checks) ? checks : []).map((item, index) => {
+    const title = item?.title || item?.id || `#${index}`;
+    const status = item?.status || "";
+    const scope = item?.scope ? `scope ${text(item.scope)}` : "";
+    const message = item?.message ? text(item.message) : "";
+    const detail = [scope, message].filter((part) => part !== "").join(" / ");
+    return witnessRow(
+      title,
+      status,
+      validationPath("checks", `#${index}`),
+      item?.id || jsonCopy(item),
+      detail
+    );
+  });
+
+const validationMissingContextRows = (items) =>
+  (Array.isArray(items) ? items : []).map((item, index) => {
+    const key =
+      item?.tx_id && item?.index !== undefined
+        ? `${item.tx_id}#${text(item.index)}`
+        : item?.tx_id || item?.kind || `#${index}`;
+    return witnessRow(
+      item?.kind || `#${index}`,
+      key,
+      validationPath("missing_context", `#${index}`),
+      item?.tx_id || key || jsonCopy(item),
+      item?.message || ""
+    );
+  });
+
+const validationFailureRows = (items) =>
+  (Array.isArray(items) ? items : []).map((item, index) =>
+    witnessRow(
+      item?.rule || item?.code || item?.kind || `#${index}`,
+      item?.predicate || item?.message || item?.code || "",
+      validationPath("failures", `#${index}`),
+      item?.predicate || jsonCopy(item),
+      item?.message || ""
+    )
+  );
+
+const validationErrorRows = (items) =>
+  (Array.isArray(items) ? items : []).map((item, index) =>
+    witnessRow(
+      item?.kind || item?.code || `#${index}`,
+      item?.message || jsonCopy(item),
+      validationPath("errors", `#${index}`),
+      jsonCopy(item),
+      item?.path ? `path ${JSON.stringify(item.path)}` : ""
+    )
+  );
+
+const normalizeValidation = (validation) => {
+  if (!validation || typeof validation !== "object") {
+    return invalidValidation(
+      "Ledger validation",
+      "Ledger operation response missing validation."
+    );
+  }
+
+  const status = text(validation.status || "unknown");
+  const checks = Array.isArray(validation.checks) ? validation.checks : [];
+  const failures = Array.isArray(validation.failures) ? validation.failures : [];
+  const missingContext = Array.isArray(validation.missing_context)
+    ? validation.missing_context
+    : [];
+  const resolvedInputs = Array.isArray(validation.resolved_inputs)
+    ? validation.resolved_inputs
+    : [];
+  const resolvedReferenceInputs = Array.isArray(validation.resolved_reference_inputs)
+    ? validation.resolved_reference_inputs
+    : [];
+  const errors = Array.isArray(validation.errors) ? validation.errors : [];
+  const warnings = Array.isArray(validation.warnings) ? validation.warnings.map(text) : [];
+  const context =
+    validation.context && typeof validation.context === "object" ? validation.context : {};
+
+  return {
+    valid: true,
+    title: "Ledger validation",
+    subtitle: validationStatusSubtitle(status, failures, missingContext, errors),
+    metrics: [
+      metric("Status", status),
+      metric("Complete", yesNo(validation.complete)),
+      metric("Valid for context", yesNo(validation.valid_for_supplied_context)),
+      metric("Checks", checks.length),
+      metric("Failures", failures.length),
+      metric("Missing context", missingContext.length),
+      metric("Context errors", errors.length),
+      metric("Resolved inputs", context.resolved_input_count ?? resolvedInputs.length),
+      metric(
+        "Resolved ref inputs",
+        context.resolved_reference_input_count ?? resolvedReferenceInputs.length
+      ),
+    ],
+    warnings,
+    sections: [
+      {
+        title: "Checks",
+        empty: "No validation checks reported.",
+        rows: validationCheckRows(checks),
+      },
+      {
+        title: "Missing context",
+        empty: "No missing context reported.",
+        rows: validationMissingContextRows(missingContext),
+      },
+      {
+        title: "Ledger failures",
+        empty: "No ledger failures reported.",
+        rows: validationFailureRows(failures),
+      },
+      {
+        title: "Context errors",
+        empty: "No context errors reported.",
+        rows: validationErrorRows(errors),
+      },
+      {
+        title: "Resolved inputs",
+        empty: "No input UTxO context supplied.",
+        rows: validationResolvedTxInRows(resolvedInputs, "resolved_inputs"),
+      },
+      {
+        title: "Resolved reference inputs",
+        empty: "No reference input UTxO context supplied.",
+        rows: validationResolvedTxInRows(
+          resolvedReferenceInputs,
+          "resolved_reference_inputs"
+        ),
+      },
+    ],
+  };
+};
+
 export const inspectImpl = (raw) => {
   let parsed;
   try {
@@ -608,5 +798,14 @@ export const operationWitnessPlanImpl = (raw) => {
     return normalizeWitnessPlan(operationResult(parsed)?.witness_plan);
   } catch (_err) {
     return invalidWitnessPlan("Witness plan", "Ledger operation response was not JSON.");
+  }
+};
+
+export const operationValidationImpl = (raw) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return normalizeValidation(operationResult(parsed)?.validation);
+  } catch (_err) {
+    return invalidValidation("Ledger validation", "Ledger operation response was not JSON.");
   }
 };

@@ -14,7 +14,7 @@ import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationWitnessPlan, pretty) as Json
+import FFI.Json (Browser, Identification, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationValidation, operationWitnessPlan, pretty) as Json
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
@@ -83,6 +83,7 @@ type State =
   , browser :: Maybe Json.Browser
   , identification :: Maybe Json.Identification
   , witnessPlan :: Maybe Json.WitnessPlan
+  , validation :: Maybe Json.Validation
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , running :: Boolean
@@ -140,6 +141,7 @@ inspectorComponent initial =
         , browser: Nothing
         , identification: Nothing
         , witnessPlan: Nothing
+        , validation: Nothing
         , browserNodes: []
         , expandedPaths: []
         , running: false
@@ -427,6 +429,7 @@ inspectorComponent initial =
                  )
               <> renderIdentificationMaybe state
               <> renderWitnessPlanMaybe state
+              <> renderValidationMaybe state
               <> renderBrowserMaybe state r.exitOk
               <> [ renderRawJson r.stdout ]
               <> renderStderr r.stderr
@@ -443,6 +446,13 @@ inspectorComponent initial =
     case state.witnessPlan of
       Just witnessPlan ->
         if witnessPlan.valid then [ renderWitnessPlan state witnessPlan ]
+        else []
+      Nothing -> []
+
+  renderValidationMaybe state =
+    case state.validation of
+      Just validation ->
+        if validation.valid then [ renderValidation state validation ]
         else []
       Nothing -> []
 
@@ -499,6 +509,24 @@ inspectorComponent initial =
       , renderWitnessWarnings witnessPlan.warnings
       , HH.div_
           (map (renderWitnessSection state) witnessPlan.sections)
+      ]
+
+  renderValidation state validation =
+    HH.div
+      [ classNames [ "identity-panel", "validation-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text validation.title ]
+              , HH.p_ [ HH.text validation.subtitle ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "metric-grid" ] ]
+          (map renderMetric validation.metrics)
+      , renderWitnessWarnings validation.warnings
+      , HH.div_
+          (map (renderWitnessSection state) validation.sections)
       ]
 
   renderWitnessWarnings warnings =
@@ -785,6 +813,7 @@ inspectorComponent initial =
           , browser = Nothing
           , identification = Nothing
           , witnessPlan = Nothing
+          , validation = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -838,11 +867,13 @@ inspectorComponent initial =
             else pure "{}"
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
+          validationResult <- H.liftAff (runLedgerOperation h "tx.validate" inputContextArgs)
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
             identification = Json.operationIdentification identifyResult.stdout
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
+            validation = Json.operationValidation validationResult.stdout
           H.modify_
             _
               { running = false
@@ -855,6 +886,9 @@ inspectorComponent initial =
                   else Nothing
               , witnessPlan =
                   if witnessPlanResult.exitOk && witnessPlan.valid then Just witnessPlan
+                  else Nothing
+              , validation =
+                  if validationResult.exitOk && validation.valid then Just validation
                   else Nothing
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
