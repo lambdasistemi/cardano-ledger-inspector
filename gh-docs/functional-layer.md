@@ -39,17 +39,17 @@ Transforming operations must return the resulting transaction as
 ## Workspace Context
 
 The host owns workspace state. A selected transaction is sent as `tx_cbor` on
-every operation, and immutable resolved input outputs can be sent as
-`args.context.utxo`.
+every operation, and immutable producer transaction bytes can be sent as
+`args.context.producer_txs`.
 
 The default `args.input_policy` is `preserve`: ordinary inspect, browse,
 witness-planning, and patch operations keep the transaction input set unchanged.
 Operations that add inputs for balancing use `may_extend`; operations that run
 coin selection use `replace`.
 
-Resolved UTxO data is stable because each entry is keyed by historical
-`tx_id#index`. Current unspent status is not stable and belongs to live-chain
-validation or submission checks.
+Producer transaction CBOR is stable because transaction bytes are immutable.
+The ledger layer derives referenced outputs by `tx_id#index`. Current unspent
+status is not stable and belongs to live-chain validation or submission checks.
 
 ## Current Operations
 
@@ -66,10 +66,11 @@ validation or submission checks.
 
 `tx.witness.plan`
 : Return transaction-derived signer, witness, script, redeemer, datum, and
-  reference-input planning data. When `args.context.utxo` is present, it also
-  reports whether every visible input has resolved immutable output context.
-  Without that context, it warns that input address credentials and reference
-  scripts cannot be inferred from transaction CBOR alone.
+  reference-input planning data. When `args.context.producer_txs` is present,
+  Haskell decodes producer transactions and reports whether every visible input
+  has resolved immutable output context. Without that context, it warns that
+  input address credentials and reference scripts cannot be inferred from
+  transaction CBOR alone.
 
 ## Contract Source
 

@@ -215,9 +215,11 @@ const resolvedTxInRows = (items, pathRoot) =>
   (Array.isArray(items) ? items : []).map((item, index) => {
     const key = item?.key || `${item?.tx_id || ""}#${text(item?.index)}`;
     const status = item?.resolved === true ? "resolved" : "missing";
-    const address = item?.address ? shortHex(item.address, 18, 10) : "";
-    const lovelace = item?.lovelace ? formatLovelace(item.lovelace) : "";
-    const detailParts = [status, lovelace, address].filter((part) => part !== "");
+    const txOut = item?.tx_out && typeof item.tx_out === "object" ? item.tx_out : {};
+    const address = txOut.address_hex ? shortHex(txOut.address_hex, 18, 10) : "";
+    const lovelace = txOut.coin_lovelace ? formatLovelace(txOut.coin_lovelace) : "";
+    const reason = item?.reason ? text(item.reason) : "";
+    const detailParts = [status, lovelace, address, reason].filter((part) => part !== "");
     return witnessRow(
       status,
       key,
@@ -287,7 +289,7 @@ const normalizeWitnessPlan = (plan) => {
       metric("Redeemers", summary.redeemer_count ?? redeemers.length),
       metric("Datums", summary.datum_count ?? datums.length),
       metric("Reference inputs", summary.reference_input_count ?? referenceInputs.length),
-      metric("Context UTxOs", context.utxo_count ?? 0),
+      metric("Producer txs", context.producer_tx_count ?? 0),
       metric("Resolved inputs", context.resolved_input_count ?? 0),
       metric("Missing inputs", context.missing_input_count ?? 0),
     ],

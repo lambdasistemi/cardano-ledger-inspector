@@ -30,8 +30,9 @@ transaction CBOR plus operation arguments and returns explicit JSON results.
 ## Input Context Model
 
 For most edit workflows, transaction inputs are the stable anchor. A `TxIn`
-references an immutable historical output, so the resolved output data can be
-cached by the host workspace and reused while the candidate transaction changes.
+references an immutable historical output. The host can fetch and cache the
+producer transaction CBOR by transaction id while the candidate transaction
+changes.
 
 The ledger layer still receives that context explicitly on each call:
 
@@ -39,25 +40,18 @@ The ledger layer still receives that context explicitly on each call:
 {
   "input_policy": "preserve",
   "context": {
-    "utxo": {
-      "<tx_id>#<index>": {
-        "tx_id": "<64 hex chars>",
-        "index": 0,
-        "address": "addr1...",
-        "lovelace": "10000000",
-        "assets": {},
-        "datum_hash": null,
-        "inline_datum_cbor": null,
-        "reference_script_hash": null,
-        "source": "blockfrost.txs.utxos.outputs",
-        "unspent_status": "not_checked"
+    "producer_txs": {
+      "<producer_tx_id>": {
+        "tx_cbor": "<hex-encoded producer transaction>",
+        "source": "blockfrost.txs.cbor"
       }
     },
     "resolution": {
       "provider": "blockfrost",
-      "source": "tx-input-producer-outputs",
+      "source": "tx-cbor",
       "requested_input_count": 1,
       "requested_reference_input_count": 0,
+      "requested_tx_count": 1,
       "resolved_count": 1,
       "missing": [],
       "errors": [],
@@ -67,9 +61,11 @@ The ledger layer still receives that context explicitly on each call:
 }
 ```
 
-Resolved output data and live chain status are intentionally separate:
+Producer transaction data and live chain status are intentionally separate:
 
-- Resolved output data is immutable and safe to cache by `TxIn`.
+- Producer transaction CBOR is immutable and safe to cache by transaction id.
+- Haskell derives referenced outputs from decoded producer transactions by
+  `tx_id#index`.
 - Live unspent status is mutable and must be checked again before submission or
   live-chain validation.
 
@@ -136,9 +132,10 @@ Common argument fields:
 `input_policy`
 : Optional. Defaults to `preserve`.
 
-`context.utxo`
-: Optional resolved UTxO map keyed by `tx_id#index`. The host workspace owns
-  this state and sends it with operations that need input context.
+`context.producer_txs`
+: Optional producer transaction CBOR map keyed by transaction id. The host
+  workspace owns this byte cache and sends it with operations that need input
+  context.
 
 Browser navigation example:
 
@@ -397,21 +394,22 @@ Arguments:
 `input_policy`
 : Optional. Defaults to `preserve`.
 
-`context.utxo`
-: Optional. Resolved UTxO map keyed by `tx_id#index`.
+`context.producer_txs`
+: Optional. Producer transaction CBOR map keyed by transaction id.
 
-When `context.utxo` is absent, the operation remains transaction-only. It can
-compare `required_signers` from the transaction body with vkey/bootstrap
-witnesses already present in the witness set, and it can report script
-witnesses, redeemers, witness datums, and reference inputs. It cannot infer
-input address credentials, datum hashes needed by consumed UTxOs, or reference
-scripts without explicit UTxO context, so it returns a transaction-only warning.
+When `context.producer_txs` is absent, the operation remains transaction-only.
+It can compare `required_signers` from the transaction body with
+vkey/bootstrap witnesses already present in the witness set, and it can report
+script witnesses, redeemers, witness datums, and reference inputs. It cannot
+infer input address credentials, datum hashes needed by consumed UTxOs, or
+reference scripts without producer transaction context, so it returns a
+transaction-only warning.
 
-When `context.utxo` is present, the operation reports coverage in
+When `context.producer_txs` is present, Haskell decodes those producer
+transactions and resolves visible inputs by selecting `outputs[index]` from the
+matching producer transaction. The operation reports coverage in
 `witness_plan.context`, plus `resolved_inputs` and
-`resolved_reference_inputs`. This first context-aware slice verifies that every
-visible input has immutable resolved-output context; deeper ledger TxOut
-reconstruction and credential inference are follow-up work.
+`resolved_reference_inputs`.
 
 ## 0.1 Target Operations
 
@@ -562,7 +560,7 @@ Machine-readable draft schemas are tracked next to this contract:
 - `../openapi/cardano-ledger-functional.openapi.json`
 - `../schemas/ledger-operation-request.schema.json`
 - `../schemas/ledger-operation-response.schema.json`
-- `../schemas/utxo-context.schema.json`
+- `../schemas/producer-tx-context.schema.json`
 - `../schemas/browser-view.schema.json`
 - `../schemas/tx-identify-result.schema.json`
 - `../schemas/tx-witness-plan-result.schema.json`

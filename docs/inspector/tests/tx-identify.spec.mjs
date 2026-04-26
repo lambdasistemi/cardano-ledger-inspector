@@ -42,32 +42,6 @@ async function installClipboardMock(page) {
   });
 }
 
-function blockfrostUtxoResponse(txHash) {
-  const indexesByTx = {
-    "42ceabd168faa7e7bbe10d8e72e6ba0e71886bf3537ea88bd098782e1df1c1e9": [2],
-    "1ef2797c28a7679ca8e62693642513a44bed07bc37cdef73d4cd29956b4f83a5": [0],
-    "87daf43c764260d9ad00342fcb0d444c15752c9215f43c6b8e74189e7ba99397": [0],
-  };
-  const indexes = indexesByTx[txHash] || [0];
-  return {
-    hash: txHash,
-    inputs: [],
-    outputs: indexes.map((index) => ({
-      address: `addr_test1resolved${txHash.slice(0, 16)}${index}`,
-      amount: [
-        {
-          unit: "lovelace",
-          quantity: "1234567",
-        },
-      ],
-      output_index: index,
-      data_hash: null,
-      inline_datum: null,
-      reference_script_hash: null,
-    })),
-  };
-}
-
 test("decodes a Conway transaction and exposes compact identity values", async ({
   page,
 }) => {
@@ -121,20 +95,25 @@ test("shows transaction-derived witness plan values", async ({ page }) => {
   expect(copied).toMatch(/^[0-9a-f]{64}$/);
 });
 
-test("passes resolved Blockfrost input context into witness planning", async ({
+test("passes producer transaction CBOR into witness planning", async ({
   page,
 }) => {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  let producerCborRequests = 0;
+  let utxoRequests = 0;
 
   await installClipboardMock(page);
-  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/utxos", async (route) => {
-    const match = route.request().url().match(/\/txs\/([^/]+)\/utxos$/);
-    const txHash = match ? match[1] : "";
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/cbor", async (route) => {
+    producerCborRequests += 1;
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(blockfrostUtxoResponse(txHash)),
+      body: JSON.stringify({ cbor: txCbor }),
     });
+  });
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/utxos", async (route) => {
+    utxoRequests += 1;
+    await route.abort();
   });
 
   await page.goto("/");
@@ -146,12 +125,14 @@ test("passes resolved Blockfrost input context into witness planning", async ({
   await page.getByRole("button", { name: "Decode" }).click();
 
   await expect(
-    page.getByText("UTxO context was supplied for every visible transaction input"),
+    page.getByText("Producer transaction CBOR resolved every visible transaction input"),
   ).toBeVisible();
-  await expect(page.getByText("Context UTxOs")).toBeVisible();
+  await expect(page.getByText("Producer txs")).toBeVisible();
   await expect(
     page.locator(".identity-section-title", { hasText: "Resolved inputs" }),
   ).toBeVisible();
+  expect(producerCborRequests).toBeGreaterThan(0);
+  expect(utxoRequests).toBe(0);
 
   const resolvedRow = page
     .locator(".witness-plan .witness-row")

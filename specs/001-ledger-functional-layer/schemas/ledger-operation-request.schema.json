@@ -35,7 +35,7 @@
           "description": "Declares whether the operation may change the transaction input set. Normal patch/inspect operations should preserve inputs."
         },
         "context": {
-          "$ref": "utxo-context.schema.json",
+          "$ref": "producer-tx-context.schema.json",
           "description": "Explicit external context owned by the host workspace."
         }
       },

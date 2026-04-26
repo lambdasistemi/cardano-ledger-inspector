@@ -196,6 +196,7 @@
               and (.result.witness_plan.resolved_inputs | type == "array")
               and (.result.witness_plan.resolved_reference_inputs | type == "array")
               and .result.witness_plan.context.supplied == false
+              and .result.witness_plan.context.producer_tx_count == 0
               and (.result.witness_plan.summary.required_signer_count >= 0)
               and (.result.witness_plan.summary.present_vkey_witness_count >= 0)
               and (.result.witness_plan.summary.missing_vkey_witness_count >= 0)
@@ -225,6 +226,7 @@
               --slurpfile inspect inspect-response.json \
               '$inspect[0].result.inspection as $inspection
               | ($inspection.inputs + $inspection.reference_inputs) as $inputs
+              | ($inputs | map(.tx_id) | unique) as $producerTxIds
               | {
                 ledger_functional_layer: "cardano-ledger-functional/v1",
                 tx_cbor: ($tx | gsub("\\s"; "")),
@@ -232,31 +234,24 @@
                 args: {
                   input_policy: "preserve",
                   context: {
-                    utxo: (
-                      $inputs
+                    producer_txs: (
+                      $producerTxIds
                       | map({
-                          key: (.tx_id + "#" + (.index | tostring)),
+                          key: .,
                           value: {
-                            tx_id: .tx_id,
-                            index: .index,
-                            address: "addr_test1synthetic",
-                            lovelace: "0",
-                            assets: {},
-                            datum_hash: null,
-                            inline_datum_cbor: null,
-                            reference_script_hash: null,
-                            source: "smoke.synthetic",
-                            unspent_status: "not_checked"
+                            tx_cbor: ($tx | gsub("\\s"; "")),
+                            source: "smoke.synthetic.current_tx_cbor"
                           }
                         })
                       | from_entries
                     ),
                     resolution: {
                       provider: "smoke",
-                      source: "decoded-fixture-inputs",
+                      source: "synthetic-producer-tx-cbor",
                       requested_input_count: ($inspection.inputs | length),
                       requested_reference_input_count: ($inspection.reference_inputs | length),
-                      resolved_count: ($inputs | length),
+                      requested_tx_count: ($producerTxIds | length),
+                      resolved_count: ($producerTxIds | length),
                       missing: [],
                       errors: [],
                       unspent_status: "not_checked"
@@ -273,6 +268,8 @@
               and .op == "tx.witness.plan"
               and $plan.context.input_policy == "preserve"
               and $plan.context.supplied == true
+              and $plan.context.producer_tx_count > 0
+              and $plan.context.decoded_producer_tx_count == $plan.context.producer_tx_count
               and $plan.context.complete == true
               and $plan.context.missing_input_count == 0
               and ($plan.resolved_inputs | length == $plan.context.input_count)

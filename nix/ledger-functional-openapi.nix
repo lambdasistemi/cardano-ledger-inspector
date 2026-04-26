@@ -83,25 +83,18 @@
                     args = {
                       input_policy = "preserve";
                       context = {
-                        utxo = {
-                          "0000000000000000000000000000000000000000000000000000000000000000#0" = {
-                            tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
-                            index = 0;
-                            address = "addr1...";
-                            lovelace = "10000000";
-                            assets = { };
-                            datum_hash = null;
-                            inline_datum_cbor = null;
-                            reference_script_hash = null;
-                            source = "blockfrost.txs.utxos.outputs";
-                            unspent_status = "not_checked";
+                        producer_txs = {
+                          "0000000000000000000000000000000000000000000000000000000000000000" = {
+                            tx_cbor = "84a4...";
+                            source = "blockfrost.txs.cbor";
                           };
                         };
                         resolution = {
                           provider = "blockfrost";
-                          source = "tx-input-producer-outputs";
+                          source = "tx-cbor";
                           requested_input_count = 1;
                           requested_reference_input_count = 0;
+                          requested_tx_count = 1;
                           resolved_count = 1;
                           missing = [ ];
                           errors = [ ];
@@ -241,17 +234,23 @@
                               tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
                               index = 0;
                               resolved = true;
-                              source = "blockfrost.txs.utxos.outputs";
-                              address = "addr1...";
-                              lovelace = "10000000";
-                              datum_hash = null;
-                              reference_script_hash = null;
+                              source = "blockfrost.txs.cbor";
+                              tx_out = {
+                                address_hex = "01...";
+                                coin_lovelace = "10000000";
+                                assets = { };
+                                datum = {
+                                  kind = "no_datum";
+                                };
+                              };
                             }
                           ];
                           resolved_reference_inputs = [ ];
                           context = {
                             input_policy = "preserve";
-                            utxo_count = 1;
+                            producer_tx_count = 1;
+                            decoded_producer_tx_count = 1;
+                            producer_tx_errors = [ ];
                             supplied = true;
                             complete = true;
                             input_count = 1;
@@ -262,9 +261,10 @@
                             missing_reference_input_count = 0;
                             resolution = {
                               provider = "blockfrost";
-                              source = "tx-input-producer-outputs";
+                              source = "tx-cbor";
                               requested_input_count = 1;
                               requested_reference_input_count = 0;
+                              requested_tx_count = 1;
                               resolved_count = 1;
                               missing = [ ];
                               errors = [ ];
@@ -282,7 +282,7 @@
                             reference_input_count = 0;
                           };
                           warnings = [
-                            "UTxO context was supplied for every visible transaction input; live unspent status is not checked by this operation."
+                            "Producer transaction CBOR resolved every visible transaction input; live unspent status is not checked by this operation."
                           ];
                         };
                       };
@@ -346,8 +346,8 @@
       TxWitnessPlanResult = {
         "$ref" = "tx-witness-plan-result.schema.json";
       };
-      UtxoContext = {
-        "$ref" = "utxo-context.schema.json";
+      ProducerTxContext = {
+        "$ref" = "producer-tx-context.schema.json";
       };
       LedgerOperationError = {
         type = "object";
