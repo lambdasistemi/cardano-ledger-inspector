@@ -68,7 +68,7 @@ function blockfrostUtxoResponse(txHash) {
   };
 }
 
-test("decodes a Conway transaction and exposes copyable identity values", async ({
+test("decodes a Conway transaction and exposes compact identity values", async ({
   page,
 }) => {
   await decodeFixture(page);
@@ -82,9 +82,25 @@ test("decodes a Conway transaction and exposes copyable identity values", async 
       .getByText("Redeemers", { exact: true }),
   ).toBeVisible();
 
+  await expect(
+    page.locator(".identity-panel:not(.witness-plan)").getByRole("button"),
+  ).toHaveCount(0);
+
   const txIdRow = page.locator(".identity-row", { hasText: "Transaction ID" });
-  await txIdRow.getByRole("button", { name: "Copy" }).click();
-  await expect(txIdRow.getByRole("button", { name: "Copied" })).toBeVisible();
+  const txId = await txIdRow.locator("code").innerText();
+  await txIdRow.locator("code").click();
+  await expect(txIdRow).toHaveClass(/is-copied/);
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(txId);
+
+  const bodyHashRow = page.locator(".identity-row", { hasText: "Body hash" });
+  const bodyHash = await bodyHashRow.locator("code").innerText();
+  await bodyHashRow.locator("code").click();
+  await expect(bodyHashRow).toHaveClass(/is-copied/);
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(bodyHash);
 });
 
 test("shows transaction-derived witness plan values", async ({ page }) => {
@@ -156,6 +172,11 @@ test("opens browser rows in place without losing identity context", async ({
     .locator(".browser-row")
     .filter({ has: page.locator("code", { hasText: "inputs" }) })
     .first();
+
+  await expect(inputsRow.getByRole("button", { name: "Copy" })).toHaveCount(0);
+  await inputsRow.locator(".browser-summary").click();
+  await expect(inputsRow).toHaveClass(/is-copied/);
+
   await inputsRow.getByRole("button", { name: "Open" }).click();
 
   await expect(page.locator(".browser-children").first()).toBeVisible();
