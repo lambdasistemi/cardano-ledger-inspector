@@ -134,6 +134,9 @@ can add a validation panel:
 1. Keep the selected transaction CBOR in the browser workspace.
 2. Fetch producer transaction CBOR for visible inputs through provider byte
    fetchers when the user asks for validation context.
-3. Call `tx.validate` with current `tx_cbor` and explicit `args.context`.
-4. Render `status`, `checks`, `failures`, `missing_context`, and resolved input
+3. Fetch network, current slot, current epoch, and protocol parameters through
+   the selected provider adapter. Koios uses `tip` plus `cli_protocol_params`;
+   Blockfrost uses `blocks/latest` plus `epochs/latest/parameters`.
+4. Call `tx.validate` with current `tx_cbor` and explicit `args.context`.
+5. Render `status`, `checks`, `failures`, `missing_context`, and resolved input
    rows with copyable hashes and paths back into the transaction browser.

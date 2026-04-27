@@ -46,12 +46,18 @@ resolveProducerTxContext provider network key inspectionResponse =
         (producerTxSource provider)
         inspectionResponse
         (\txId -> fetchTxCborEffect provider network key txId)
+        (fetchValidationContextEffect provider network key)
     )
 
 fetchTxCborEffect :: Provider -> Network -> String -> String -> Effect (Promise String)
 fetchTxCborEffect = case _ of
   Blockfrost -> Blockfrost.fetchTxCborEffect
   Koios      -> Koios.fetchTxCborEffect
+
+fetchValidationContextEffect :: Provider -> Network -> String -> Effect (Promise String)
+fetchValidationContextEffect = case _ of
+  Blockfrost -> Blockfrost.fetchValidationContextEffect
+  Koios      -> Koios.fetchValidationContextEffect
 
 resolutionProvider :: Provider -> String
 resolutionProvider = case _ of
@@ -68,4 +74,5 @@ foreign import resolveProducerTxContextImpl
   -> String -- producer tx source
   -> String -- tx.inspect response
   -> (String -> Effect (Promise String)) -- fetchTxCbor by tx id
+  -> Effect (Promise String) -- fetch current validation context
   -> Effect (Promise String)

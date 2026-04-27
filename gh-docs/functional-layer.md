@@ -53,17 +53,23 @@ status is not stable and belongs to live-chain validation or submission checks.
 
 ## Provider Boundary
 
-Browser provider adapters expose one capability for the current 0.1 inspection
-path:
+Browser provider adapters expose byte-fetch and context-fetch capabilities for
+the current 0.1 inspection path:
 
 ```text
 fetchTxCbor(network, credentials, tx_id) -> tx_cbor
+fetchValidationContext(network, credentials) -> { network, slot, epoch, protocol_parameters }
 ```
 
-The same capability opens the user-selected transaction and fetches producer
+`fetchTxCbor` opens the user-selected transaction and fetches producer
 transactions needed for input context. Provider modules do not expose UTxO JSON
 projection or ledger reconstruction helpers; producer-context arguments are
 built by the host and interpreted by the Haskell ledger layer.
+
+The browser host resolves validation context from the selected provider instead
+of asking users to paste it. Koios uses `tip` plus `cli_protocol_params`;
+Blockfrost uses `blocks/latest` plus `epochs/latest/parameters`, translating
+the Blockfrost protocol-parameter response into the ledger-compatible shape.
 
 ## Current Operations
 
@@ -97,8 +103,9 @@ built by the host and interpreted by the Haskell ledger layer.
 The browser inspector now calls `tx.inspect`, `tx.identify`,
 `tx.witness.plan`, and `tx.validate` from the same selected transaction CBOR.
 When provider credentials are available, producer transaction CBOR fetched by
-transaction id is passed as explicit `args.context.producer_txs`; missing time,
-network, protocol, governance, or certificate context remains visible as
+transaction id is passed as explicit `args.context.producer_txs`, and provider
+tip/protocol-parameter data is passed as explicit validation context. Missing
+governance, certificate, or failed provider context remains visible as
 validation diagnostics rather than being guessed by the UI.
 
 A complete positive request is committed at
