@@ -86,9 +86,34 @@ Transaction inspector: <https://lambdasistemi.github.io/cardano-ledger-wasi/insp
 
 Pull-request previews are published to Surge by the `PR preview` workflow.
 
-## CI Artifacts
+## Releases
 
-Every `CI` workflow run uploads downloadable artifacts:
+Tagged releases are produced by
+[release-please](https://github.com/googleapis/release-please) from
+conventional-commit history. Each release attaches:
+
+- `cardano-ledger-reference-<tag>.wasm` — Extism plugin exposing
+  `tx_identify` and `tx_validate`. The conformance reference for
+  alternative node implementations: load this in your test runner via
+  any [Extism host SDK](https://extism.org/docs/concepts/host-sdk),
+  call the same exports against the same input, diff your output. The
+  Wasmtime-backed SDKs (Rust, Haskell, Python via libextism, etc.)
+  work; the Go SDK currently does not because its bundled wazero
+  predates wasm tail-call support.
+- `wasm-tx-inspector-<tag>.wasm` — same Conway ledger, packaged as a
+  WASI reactor (stdin/stdout JSON). Suitable for shell-driven debug
+  and the inspector UI.
+- `ledger-functional-openapi-<tag>.tar.gz` — OpenAPI contract for the
+  JSON envelope.
+- `SHA256SUMS-<tag>.txt` — checksums.
+
+Releases: <https://github.com/lambdasistemi/cardano-ledger-wasi/releases>
+
+## CI Artifacts (per-run, ephemeral)
+
+Every `CI` workflow run also uploads per-run artifacts retained for 30
+days. Use these for inspecting a specific PR; use a tagged release for
+anything you depend on.
 
 - `wasm-tx-inspector` — `wasm-tx-inspector.wasm` plus `SHA256SUMS`.
 - `tx-inspector-ui` — static `index.html`, `index.js`, plus `SHA256SUMS`.
