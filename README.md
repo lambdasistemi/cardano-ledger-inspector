@@ -51,6 +51,7 @@ just check-identify
 just check-witness-plan
 just check-input-context
 just check-validate
+just check-evaluate-scripts
 just test-playwright
 just test
 ```
@@ -71,6 +72,9 @@ context.
 including incomplete-context diagnostics and producer transaction coverage.
 The positive validation fixture is
 `specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`.
+`just check-evaluate-scripts` verifies the implemented `tx.evaluate.scripts`
+response shape, including incomplete-context diagnostics, per-redeemer budget
+data, and complete-context execution-unit reporting.
 `just test-playwright` runs the Playwright E2E suite against the packaged inspector UI.
 `just test` runs the feature smoke check plus the browser suite.
 

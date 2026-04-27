@@ -103,6 +103,13 @@ producer transaction CBOR that could not be fetched.
   and protocol parameters are complete. It never mutates or returns transaction
   CBOR.
 
+`tx.evaluate.scripts`
+: Return structured phase-2 script evaluation status for the selected
+  transaction and explicit context. The operation reports `succeeded`, `failed`,
+  `incomplete`, `rejected`, or `not_applicable`, lists redeemers with budgeted
+  and evaluated execution units, and preserves missing-context diagnostics. It
+  never mutates or returns transaction CBOR.
+
 The browser inspector now calls `tx.inspect`, `tx.identify`,
 `tx.witness.plan`, and `tx.validate` from the same selected transaction CBOR.
 When provider credentials are available, producer transaction CBOR fetched by
@@ -110,6 +117,9 @@ transaction id is passed as explicit `args.context.producer_txs`, and provider
 tip/protocol-parameter data is passed as explicit validation context. Missing
 governance, certificate, or failed provider context remains visible as
 validation diagnostics rather than being guessed by the UI.
+
+`tx.evaluate.scripts` is available through the WASI/API boundary; a dedicated
+browser panel can be added separately once its UI flow is selected.
 
 A complete positive request is committed at
 [`specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json).
@@ -127,7 +137,7 @@ The readable API page and detailed contract are tracked here:
 ## Direction
 
 The 0.1 surface should keep growing around useful ledger operations: script
-evaluation, verification, transformation, patching, and eventually balancing
-where the transaction has enough slack. Each operation should keep the same
-boundary discipline: explicit inputs, ledger-owned semantics, CBOR for
-transaction bytes, JSON for control and results.
+verification, transformation, patching, and eventually balancing where the
+transaction has enough slack. Each operation should keep the same boundary
+discipline: explicit inputs, ledger-owned semantics, CBOR for transaction
+bytes, JSON for control and results.

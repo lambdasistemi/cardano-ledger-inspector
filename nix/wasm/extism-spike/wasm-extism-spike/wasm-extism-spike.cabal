@@ -40,4 +40,5 @@ executable wasm-extism-spike
   ghc-options:
     -Wall -no-hs-main -optl-mexec-model=reactor
     "-optl-Wl,--export=hs_init" "-optl-Wl,--export=tx_identify"
-    "-optl-Wl,--export=tx_validate" "-optl-Wl,--allow-undefined"
+    "-optl-Wl,--export=tx_validate" "-optl-Wl,--export=tx_evaluate_scripts"
+    "-optl-Wl,--allow-undefined"

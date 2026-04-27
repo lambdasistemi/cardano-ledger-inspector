@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-evaluate-scripts-result.schema.json",
+  "title": "tx.evaluate.scripts result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["script_evaluation"],
+  "properties": {
+    "script_evaluation": {
+      "$ref": "#/$defs/scriptEvaluation"
+    }
+  },
+  "$defs": {
+    "scriptEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "scripts_evaluate_for_supplied_context",
+        "complete",
+        "redeemers",
+        "total_ex_units",
+        "failures",
+        "missing_context",
+        "warnings",
+        "errors"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["succeeded", "failed", "incomplete", "rejected", "not_applicable"]
+        },
+        "scripts_evaluate_for_supplied_context": {
+          "type": ["boolean", "null"]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "tx_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "body_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "redeemers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/redeemerEvaluation"
+          }
+        },
+        "total_ex_units": {
+          "$ref": "#/$defs/exUnitsTotal"
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evaluationFailure"
+          }
+        },
+        "missing_context": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/missingContext"
+          }
+        },
+        "resolved_inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resolvedInput"
+          }
+        },
+        "resolved_reference_inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resolvedInput"
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contextError"
+          }
+        }
+      }
+    },
+    "redeemerEvaluation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["key", "purpose", "index", "status"],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string",
+          "enum": ["succeeded", "failed", "not_evaluated", "rejected"]
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "script_hash": {
+          "type": "string"
+        },
+        "redeemer_data_hash": {
+          "type": "string"
+        },
+        "datum_hash": {
+          "type": "string"
+        },
+        "budget_ex_units": {
+          "$ref": "#/$defs/exUnits"
+        },
+        "evaluated_ex_units": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/exUnits"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing_context": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "exUnits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory", "steps"],
+      "properties": {
+        "memory": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "steps": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        }
+      }
+    },
+    "exUnitsTotal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory", "steps"],
+      "properties": {
+        "memory": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "steps": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evaluationFailure": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["message"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning"]
+        },
+        "redeemer": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "missingContext": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "tx_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_for": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "resolvedInput": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["key", "tx_id", "index", "kind", "resolved"],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "tx_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["input", "reference_input"]
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "contextError": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["message"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

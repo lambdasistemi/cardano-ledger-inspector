@@ -402,11 +402,123 @@
               invalid-network-request.json invalid-network-response.json $out/
           '';
 
+          tx-evaluate-scripts-smoke = pkgs.runCommand "tx-evaluate-scripts-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.evaluate.scripts",
+                args: {
+                  input_policy: "preserve",
+                  context: {}
+                }
+              }' > missing-context-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < missing-context-request.json > missing-context-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.script_evaluation as $e
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.evaluate.scripts"
+              and $e.status == "incomplete"
+              and $e.scripts_evaluate_for_supplied_context == null
+              and $e.complete == false
+              and ($e.tx_id | test("^[0-9a-f]{64}$"))
+              and ($e.body_hash | test("^[0-9a-f]{64}$"))
+              and ($e.redeemers | type == "array")
+              and ($e.redeemers | length >= 1)
+              and ([$e.redeemers[]? | select(.status == "not_evaluated")] | length >= 1)
+              and ([$e.redeemers[]? | select(.budget_ex_units.memory | test("^[0-9]+$"))] | length >= 1)
+              and ($e.total_ex_units.memory | test("^[0-9]+$"))
+              and ($e.total_ex_units.steps | test("^[0-9]+$"))
+              and $e.total_ex_units.partial == true
+              and ($e.failures | length == 0)
+              and ($e.missing_context | length >= 1)
+              and ([$e.missing_context[]? | select(.kind == "source_output")] | length >= 1)
+              and ($e.resolved_inputs | type == "array")
+              and ($e.resolved_reference_inputs | type == "array")
+              and $e.context.input_policy == "preserve"
+              and $e.context.producer_tx_count == 0
+              and (.result | has("tx_cbor") | not)
+            ' missing-context-response.json
+
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.evaluate.scripts",
+                args: {
+                  input_policy: "preserve",
+                  context: {
+                    utxo: {}
+                  }
+                }
+              }' > malformed-context-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < malformed-context-request.json > malformed-context-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.script_evaluation as $e
+              | .op == "tx.evaluate.scripts"
+              and $e.status == "rejected"
+              and $e.scripts_evaluate_for_supplied_context == null
+              and ($e.errors | type == "array")
+              and ([$e.errors[]? | select(.code == "unsupported_utxo_json")] | length == 1)
+              and ($e.failures | length == 0)
+              and (.result | has("tx_cbor") | not)
+            ' malformed-context-response.json
+
+            cp ${./specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-complete-request.json} \
+              complete-context-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < complete-context-request.json > complete-context-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.script_evaluation as $e
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.evaluate.scripts"
+              and $e.status == "succeeded"
+              and $e.scripts_evaluate_for_supplied_context == true
+              and $e.complete == true
+              and ($e.errors | length == 0)
+              and ($e.failures | length == 0)
+              and ($e.missing_context | length == 0)
+              and ($e.redeemers | length >= 1)
+              and ([$e.redeemers[]? | select(.status == "succeeded")] | length == ($e.redeemers | length))
+              and ([$e.redeemers[]? | select(.evaluated_ex_units.memory | test("^[0-9]+$"))] | length == ($e.redeemers | length))
+              and ($e.total_ex_units.memory | test("^[0-9]+$"))
+              and ($e.total_ex_units.steps | test("^[0-9]+$"))
+              and $e.total_ex_units.partial == false
+              and $e.context.complete == true
+              and $e.context.evaluated_redeemer_count == $e.context.redeemer_count
+              and (.result | has("tx_cbor") | not)
+            ' complete-context-response.json
+
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < complete-context-request.json > complete-context-response-2.json
+            ${pkgs.jq}/bin/jq -s -e '
+              .[0].result.script_evaluation == .[1].result.script_evaluation
+            ' complete-context-response.json complete-context-response-2.json
+
+            cp missing-context-request.json missing-context-response.json \
+              malformed-context-request.json malformed-context-response.json \
+              complete-context-request.json complete-context-response.json \
+              complete-context-response-2.json $out/
+          '';
+
           # Spike: native Haskell host (libextism + Wasmtime) loads the
-          # plugin and calls tx_identify + tx_validate against Conway
-          # fixtures. Both Extism exports delegate to the same
+          # plugin and calls ledger operation exports against Conway
+          # fixtures. The Extism exports delegate to the same
           # runLedgerOperationInput as the WASI reactor, so responses
-          # are byte-identical to tx-identify-smoke / tx-validate-smoke.
+          # are byte-identical to the WASI reactor for the same
+          # envelope.
           # The host is in nix/host/extism-spike-host; libextism is the
           # prebuilt Rust runtime fetched from the upstream release.
           tx-extism-spike-smoke = pkgs.runCommand "tx-extism-spike-smoke" { } ''
@@ -440,7 +552,7 @@
               and (.result.identification.witness_counts.vkey >= 0)
             ' identify-response.json
 
-            # tx.validate — complete-context fixture (status=valid)
+            # tx.validate - complete-context fixture (status=valid)
             "$HOST" "$WASM" tx_validate \
               < ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
               > validate-response.json
@@ -464,8 +576,34 @@
             ${pkgs.jq}/bin/jq -s -e '.[0] == .[1]' \
               validate-response.json wasi-validate-response.json
 
+            # tx.evaluate.scripts - complete-context fixture (status=succeeded)
+            "$HOST" "$WASM" tx_evaluate_scripts \
+              < ${./specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-complete-request.json} \
+              > evaluate-scripts-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.script_evaluation as $e
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.evaluate.scripts"
+              and $e.status == "succeeded"
+              and $e.scripts_evaluate_for_supplied_context == true
+              and $e.complete == true
+              and ($e.failures | length == 0)
+              and ([$e.redeemers[]? | select(.status == "succeeded")] | length == ($e.redeemers | length))
+            ' evaluate-scripts-response.json
+
+            # Conformance: Extism response on tx.evaluate.scripts is
+            # byte-identical to the WASI reactor response on the same envelope.
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < ${./specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-complete-request.json} \
+              > wasi-evaluate-scripts-response.json
+            ${pkgs.jq}/bin/jq -s -e '.[0] == .[1]' \
+              evaluate-scripts-response.json wasi-evaluate-scripts-response.json
+
             cp identify-request.json identify-response.json \
-              validate-response.json wasi-validate-response.json $out/
+              validate-response.json wasi-validate-response.json \
+              evaluate-scripts-response.json wasi-evaluate-scripts-response.json \
+              $out/
           '';
         in
         {
@@ -489,6 +627,7 @@
               tx-witness-plan-smoke
               tx-input-context-smoke
               tx-validate-smoke
+              tx-evaluate-scripts-smoke
               tx-extism-spike-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };

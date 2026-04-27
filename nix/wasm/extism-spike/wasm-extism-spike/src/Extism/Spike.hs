@@ -6,12 +6,11 @@
 Module      : Extism.Spike
 Description : Extism PDK plugin exposing ledger operations.
 
-Two foreign exports — 'tx_identify' and 'tx_validate'. Both delegate
-to 'Conway.Inspector.runLedgerOperationInput', which is the same code
-path the WASI reactor (@wasm-tx-inspector@) runs on stdin. The
-plugin's response is therefore byte-identical to the WASI reactor's
-response for the same input — that property is what makes the spike
-useful for differential conformance testing.
+Foreign exports delegate to 'Conway.Inspector.runLedgerOperationInput',
+which is the same code path the WASI reactor (@wasm-tx-inspector@)
+runs on stdin. The plugin's response is therefore byte-identical to the
+WASI reactor's response for the same input; that property is what
+makes the spike useful for differential conformance testing.
 
 Input is the canonical JSON envelope:
 
@@ -23,7 +22,12 @@ Input is the canonical JSON envelope:
 Output is the matching response envelope. Errors go through
 'Extism.PDK.setError'.
 -}
-module Extism.Spike (tx_identify, tx_validate) where
+module Extism.Spike (
+    tx_evaluate_scripts,
+    tx_identify,
+    tx_validate,
+)
+where
 
 import qualified Conway.Inspector as Inspector
 import qualified Data.Aeson as Aeson
@@ -36,6 +40,9 @@ tx_identify = runOp
 
 tx_validate :: IO ()
 tx_validate = runOp
+
+tx_evaluate_scripts :: IO ()
+tx_evaluate_scripts = runOp
 
 runOp :: IO ()
 runOp = do
@@ -57,3 +64,4 @@ errorMessage = \case
 
 foreign export ccall "tx_identify" tx_identify :: IO ()
 foreign export ccall "tx_validate" tx_validate :: IO ()
+foreign export ccall "tx_evaluate_scripts" tx_evaluate_scripts :: IO ()

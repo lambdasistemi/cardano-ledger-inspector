@@ -18,12 +18,12 @@ implemented and tested independently after the foundational contract work.
 **Purpose**: Promote the planned `tx.evaluate.scripts` contract into the public
 API surface before implementation depends on it.
 
-- [ ] T001 Copy `contracts/schemas/tx-evaluate-scripts-result.schema.json` to `specs/001-ledger-functional-layer/schemas/tx-evaluate-scripts-result.schema.json`
-- [ ] T002 Add `tx.evaluate.scripts` request and response examples to `nix/ledger-functional-openapi.nix`
-- [ ] T003 Register `TxEvaluateScriptsResult` in OpenAPI components in `nix/ledger-functional-openapi.nix`
-- [ ] T004 Update the operation registry and `tx.evaluate.scripts` section in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
-- [ ] T005 Regenerate committed OpenAPI JSON in `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
-- [ ] T006 Add the `tx.evaluate.scripts` schema link to `gh-docs/api.md`
+- [X] T001 Copy `contracts/schemas/tx-evaluate-scripts-result.schema.json` to `specs/001-ledger-functional-layer/schemas/tx-evaluate-scripts-result.schema.json`
+- [X] T002 Add `tx.evaluate.scripts` request and response examples to `nix/ledger-functional-openapi.nix`
+- [X] T003 Register `TxEvaluateScriptsResult` in OpenAPI components in `nix/ledger-functional-openapi.nix`
+- [X] T004 Update the operation registry and `tx.evaluate.scripts` section in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
+- [X] T005 Regenerate committed OpenAPI JSON in `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
+- [X] T006 Add the `tx.evaluate.scripts` schema link to `gh-docs/api.md`
 
 ---
 
@@ -32,13 +32,13 @@ API surface before implementation depends on it.
 **Purpose**: Prepare shared context-resolution code and smoke checks used by
 all script-evaluation stories.
 
-- [ ] T007 [P] Add `tx.evaluate.scripts` contract-shape assertions to a new Nix check in `flake.nix`
-- [ ] T008 [P] Add `just check-evaluate-scripts` to `justfile`
-- [ ] T009 Extract or reuse producer context and input-resolution helpers from `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T010 Add script-evaluation result helper constructors in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T011 Add `normalizeOperation "evaluate.scripts" = "tx.evaluate.scripts"` and dispatch plumbing in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T012 Decode explicit script-evaluation context from operation args in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T013 Run `just check-openapi` and `just check-swagger` to verify generated API artifacts
+- [X] T007 [P] Add `tx.evaluate.scripts` contract-shape assertions to a new Nix check in `flake.nix`
+- [X] T008 [P] Add `just check-evaluate-scripts` to `justfile`
+- [X] T009 Extract or reuse producer context and input-resolution helpers from `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T010 Add script-evaluation result helper constructors in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T011 Add `normalizeOperation "evaluate.scripts" = "tx.evaluate.scripts"` and dispatch plumbing in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T012 Decode explicit script-evaluation context from operation args in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T013 Run `just check-openapi` and `just check-swagger` to verify generated API artifacts
 
 **Checkpoint**: Contract artifacts and operation dispatch are ready for user
 story implementation.
@@ -57,16 +57,16 @@ execution units are equivalent and no `tx_cbor` mutation is returned.
 
 ### Tests for User Story 1
 
-- [ ] T014 [US1] Add a complete-context script-evaluation fixture in `specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-complete-request.json`
-- [ ] T015 [US1] Add jq assertions for `status == "succeeded"` and per-redeemer execution units in `flake.nix`
-- [ ] T016 [US1] Add determinism assertions for repeated `tx.evaluate.scripts` runs in `flake.nix`
+- [X] T014 [US1] Add a complete-context script-evaluation fixture in `specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-complete-request.json`
+- [X] T015 [US1] Add jq assertions for `status == "succeeded"` and per-redeemer execution units in `flake.nix`
+- [X] T016 [US1] Add determinism assertions for repeated `tx.evaluate.scripts` runs in `flake.nix`
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Invoke upstream ledger script evaluation and map successful redeemer execution units in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T018 [US1] Populate candidate `tx_id`, `body_hash`, `complete`, `scripts_evaluate_for_supplied_context`, and `total_ex_units` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T019 [US1] Ensure `tx.evaluate.scripts` never returns `result.tx_cbor` or mutating changes in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T020 [US1] Run `just check-evaluate-scripts` and record fixture limitations in `specs/003-tx-evaluate-scripts/quickstart.md`
+- [X] T017 [US1] Invoke upstream ledger script evaluation and map successful redeemer execution units in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T018 [US1] Populate candidate `tx_id`, `body_hash`, `complete`, `scripts_evaluate_for_supplied_context`, and `total_ex_units` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T019 [US1] Ensure `tx.evaluate.scripts` never returns `result.tx_cbor` or mutating changes in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T020 [US1] Run `just check-evaluate-scripts` and record fixture limitations in `specs/003-tx-evaluate-scripts/quickstart.md`
 
 **Checkpoint**: User Story 1 works independently as the MVP script-evaluation
 surface.
@@ -86,17 +86,17 @@ what to provide next when script evaluation cannot complete.
 
 - [ ] T021 [P] [US2] Add a missing-context script-evaluation fixture in `specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-missing-context-request.json`
 - [ ] T022 [P] [US2] Add a producer-id mismatch fixture in `specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-producer-mismatch-request.json`
-- [ ] T023 [US2] Add jq assertions for `status == "incomplete"` and actionable `missing_context` entries in `flake.nix`
-- [ ] T024 [US2] Add jq assertions that contradictory context produces `status == "rejected"` or structured context errors in `flake.nix`
+- [X] T023 [US2] Add jq assertions for `status == "incomplete"` and actionable `missing_context` entries in `flake.nix`
+- [X] T024 [US2] Add jq assertions that contradictory context produces `status == "rejected"` or structured context errors in `flake.nix`
 - [ ] T025 [US2] Add assertions that malformed hex, malformed CBOR, and malformed operation envelopes remain command-level errors in `flake.nix`
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Implement missing source-output diagnostics for script inputs in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T027 [US2] Implement missing protocol-parameter, cost-model, network, slot, and epoch diagnostics in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T028 [US2] Reject or explicitly label caller-provided non-CBOR UTxO context in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T026 [US2] Implement missing source-output diagnostics for script inputs in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T027 [US2] Implement missing protocol-parameter, cost-model, network, slot, and epoch diagnostics in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T028 [US2] Reject or explicitly label caller-provided non-CBOR UTxO context in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
 - [ ] T029 [US2] Ensure partially associated redeemers can return both `failures` and `missing_context` in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T030 [US2] Run `just check-evaluate-scripts` and verify missing-context output
+- [X] T030 [US2] Run `just check-evaluate-scripts` and verify missing-context output
 
 **Checkpoint**: User Story 2 works independently and incomplete evaluation is
 actionable.
@@ -121,10 +121,10 @@ and budget/evaluation data where available.
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Attach navigation paths to every redeemer result in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T035 [US3] Report budgeted execution units from the candidate transaction and evaluated execution units from ledger evaluation in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T034 [US3] Attach navigation paths to every redeemer result in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
+- [X] T035 [US3] Report budgeted execution units from the candidate transaction and evaluated execution units from ledger evaluation in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
 - [ ] T036 [US3] Include script hash, redeemer data hash, datum hash, and related input identifiers where available in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
-- [ ] T037 [US3] Run `just check-evaluate-scripts` and verify navigation fields in the smoke response
+- [X] T037 [US3] Run `just check-evaluate-scripts` and verify navigation fields in the smoke response
 
 **Checkpoint**: User Story 3 works independently and evaluation results are
 navigable.
@@ -136,11 +136,11 @@ navigable.
 **Purpose**: Finish repo integration, docs, formatting, and optional browser
 surface.
 
-- [ ] T038 [P] Update implemented operation docs in `gh-docs/functional-layer.md`
-- [ ] T039 [P] Update developer commands and CI artifact notes in `README.md`
-- [ ] T040 [P] Add `tx.evaluate.scripts` to the implemented operations table in `gh-docs/api.md`
-- [ ] T041 Add `tx-evaluate-scripts-result.schema.json` to the public schema list in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
-- [ ] T042 Run Fourmolu formatting check with `just format-check` for Haskell changes
+- [X] T038 [P] Update implemented operation docs in `gh-docs/functional-layer.md`
+- [X] T039 [P] Update developer commands and CI artifact notes in `README.md`
+- [X] T040 [P] Add `tx.evaluate.scripts` to the implemented operations table in `gh-docs/api.md`
+- [X] T041 Add `tx-evaluate-scripts-result.schema.json` to the public schema list in `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
+- [X] T042 Run Fourmolu formatting check with `just format-check` for Haskell changes
 - [ ] T043 Run PureScript compile with `just ui-check` if browser code changes
 - [ ] T044 Run full repository verification with `just test`
 - [ ] T045 [P] If a browser evaluation panel is added, implement result decoding in `docs/inspector/src/FFI/Json.js`
