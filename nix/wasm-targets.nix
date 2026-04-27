@@ -9,6 +9,8 @@
 # - wasm-ledger-smoke : full ledger closure + wasm32-built C libs; prints a
 #                       version reference
 # - wasm-tx-inspector : real Conway tx decoder; reads hex on stdin, emits JSON
+# - wasm-extism-spike : Conway tx decoder packaged as an Extism PDK plugin;
+#                       proof-of-concept for Extism-driven conformance tests
 { pkgs
 , libWasm
 , ghcWasmMeta
@@ -17,6 +19,7 @@
 , smokeSrc
 , ledgerSmokeSrc
 , txInspectorSrc
+, extismSpikeSrc
 }:
 let
   # Full ledger override set + wasm32-built C libs — the superset both
@@ -60,5 +63,18 @@ in
     # pulls additional Hackage tarballs (aeson, base16-bytestring, text,
     # microlens, ...) that expand the cabal cache.
     dependenciesHash = "sha256-KmY5jyyPc2NFXZSP133Tq6rQWp3d7STwT4O51h7Ukys=";
+  };
+
+  # Spike: depends on wasm-tx-inspector via path package, so the src
+  # has to span both subdirs (extism-spike + tx-inspector). The
+  # spike's project file lives at extism-spike/cabal-wasm.project.
+  wasm-extism-spike = libWasm.mkCardanoLedgerWasm {
+    inherit pkgs ghcWasmMeta wasiSdk chap;
+    src = extismSpikeSrc;
+    projectFile = "extism-spike/cabal-wasm.project";
+    packages = [ "wasm-extism-spike" ];
+    srpForks = fullLedgerForks;
+    withCLibs = true;
+    dependenciesHash = "sha256-I6srK/QXzWcr5dbOFBV1cPJ7C5iNPCgSs1oshVoMvpU=";
   };
 }

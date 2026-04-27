@@ -1,0 +1,25 @@
+cabal-version: 3.0
+name:          extism-spike-host
+version:       0.1.0.0
+synopsis:
+  Native Haskell host for the Extism PDK spike
+
+author:        lambdasistemi
+license:       Apache-2.0
+build-type:    Simple
+
+-- Loads wasm-extism-spike.wasm via the extism Hackage package
+-- (libextism, Wasmtime-backed) and calls the tx_identify export
+-- against transaction CBOR hex read from stdin.
+
+executable extism-spike-host
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  build-depends:
+    , base        >=4.17 && <5
+    , bytestring
+    , extism
+    , text
+
+  default-language: Haskell2010
+  ghc-options:      -Wall

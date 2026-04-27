@@ -88,6 +88,8 @@
             ]
           );
 
+          hostTargets = import ./nix/host { inherit pkgs; };
+
           wasmTargets = import ./nix/wasm-targets.nix {
             inherit pkgs;
             libWasm = self.lib.wasm;
@@ -97,6 +99,7 @@
             smokeSrc = ./nix/wasm/smoke;
             ledgerSmokeSrc = ./nix/wasm/ledger-smoke;
             txInspectorSrc = ./nix/wasm/tx-inspector;
+            extismSpikeSrc = ./nix/wasm;
           };
 
           tx-inspector-ui = import ./nix/wasm-ui.nix {
@@ -398,10 +401,78 @@
               complete-context-response.json complete-context-response-2.json \
               invalid-network-request.json invalid-network-response.json $out/
           '';
+
+          # Spike: native Haskell host (libextism + Wasmtime) loads the
+          # plugin and calls tx_identify + tx_validate against Conway
+          # fixtures. Both Extism exports delegate to the same
+          # runLedgerOperationInput as the WASI reactor, so responses
+          # are byte-identical to tx-identify-smoke / tx-validate-smoke.
+          # The host is in nix/host/extism-spike-host; libextism is the
+          # prebuilt Rust runtime fetched from the upstream release.
+          tx-extism-spike-smoke = pkgs.runCommand "tx-extism-spike-smoke" { } ''
+            mkdir -p $out
+            # Wasmtime writes a compile cache; sandbox HOME is unwritable.
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+
+            HOST=${hostTargets.extism-spike-host}/bin/extism-spike-host
+            WASM=${wasmTargets.wasm-extism-spike}/wasm-extism-spike.wasm
+
+            # tx.identify
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.identify",
+                args: {}
+              }' > identify-request.json
+            "$HOST" "$WASM" tx_identify \
+              < identify-request.json > identify-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.identify"
+              and (.result.identification.tx_id | test("^[0-9a-f]{64}$"))
+              and (.result.identification.body_hash | test("^[0-9a-f]{64}$"))
+              and (.result.identification.tx_size_bytes > 0)
+              and (.result.identification.fee_lovelace | test("^[0-9]+$"))
+              and (.result.identification.witness_counts.vkey >= 0)
+            ' identify-response.json
+
+            # tx.validate — complete-context fixture (status=valid)
+            "$HOST" "$WASM" tx_validate \
+              < ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > validate-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.validation as $v
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.validate"
+              and $v.status == "valid"
+              and $v.valid_for_supplied_context == true
+              and $v.complete == true
+              and ($v.failures | length == 0)
+              and ([$v.checks[]? | select(.id == "ledger.apply_tx" and .status == "passed")] | length == 1)
+            ' validate-response.json
+
+            # Conformance: Extism response on tx.validate is byte-identical
+            # to the WASI reactor response on the same envelope.
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > wasi-validate-response.json
+            ${pkgs.jq}/bin/jq -s -e '.[0] == .[1]' \
+              validate-response.json wasi-validate-response.json
+
+            cp identify-request.json identify-response.json \
+              validate-response.json wasi-validate-response.json $out/
+          '';
         in
         {
           packages = {
-            inherit (wasmTargets) wasm-smoke wasm-ledger-smoke wasm-tx-inspector;
+            inherit (wasmTargets)
+              wasm-smoke wasm-ledger-smoke wasm-tx-inspector wasm-extism-spike;
+            inherit (hostTargets) extism-spike-host libextism;
             inherit
               ledger-functional-openapi
               ledger-functional-openapi-generated
@@ -412,7 +483,13 @@
           };
 
           checks = {
-            inherit ledger-functional-openapi-check tx-identify-smoke tx-witness-plan-smoke tx-input-context-smoke tx-validate-smoke;
+            inherit
+              ledger-functional-openapi-check
+              tx-identify-smoke
+              tx-witness-plan-smoke
+              tx-input-context-smoke
+              tx-validate-smoke
+              tx-extism-spike-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 

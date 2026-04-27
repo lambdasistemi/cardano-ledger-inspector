@@ -28,6 +28,15 @@ check-input-context:
 check-validate:
     nix build .#checks.x86_64-linux.tx-validate-smoke -o result-validate-smoke
 
+build-extism-spike:
+    nix build .#packages.x86_64-linux.wasm-extism-spike -o result-extism-spike
+
+build-extism-host:
+    nix build .#packages.x86_64-linux.extism-spike-host -o result-extism-host
+
+check-extism-spike:
+    nix build .#checks.x86_64-linux.tx-extism-spike-smoke -o result-extism-spike-smoke
+
 test-playwright: build-ui
     nix develop --quiet -c sh -c 'cd docs/inspector && ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules && TX_INSPECTOR_SITE_DIR=../../result playwright test --reporter=list'
 

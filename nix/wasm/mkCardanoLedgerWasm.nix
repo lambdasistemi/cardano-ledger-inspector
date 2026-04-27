@@ -379,6 +379,7 @@ let
       cp -rL $CABAL_DIR $out/cabal
       cp -rL dist-newstyle $out/dist-newstyle
       # Preserve the patched project file so the wasm phase can reuse it.
+      mkdir -p "$(dirname "$out/${projectFile}")"
       cp ${projectFile} $out/${projectFile}
       chmod -R u+w $out
     '';
@@ -417,6 +418,25 @@ let
       rm -f ${projectFile}
       cp ${prebuiltDeps}/${projectFile} ${projectFile}
       chmod u+w ${projectFile}
+
+      # prebuiltDeps was built from metadata-only src (no .hs files), so any
+      # local path-package libraries listed in the project file got "built"
+      # with empty source — their dist-newstyle entries are present but
+      # don't expose any modules. Delete those entries so cabal rebuilds
+      # them from real source in this phase. External Hackage/CHaP/SRP libs
+      # are unaffected — their dist-newstyle artifacts are correct.
+      for pkg in $(find dist-newstyle/build -mindepth 3 -maxdepth 3 -type d \
+                     -path '*/wasm32-wasi/*' -name '*-0.1.0.0'); do
+        echo "purging local path-package dist entries: $pkg"
+        rm -rf "$pkg"
+      done
+      find dist-newstyle -name 'package.conf.d' -exec sh -c '
+        for d; do
+          for entry in "$d"/*-0.1.0.0-inplace*.conf; do
+            [ -e "$entry" ] && rm -f "$entry"
+          done
+        done
+      ' sh {} +
     '';
 
     buildPhase = ''
