@@ -1,0 +1,84 @@
+name: release-assets
+
+# Triggered by release-please when it creates a GitHub Release. Builds
+# the conformance-relevant artifacts and uploads them to the release.
+#
+# Conformance artifact: cardano-ledger-reference.wasm — Extism plugin
+# exposing tx_identify and tx_validate. Alternative-node implementors
+# load this in their own test runner via any extism host SDK and diff
+# their results against ours.
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-assets:
+    name: Publish release assets
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build conformance reference plugin
+        run: |
+          nix build --quiet .#packages.x86_64-linux.wasm-extism-spike \
+            -o result-extism-spike
+
+      - name: Build inspector WASI reactor
+        run: |
+          nix build --quiet .#packages.x86_64-linux.wasm-tx-inspector \
+            -o result-wasm
+
+      - name: Build OpenAPI contract
+        run: |
+          nix build --quiet .#packages.x86_64-linux.ledger-functional-openapi \
+            -o result-openapi
+
+      - name: Stage release artifacts
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.release.tag_name }}"
+          mkdir -p artifacts
+
+          # Conformance plugin — primary artifact for alternative-node
+          # implementors.
+          cp -L result-extism-spike/wasm-extism-spike.wasm \
+            "artifacts/cardano-ledger-reference-${tag}.wasm"
+
+          # WASI reactor — secondary artifact for stdin/stdout consumers
+          # (inspector UI, debug CLI use).
+          cp -L result-wasm/wasm-tx-inspector.wasm \
+            "artifacts/wasm-tx-inspector-${tag}.wasm"
+
+          # OpenAPI contract bundle.
+          (cd result-openapi && tar -czhf - .) \
+            > "artifacts/ledger-functional-openapi-${tag}.tar.gz"
+
+          (cd artifacts && sha256sum -- * > "SHA256SUMS-${tag}.txt")
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          gh release upload "$tag" \
+            "artifacts/cardano-ledger-reference-${tag}.wasm" \
+            "artifacts/wasm-tx-inspector-${tag}.wasm" \
+            "artifacts/ledger-functional-openapi-${tag}.tar.gz" \
+            "artifacts/SHA256SUMS-${tag}.txt" \
+            --clobber
