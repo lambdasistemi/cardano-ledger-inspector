@@ -841,15 +841,29 @@ inspectorComponent initial =
           [ "choice-option" ]
       )
 
+  looksLikeBlockfrostProjectId value =
+    let
+      trimmed = String.trim value
+    in
+      StringCodeUnits.take 7 trimmed == "mainnet"
+        || StringCodeUnits.take 7 trimmed == "preprod"
+        || StringCodeUnits.take 7 trimmed == "preview"
+
   handleAction = case _ of
     SetBlockfrostKey s -> do
       H.modify_ _ { blockfrostKey = s }
       persist <- H.gets _.persistKeys
       when persist (liftEffect (Storage.setItem blockfrostKey s))
     SetKoiosBearer s -> do
-      H.modify_ _ { koiosBearer = s }
-      persist <- H.gets _.persistKeys
-      when persist (liftEffect (Storage.setItem koiosKey s))
+      if looksLikeBlockfrostProjectId s then do
+        H.modify_ _ { provider = Blockfrost, blockfrostKey = s, fetchError = Nothing }
+        liftEffect (Storage.setItem providerKey (Provider.providerName Blockfrost))
+        persist <- H.gets _.persistKeys
+        when persist (liftEffect (Storage.setItem blockfrostKey s))
+      else do
+        H.modify_ _ { koiosBearer = s }
+        persist <- H.gets _.persistKeys
+        when persist (liftEffect (Storage.setItem koiosKey s))
     SelectProvider p -> do
       H.modify_ _ { provider = p, fetchError = Nothing }
       liftEffect (Storage.setItem providerKey (Provider.providerName p))
