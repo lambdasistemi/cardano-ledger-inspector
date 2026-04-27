@@ -72,18 +72,24 @@ Producer transaction data and live chain status are intentionally separate:
 ## Provider Boundary
 
 Provider adapters are byte fetchers, not ledger interpreters. The current
-required provider capability is:
+required provider capabilities are:
 
 ```text
 fetchTxCbor(network, credentials, tx_id) -> tx_cbor
+fetchValidationContext(network, credentials) -> { network, slot, epoch, protocol_parameters }
 ```
 
-The same function opens the transaction selected by hash and fetches producer
+`fetchTxCbor` opens the transaction selected by hash and fetches producer
 transactions for `context.producer_txs`. Provider modules MUST NOT expose
 provider-specific UTxO JSON as the core ledger interface. If later operations
 need additional mutable chain state, that capability must be added explicitly
 with a ledger-facing schema and must not replace transaction CBOR as the byte
 data plane.
+
+Browser hosts use provider tip and protocol-parameter endpoints to populate the
+explicit validation context. The ledger operation still receives those values
+inside `args.context` on every call; it does not reach out to providers or hold
+hidden state.
 
 `input_policy` has three draft values:
 

@@ -37,8 +37,26 @@ const extractInspectionInputs = (inspectionResponse) => {
   };
 };
 
+const errorMessage = (err) => (err instanceof Error ? err.message : String(err));
+
+const providerValidationContext = async (fetchValidationContext, errors) => {
+  try {
+    const raw = await fetchValidationContext();
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      errors.push("validation_context: provider returned a non-object response");
+      return { fields: {}, source: "" };
+    }
+    const { source, ...fields } = parsed;
+    return { fields, source: typeof source === "string" ? source : "" };
+  } catch (err) {
+    errors.push(`validation_context: ${errorMessage(err)}`);
+    return { fields: {}, source: "" };
+  }
+};
+
 export const resolveProducerTxContextImpl =
-  (provider) => (source) => (inspectionResponse) => (fetchTxCbor) => async () => {
+  (provider) => (source) => (inspectionResponse) => (fetchTxCbor) => (fetchValidationContext) => async () => {
     const { inputs, referenceInputs } = extractInspectionInputs(inspectionResponse);
     const requestedTxIds = [
       ...new Set([...inputs, ...referenceInputs].map((input) => input.tx_id)),
@@ -46,6 +64,7 @@ export const resolveProducerTxContextImpl =
     const producerTxs = {};
     const missing = [];
     const errors = [];
+    const validationContext = await providerValidationContext(fetchValidationContext, errors);
 
     for (const txId of requestedTxIds) {
       try {
@@ -56,17 +75,19 @@ export const resolveProducerTxContextImpl =
         };
       } catch (err) {
         missing.push(txId);
-        errors.push(`${txId}: ${err instanceof Error ? err.message : String(err)}`);
+        errors.push(`${txId}: ${errorMessage(err)}`);
       }
     }
 
     return JSON.stringify({
       input_policy: "preserve",
       context: {
+        ...validationContext.fields,
         producer_txs: producerTxs,
         resolution: {
           provider,
           source: "tx-cbor",
+          validation_context_source: validationContext.source,
           requested_input_count: inputs.length,
           requested_reference_input_count: referenceInputs.length,
           requested_tx_count: requestedTxIds.length,

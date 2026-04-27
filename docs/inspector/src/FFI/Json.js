@@ -548,6 +548,46 @@ const validationErrorRows = (items) =>
     )
   );
 
+const validationResolutionRows = (resolution) => {
+  if (!resolution || typeof resolution !== "object") return [];
+  const rows = [];
+  if (resolution.provider) {
+    rows.push(
+      witnessRow(
+        "provider",
+        resolution.provider,
+        validationPath("context", "resolution", "provider"),
+        resolution.provider,
+        resolution.source ? `source ${resolution.source}` : ""
+      )
+    );
+  }
+  if (resolution.validation_context_source) {
+    rows.push(
+      witnessRow(
+        "validation context",
+        resolution.validation_context_source,
+        validationPath("context", "resolution", "validation_context_source"),
+        resolution.validation_context_source,
+        "slot, epoch, network, protocol parameters"
+      )
+    );
+  }
+  const errors = Array.isArray(resolution.errors) ? resolution.errors : [];
+  errors.forEach((error, index) =>
+    rows.push(
+      witnessRow(
+        "provider error",
+        error,
+        validationPath("context", "resolution", "errors", `#${index}`),
+        error,
+        "provider resolution"
+      )
+    )
+  );
+  return rows;
+};
+
 const normalizeValidation = (validation) => {
   if (!validation || typeof validation !== "object") {
     return invalidValidation(
@@ -572,6 +612,8 @@ const normalizeValidation = (validation) => {
   const warnings = Array.isArray(validation.warnings) ? validation.warnings.map(text) : [];
   const context =
     validation.context && typeof validation.context === "object" ? validation.context : {};
+  const resolution =
+    context.resolution && typeof context.resolution === "object" ? context.resolution : {};
 
   return {
     valid: true,
@@ -579,6 +621,9 @@ const normalizeValidation = (validation) => {
     subtitle: validationStatusSubtitle(status, failures, missingContext, errors),
     metrics: [
       metric("Status", status),
+      metric("Network", context.network ?? "n/a"),
+      metric("Slot", context.slot ?? "n/a"),
+      metric("Epoch", context.epoch ?? "n/a"),
       metric("Complete", yesNo(validation.complete)),
       metric("Valid for context", yesNo(validation.valid_for_supplied_context)),
       metric("Checks", checks.length),
@@ -597,6 +642,11 @@ const normalizeValidation = (validation) => {
         title: "Checks",
         empty: "No validation checks reported.",
         rows: validationCheckRows(checks),
+      },
+      {
+        title: "Provider resolution",
+        empty: "No provider resolution metadata supplied.",
+        rows: validationResolutionRows(resolution),
       },
       {
         title: "Missing context",

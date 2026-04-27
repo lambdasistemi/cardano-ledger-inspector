@@ -3,6 +3,7 @@ module FFI.Blockfrost
   , networkName
   , fetchTxCbor
   , fetchTxCborEffect
+  , fetchValidationContextEffect
   ) where
 
 import Prelude
@@ -27,6 +28,11 @@ foreign import fetchTxCborImpl
   -> String -- tx hash
   -> Effect (Promise String)
 
+foreign import fetchValidationContextImpl
+  :: String -- network
+  -> String -- projectId
+  -> Effect (Promise String)
+
 fetchTxCbor :: Network -> String -> String -> Aff String
 fetchTxCbor net projectId hash =
   toAffE (fetchTxCborEffect net projectId hash)
@@ -34,3 +40,7 @@ fetchTxCbor net projectId hash =
 fetchTxCborEffect :: Network -> String -> String -> Effect (Promise String)
 fetchTxCborEffect net projectId hash =
   fetchTxCborImpl (networkName net) projectId hash
+
+fetchValidationContextEffect :: Network -> String -> Effect (Promise String)
+fetchValidationContextEffect net projectId =
+  fetchValidationContextImpl (networkName net) projectId

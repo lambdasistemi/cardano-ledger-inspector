@@ -547,7 +547,12 @@ inspectorComponent initial =
       ]
 
   renderValidationRow state sectionTitle row =
-    renderWitnessRow state (presentValidationRow sectionTitle row)
+    let
+      presented = presentValidationRow sectionTitle row
+    in
+      case sectionTitle of
+        "Checks" -> renderWitnessRowWithCopy state false presented
+        _        -> renderWitnessRow state presented
 
   presentValidationRow sectionTitle row =
     case sectionTitle of
@@ -606,6 +611,9 @@ inspectorComponent initial =
       ]
 
   renderWitnessRow state row =
+    renderWitnessRowWithCopy state true row
+
+  renderWitnessRowWithCopy state showCopy row =
     HH.div
       [ classNames [ "identity-row", "witness-row" ] ]
       [ HH.div
@@ -613,17 +621,20 @@ inspectorComponent initial =
           [ HH.span
               [ classNames [ "identity-label" ] ]
               [ HH.text row.label ]
-          , HH.button
-              [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
-              , classNames [ "inline-action" ]
-              ]
-              [ HH.text
-                  ( if state.copiedPath == Just row.path then
-                      "Copied"
-                    else
-                      "Copy"
-                  )
-              ]
+          , if showCopy then
+              HH.button
+                [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
+                , classNames [ "inline-action" ]
+                ]
+                [ HH.text
+                    ( if state.copiedPath == Just row.path then
+                        "Copied"
+                      else
+                        "Copy"
+                    )
+                ]
+            else
+              HH.text ""
           ]
       , HH.code_ [ HH.text row.value ]
       , if row.detail == "" then

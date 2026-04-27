@@ -11,6 +11,74 @@ const fixturePath =
     repoRoot,
     "specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex",
   );
+const validationFixturePath = path.join(
+  repoRoot,
+  "specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json",
+);
+
+async function loadValidationContext() {
+  const request = JSON.parse(await readFile(validationFixturePath, "utf8"));
+  return request.args.context;
+}
+
+function producerCbor(context, txHash, fallback) {
+  return context.producer_txs?.[txHash]?.tx_cbor || fallback;
+}
+
+function blockfrostParamsFromLedger(params) {
+  const pool = params.poolVotingThresholds || {};
+  const drep = params.dRepVotingThresholds || {};
+  return {
+    min_fee_a: params.txFeePerByte,
+    min_fee_b: params.txFeeFixed,
+    max_block_size: params.maxBlockBodySize,
+    max_tx_size: params.maxTxSize,
+    max_block_header_size: params.maxBlockHeaderSize,
+    key_deposit: String(params.stakeAddressDeposit),
+    pool_deposit: String(params.stakePoolDeposit),
+    e_max: params.poolRetireMaxEpoch,
+    n_opt: params.stakePoolTargetNum,
+    a0: params.poolPledgeInfluence,
+    rho: params.monetaryExpansion,
+    tau: params.treasuryCut,
+    protocol_major_ver: params.protocolVersion?.major,
+    protocol_minor_ver: params.protocolVersion?.minor,
+    min_pool_cost: String(params.minPoolCost),
+    coins_per_utxo_size: String(params.utxoCostPerByte),
+    cost_models_raw: params.costModels,
+    price_mem: params.executionUnitPrices?.priceMemory,
+    price_step: params.executionUnitPrices?.priceSteps,
+    max_tx_ex_mem: String(params.maxTxExecutionUnits?.memory),
+    max_tx_ex_steps: String(params.maxTxExecutionUnits?.steps),
+    max_block_ex_mem: String(params.maxBlockExecutionUnits?.memory),
+    max_block_ex_steps: String(params.maxBlockExecutionUnits?.steps),
+    max_val_size: String(params.maxValueSize),
+    collateral_percent: params.collateralPercentage,
+    max_collateral_inputs: params.maxCollateralInputs,
+    pvt_motion_no_confidence: pool.motionNoConfidence,
+    pvt_committee_normal: pool.committeeNormal,
+    pvt_committee_no_confidence: pool.committeeNoConfidence,
+    pvt_hard_fork_initiation: pool.hardForkInitiation,
+    pvt_p_p_security_group: pool.ppSecurityGroup,
+    dvt_motion_no_confidence: drep.motionNoConfidence,
+    dvt_committee_normal: drep.committeeNormal,
+    dvt_committee_no_confidence: drep.committeeNoConfidence,
+    dvt_update_to_constitution: drep.updateToConstitution,
+    dvt_hard_fork_initiation: drep.hardForkInitiation,
+    dvt_p_p_network_group: drep.ppNetworkGroup,
+    dvt_p_p_economic_group: drep.ppEconomicGroup,
+    dvt_p_p_technical_group: drep.ppTechnicalGroup,
+    dvt_p_p_gov_group: drep.ppGovGroup,
+    dvt_treasury_withdrawal: drep.treasuryWithdrawal,
+    committee_min_size: String(params.committeeMinSize),
+    committee_max_term_length: String(params.committeeMaxTermLength),
+    gov_action_lifetime: String(params.govActionLifetime),
+    gov_action_deposit: String(params.govActionDeposit),
+    drep_deposit: String(params.dRepDeposit),
+    drep_activity: String(params.dRepActivity),
+    min_fee_ref_script_cost_per_byte: params.minFeeRefScriptCostPerByte,
+  };
+}
 
 async function decodeFixture(page) {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
@@ -120,6 +188,11 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
   await expect(
     validationPanel.locator(".witness-row").filter({ hasText: "protocol parameters" }).first(),
   ).toBeVisible();
+  await expect(
+    validationPanel
+      .locator(".witness-section", { hasText: "Checks" })
+      .getByRole("button", { name: "Copy" }),
+  ).toHaveCount(0);
 
   const missingContextSection = validationPanel
     .locator(".witness-section")
@@ -139,18 +212,46 @@ test("passes producer transaction CBOR into witness planning", async ({
   page,
 }) => {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
   let producerCborRequests = 0;
   let utxoRequests = 0;
+  let latestBlockRequests = 0;
+  let protocolParameterRequests = 0;
 
   await installClipboardMock(page);
   await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/cbor", async (route) => {
     producerCborRequests += 1;
+    const txHash = route.request().url().match(/\/txs\/([0-9a-f]+)\/cbor/)?.[1];
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ cbor: txCbor }),
+      body: JSON.stringify({ cbor: producerCbor(validationContext, txHash, txCbor) }),
     });
   });
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/blocks/latest", async (route) => {
+    latestBlockRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        slot: Number(validationContext.slot),
+        epoch: Number(validationContext.epoch),
+      }),
+    });
+  });
+  await page.route(
+    "https://cardano-mainnet.blockfrost.io/api/v0/epochs/latest/parameters",
+    async (route) => {
+      protocolParameterRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          blockfrostParamsFromLedger(validationContext.protocol_parameters),
+        ),
+      });
+    },
+  );
   await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/utxos", async (route) => {
     utxoRequests += 1;
     await route.abort();
@@ -178,7 +279,14 @@ test("passes producer transaction CBOR into witness planning", async ({
       .locator(".validation-panel .identity-section-title", { hasText: "Resolved inputs" })
       .first(),
   ).toBeVisible();
+  await expect(
+    page
+      .locator(".validation-panel .metric-card", { hasText: "Status" })
+      .getByText("valid", { exact: true }),
+  ).toBeVisible();
   expect(producerCborRequests).toBeGreaterThan(0);
+  expect(latestBlockRequests).toBe(1);
+  expect(protocolParameterRequests).toBe(1);
   expect(utxoRequests).toBe(0);
 
   const resolvedRow = page
@@ -193,17 +301,42 @@ test("passes producer transaction CBOR into witness planning", async ({
 
 test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
   let koiosCborRequests = 0;
+  let koiosTipRequests = 0;
+  let koiosPParamRequests = 0;
 
   await installClipboardMock(page);
   await page.route("https://api.koios.rest/api/v1/tx_cbor", async (route) => {
     koiosCborRequests += 1;
     const requestBody = route.request().postDataJSON();
     expect(requestBody._tx_hashes).toHaveLength(1);
+    const txHash = requestBody._tx_hashes[0];
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify([{ cbor: txCbor }]),
+      body: JSON.stringify([{ cbor: producerCbor(validationContext, txHash, txCbor) }]),
+    });
+  });
+  await page.route("https://api.koios.rest/api/v1/tip", async (route) => {
+    koiosTipRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          abs_slot: Number(validationContext.slot),
+          epoch_no: Number(validationContext.epoch),
+        },
+      ]),
+    });
+  });
+  await page.route("https://api.koios.rest/api/v1/cli_protocol_params", async (route) => {
+    koiosPParamRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(validationContext.protocol_parameters),
     });
   });
 
@@ -218,7 +351,14 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
     page.getByText("Producer transaction CBOR resolved every visible transaction input"),
   ).toBeVisible();
   await expect(page.getByText("Producer txs")).toBeVisible();
+  await expect(
+    page
+      .locator(".validation-panel .metric-card", { hasText: "Status" })
+      .getByText("valid", { exact: true }),
+  ).toBeVisible();
   expect(koiosCborRequests).toBeGreaterThan(0);
+  expect(koiosTipRequests).toBe(1);
+  expect(koiosPParamRequests).toBe(1);
 });
 
 test("opens browser rows in place without losing identity context", async ({
