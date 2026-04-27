@@ -1,20 +1,25 @@
 # Extism PDK spike
 
-Proof-of-concept: package one ledger operation (Conway tx → small
-identification JSON) as an [Extism](https://extism.org) plugin instead of
-the WASI reactor used by `wasm-tx-inspector`. The motivation is
-language-agnostic conformance testing — a Rust ledger (Amaru) packaged as
-an Extism plugin with the same export names + byte contract can be
-diff-tested against this Haskell ledger by feeding identical inputs to
-both.
+Proof-of-concept: package ledger operations as
+[Extism](https://extism.org) plugin exports instead of the WASI reactor
+used by `wasm-tx-inspector`. The motivation is language-agnostic
+conformance testing — a Rust ledger (Amaru) packaged as an Extism plugin
+with the same export names + byte contract can be diff-tested against
+this Haskell ledger by feeding identical inputs to both.
 
 ## What's here
 
-- `wasm-extism-spike/` — Haskell package depending on `extism-pdk` and the
-  Conway ledger libs. Single foreign export: `tx_identify`.
+- `wasm-extism-spike/` — Haskell package depending on `extism-pdk` and
+  the inspector library. Two foreign exports — `tx_identify` and
+  `tx_validate` — both delegating to the inspector's
+  `runLedgerOperationInput`. The Extism response is therefore
+  byte-identical to the WASI reactor's response on the same input,
+  which is exactly what conformance vs another implementation needs.
 - `cabal-wasm.project` — same fork overrides as `tx-inspector` plus
   `allow-newer` punches for `extism-pdk` / `extism-manifest` /
-  `messagepack` / `json` against bytestring/containers/binary.
+  `messagepack` / `json` against bytestring/containers/binary. Lists
+  both `extism-spike/wasm-extism-spike` and
+  `tx-inspector/wasm-tx-inspector` as path packages.
 
 ## Build
 
@@ -23,9 +28,9 @@ just build-extism-spike
 just check-extism-spike
 ```
 
-The check is **structural**: it asserts `tx_identify` and `hs_init` are
-exported and the wasm module is valid. End-to-end runtime invocation is
-deliberately not part of the smoke (see "Runtime status" below).
+`check-extism-spike` runs both `tx_identify` and `tx_validate` against
+the canonical Conway fixtures and asserts the response matches the WASI
+reactor's response **byte-for-byte**.
 
 ## Spike outcome
 
@@ -34,15 +39,9 @@ deliberately not part of the smoke (see "Runtime status" below).
 | `extism-pdk` co-exists with the Conway closure under `wasm32-wasi-ghc 9.12` | ✅ |
 | Cabal solver accepts the combined dep set at the inspector's index-state | ✅ |
 | Resulting `.wasm` is a valid Extism plugin shape (named exports + WASI) | ✅ |
-| Plugin runs end-to-end against real Conway fixture (libextism + Wasmtime) | ✅ |
+| Plugin runs end-to-end (libextism + Wasmtime, both `tx_identify` and `tx_validate`) | ✅ |
+| Extism response is byte-identical to WASI reactor response on the same envelope | ✅ |
 | Plugin runs through `pkgs.extism-cli` (Go, wazero) | ❌ (see below) |
-
-End-to-end response on the canonical Conway fixture:
-
-```json
-{"era":"Conway","fee_lovelace":"319463","input_count":1,"output_count":5,
- "tx_id":"2e614d78...49da6f3","tx_size_bytes":1918}
-```
 
 ## Two host paths — only one currently works
 
@@ -50,8 +49,15 @@ End-to-end response on the canonical Conway fixture:
 Uses the [`extism`](https://hackage.haskell.org/package/extism) Hackage
 package, which links libextism (Rust + Wasmtime). libextism is fetched
 prebuilt from the upstream release in `nix/host/libextism.nix`. This is
-the production conformance-harness path. Run with
-`just check-extism-spike`.
+the production conformance-harness path. Invocation:
+
+```
+extism-spike-host PATH-TO-WASM [FUNCTION] < envelope.json > response.json
+```
+
+`FUNCTION` defaults to `tx_identify`; pass `tx_validate` for the
+validation operation. The envelope is the same JSON the WASI reactor
+accepts on stdin.
 
 **Blocked: `pkgs.extism-cli` (Go, wazero).** Version 1.6.3 (July 2024)
 embeds a wazero that predates
@@ -72,9 +78,8 @@ plugin changes.
 
 ## Next steps
 
-1. Promote `tx_identify` to a versioned contract — same export name on
-   any future Amaru-PDK plugin.
-2. Add `tx_validate` and `apply_tx` exports once the contract shape is
-   stable.
+1. Promote `tx_identify` and `tx_validate` to a versioned contract —
+   same export names on any future Amaru-PDK plugin.
+2. Add `apply_tx` once the contract shape is stable.
 3. Build the diff harness: same fixture vector → both plugins → byte
    compare on serialized output.

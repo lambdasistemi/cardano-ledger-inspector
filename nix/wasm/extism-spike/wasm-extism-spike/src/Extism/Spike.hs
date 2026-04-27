@@ -1,104 +1,59 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications #-}
 
 {- |
 Module      : Extism.Spike
-Description : Extism PDK plugin exposing one ledger operation.
+Description : Extism PDK plugin exposing ledger operations.
 
-Single export: 'tx_identify'. Reads a hex-encoded Conway transaction
-from the Extism plugin input, decodes it through
-'cardano-ledger-conway', and writes a small identification JSON
-(tx_id, input_count, output_count, fee_lovelace, tx_size_bytes) to
-the plugin output.
+Two foreign exports — 'tx_identify' and 'tx_validate'. Both delegate
+to 'Conway.Inspector.runLedgerOperationInput', which is the same code
+path the WASI reactor (@wasm-tx-inspector@) runs on stdin. The
+plugin's response is therefore byte-identical to the WASI reactor's
+response for the same input — that property is what makes the spike
+useful for differential conformance testing.
 
-Slice — not byte-parity — of the WASI reactor's @tx.identify@. The
-spike answers "can the Conway closure co-exist with the Extism PDK
-in one wasm32-wasi binary?" not "is the Extism response byte-
-identical to the WASI response?". Byte parity is a follow-up.
+Input is the canonical JSON envelope:
+
+> { "ledger_functional_layer": "...",
+>   "tx_cbor": "...",
+>   "op": "tx.identify" | "tx.validate" | ...,
+>   "args": { ... } }
+
+Output is the matching response envelope. Errors go through
+'Extism.PDK.setError'.
 -}
-module Extism.Spike (tx_identify) where
+module Extism.Spike (tx_identify, tx_validate) where
 
-import qualified Cardano.Crypto.Hash as Crypto
-import qualified Cardano.Ledger.Api as L
-import qualified Cardano.Ledger.Binary as Binary
-import qualified Cardano.Ledger.Coin as Coin
-import qualified Cardano.Ledger.Conway as Conway
-import Cardano.Ledger.Core (TxLevel (..))
-import qualified Cardano.Ledger.Core as Core
-import qualified Cardano.Ledger.Hashes as Hashes
-import qualified Cardano.Ledger.TxIn as TxIn
-import Data.Aeson ((.=))
+import qualified Conway.Inspector as Inspector
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as BSL
-import Data.Foldable (toList)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import Extism.PDK (inputByteString, output, setError)
-import Lens.Micro ((^.))
 
--- | Plugin entry point.
 tx_identify :: IO ()
-tx_identify = do
+tx_identify = runOp
+
+tx_validate :: IO ()
+tx_validate = runOp
+
+runOp :: IO ()
+runOp = do
     payload <- inputByteString
-    case identify payload of
+    case Inspector.runLedgerOperationInput payload of
         Right value -> output (BSL.toStrict (Aeson.encode value))
-        Left err -> setError (T.unpack err)
+        Left err -> setError (errorMessage err)
 
-identify :: BS.ByteString -> Either T.Text Aeson.Value
-identify hexInput = do
-    raw <- decodeHex (stripWhitespace hexInput)
-    tx <- decodeTx raw
-    pure (identifyJson raw tx)
-
-stripWhitespace :: BS.ByteString -> BS.ByteString
-stripWhitespace =
-    BS.filter
-        (\c -> c /= 0x20 && c /= 0x09 && c /= 0x0a && c /= 0x0d)
-
-decodeHex :: BS.ByteString -> Either T.Text BS.ByteString
-decodeHex bytes = case Base16.decode bytes of
-    Right ok -> Right ok
-    Left err -> Left ("malformed_hex: " <> T.pack err)
-
-decodeTx ::
-    BS.ByteString ->
-    Either T.Text (L.Tx TopTx Conway.ConwayEra)
-decodeTx bytes =
-    case Binary.decodeFullAnnotator
-        (Core.eraProtVerLow @Conway.ConwayEra)
-        "ConwayTx"
-        Binary.decCBOR
-        (BSL.fromStrict bytes) of
-        Right tx -> Right tx
-        Left err -> Left ("malformed_cbor: " <> T.pack (show err))
-
-identifyJson ::
-    BS.ByteString ->
-    L.Tx TopTx Conway.ConwayEra ->
-    Aeson.Value
-identifyJson rawBytes tx =
-    let body = tx ^. L.bodyTxL
-        inputs = toList (body ^. L.inputsTxBodyL)
-        outputs = toList (body ^. L.outputsTxBodyL)
-     in Aeson.object
-            [ "era" .= ("Conway" :: T.Text)
-            , "tx_id" .= txIdHex (Core.txIdTx tx)
-            , "tx_size_bytes" .= BS.length rawBytes
-            , "fee_lovelace"
-                .= T.pack (show (Coin.unCoin (body ^. L.feeTxBodyL)))
-            , "input_count" .= length inputs
-            , "output_count" .= length outputs
-            ]
-
-txIdHex :: TxIn.TxId -> T.Text
-txIdHex (TxIn.TxId safeHash) =
-    hashHex (Hashes.extractHash safeHash)
-
-hashHex :: Crypto.Hash h a -> T.Text
-hashHex = T.decodeUtf8 . Base16.encode . Crypto.hashToBytes
+errorMessage :: Inspector.InspectError -> String
+errorMessage = \case
+    Inspector.MalformedHex detail ->
+        "malformed_hex: " <> detail
+    Inspector.MalformedCbor detail ->
+        "malformed_cbor: " <> detail
+    Inspector.MalformedLedgerOperation detail ->
+        "malformed_ledger_operation: " <> detail
+    Inspector.UnknownLedgerOperation operation ->
+        "unknown_ledger_operation: " <> T.unpack operation
 
 foreign export ccall "tx_identify" tx_identify :: IO ()
+foreign export ccall "tx_validate" tx_validate :: IO ()

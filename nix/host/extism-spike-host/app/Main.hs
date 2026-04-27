@@ -5,11 +5,15 @@ Module      : Main
 Description : Native Haskell host for the Extism PDK spike.
 
 Loads the wasm-extism-spike plugin via libextism (Wasmtime-backed),
-calls 'tx_identify' with the bytes read from stdin, and writes the
-plugin's output bytes to stdout. Errors from the runtime go to
-stderr with a non-zero exit code.
+calls a named export with bytes read from stdin, and writes the
+plugin's output bytes to stdout.
 
-Invocation: @extism-spike-host PATH-TO-WASM < input.hex > out.json@.
+Invocation:
+
+>     extism-spike-host PATH-TO-WASM [FUNCTION] < input > out
+
+@FUNCTION@ defaults to @tx_identify@. Errors from the runtime go to
+stderr with a non-zero exit code.
 -}
 module Main (main) where
 
@@ -24,15 +28,14 @@ import System.IO (hPutStrLn, stderr, stdout)
 main :: IO ()
 main = do
     args <- getArgs
-    pluginPath <- case args of
-        [path] -> pure path
-        _ ->
-            die "usage: extism-spike-host PATH-TO-WASM"
+    (pluginPath, function) <- case args of
+        [path] -> pure (path, "tx_identify")
+        [path, fn] -> pure (path, fn)
+        _ -> die "usage: extism-spike-host PATH-TO-WASM [FUNCTION]"
     let manifest = Manifest.manifest [Manifest.wasmFile pluginPath]
     plugin <- Extism.newPlugin manifest [] True >>= unwrap
     payload <- BS.getContents
-    response <-
-        Extism.call plugin "tx_identify" payload >>= unwrap
+    response <- Extism.call plugin function payload >>= unwrap
     BSL.hPut stdout (BSL.fromStrict response)
     BSL.hPut stdout "\n"
     exitSuccess

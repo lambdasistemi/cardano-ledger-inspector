@@ -65,11 +65,13 @@ in
     dependenciesHash = "sha256-KmY5jyyPc2NFXZSP133Tq6rQWp3d7STwT4O51h7Ukys=";
   };
 
-  # Spike: same ledger override set as wasm-tx-inspector plus extism-pdk
-  # and extism-manifest from Hackage.
+  # Spike: depends on wasm-tx-inspector via path package, so the src
+  # has to span both subdirs (extism-spike + tx-inspector). The
+  # spike's project file lives at extism-spike/cabal-wasm.project.
   wasm-extism-spike = libWasm.mkCardanoLedgerWasm {
     inherit pkgs ghcWasmMeta wasiSdk chap;
     src = extismSpikeSrc;
+    projectFile = "extism-spike/cabal-wasm.project";
     packages = [ "wasm-extism-spike" ];
     srpForks = fullLedgerForks;
     withCLibs = true;
