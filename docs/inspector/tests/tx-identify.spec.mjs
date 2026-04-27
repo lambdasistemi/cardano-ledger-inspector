@@ -389,6 +389,17 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
   expect(koiosPParamRequests).toBe(1);
 });
 
+test("routes Blockfrost-shaped keys away from Koios auth", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("radio", { name: "Koios" }).check();
+  await page.getByPlaceholder("eyJhbGciOi...").fill("mainnet-test-project");
+
+  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeChecked();
+  await expect(page.getByPlaceholder("mainnet... / preprod... / preview...")).toHaveValue(
+    "mainnet-test-project",
+  );
+});
+
 test("opens browser rows in place without losing identity context", async ({
   page,
 }) => {
