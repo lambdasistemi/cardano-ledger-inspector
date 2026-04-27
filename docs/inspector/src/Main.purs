@@ -566,14 +566,18 @@ inspectorComponent initial =
       _ -> row
 
   presentValidationCheckStatus status detail =
-    if status == "not_evaluated" && StringCodeUnits.contains (String.Pattern "needs more explicit context") detail then
+    if status == "not_evaluated" && validationCheckNeedsContext detail then
       "needs context"
     else
       readableValidationToken status
 
+  validationCheckNeedsContext detail =
+    StringCodeUnits.contains (String.Pattern "needs more explicit context") detail
+      || StringCodeUnits.contains (String.Pattern "Missing ") detail
+
   presentValidationCheckDetail detail =
     if StringCodeUnits.contains (String.Pattern "scope ledger / Ledger validation needs more explicit context before Conway applyTx can run.") detail then
-      "Missing source output, protocol parameters, slot, epoch, and network."
+      "Missing required validation context."
     else if StringCodeUnits.contains (String.Pattern "scope ledger / Ledger validation was not run because the supplied context is invalid.") detail then
       "Fix the context errors below."
     else
@@ -917,13 +921,13 @@ inspectorComponent initial =
             providerKeyValue = case st.provider of
               Blockfrost -> String.trim st.blockfrostKey
               Koios      -> String.trim st.koiosBearer
-            canResolveContext =
+            canFetchProducerTxs =
               operationResult.exitOk
                 && (not (Provider.needsKey st.provider) || providerKeyValue /= "")
           inputContextArgs <-
-            if canResolveContext then do
+            if operationResult.exitOk then do
               ctx <- H.liftAff
-                (attempt (Provider.resolveProducerTxContext st.provider st.network providerKeyValue operationResult.stdout))
+                (attempt (Provider.resolveProducerTxContext st.provider st.network providerKeyValue canFetchProducerTxs operationResult.stdout))
               case ctx of
                 Right args -> pure args
                 Left _     -> pure "{}"

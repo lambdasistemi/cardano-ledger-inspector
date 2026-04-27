@@ -70,6 +70,9 @@ The browser host resolves validation context from the selected provider instead
 of asking users to paste it. Koios uses `tip` plus `cli_protocol_params`;
 Blockfrost uses `blocks/latest` plus `epochs/latest/parameters`, translating
 the Blockfrost protocol-parameter response into the ledger-compatible shape.
+If Blockfrost is selected but no project ID is configured, the browser still
+fetches keyless Koios tip/protocol-parameter context and reports only the
+producer transaction CBOR that could not be fetched.
 
 ## Current Operations
 

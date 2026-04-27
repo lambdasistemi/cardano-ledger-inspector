@@ -137,6 +137,9 @@ can add a validation panel:
 3. Fetch network, current slot, current epoch, and protocol parameters through
    the selected provider adapter. Koios uses `tip` plus `cli_protocol_params`;
    Blockfrost uses `blocks/latest` plus `epochs/latest/parameters`.
+   If Blockfrost has no project ID, fall back to keyless Koios for this
+   validation environment and keep producer transaction CBOR reported as
+   missing until a byte provider is available.
 4. Call `tx.validate` with current `tx_cbor` and explicit `args.context`.
 5. Render `status`, `checks`, `failures`, `missing_context`, and resolved input
    rows with copyable hashes and paths back into the transaction browser.

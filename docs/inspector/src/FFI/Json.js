@@ -495,12 +495,36 @@ const validationStatusSubtitle = (status, failures, missingContext, errors) => {
   }
 };
 
-const validationCheckRows = (checks) =>
+const readableContextKind = (kind, count) => {
+  const label = text(kind || "context").replace(/_/g, " ");
+  if (count === 1) return label;
+  if (label === "source output") return `source outputs (${count})`;
+  return `${label} (${count})`;
+};
+
+const missingContextSummary = (items) => {
+  const counts = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const kind = item?.kind || "context";
+    counts.set(kind, (counts.get(kind) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([kind, count]) => readableContextKind(kind, count))
+    .join(", ");
+};
+
+const validationCheckRows = (checks, missingContext) =>
   (Array.isArray(checks) ? checks : []).map((item, index) => {
     const title = item?.title || item?.id || `#${index}`;
     const status = item?.status || "";
     const scope = item?.scope ? `scope ${text(item.scope)}` : "";
-    const message = item?.message ? text(item.message) : "";
+    const missing = missingContextSummary(missingContext);
+    const message =
+      item?.id === "ledger.apply_tx" && status === "not_evaluated" && missing !== ""
+        ? `Missing ${missing}.`
+        : item?.message
+          ? text(item.message)
+          : "";
     const detail = [scope, message].filter((part) => part !== "").join(" / ");
     return witnessRow(
       title,
@@ -641,7 +665,7 @@ const normalizeValidation = (validation) => {
       {
         title: "Checks",
         empty: "No validation checks reported.",
-        rows: validationCheckRows(checks),
+        rows: validationCheckRows(checks, missingContext),
       },
       {
         title: "Provider resolution",

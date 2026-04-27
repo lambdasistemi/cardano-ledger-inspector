@@ -38,8 +38,8 @@ fetchTxCbor :: Provider -> Network -> String -> String -> Aff String
 fetchTxCbor provider network key txId =
   toAffE (fetchTxCborEffect provider network key txId)
 
-resolveProducerTxContext :: Provider -> Network -> String -> String -> Aff String
-resolveProducerTxContext provider network key inspectionResponse =
+resolveProducerTxContext :: Provider -> Network -> String -> Boolean -> String -> Aff String
+resolveProducerTxContext provider network key canFetchProducerTxs inspectionResponse =
   toAffE
     ( resolveProducerTxContextImpl
         (resolutionProvider provider)
@@ -47,6 +47,7 @@ resolveProducerTxContext provider network key inspectionResponse =
         inspectionResponse
         (\txId -> fetchTxCborEffect provider network key txId)
         (fetchValidationContextEffect provider network key)
+        canFetchProducerTxs
     )
 
 fetchTxCborEffect :: Provider -> Network -> String -> String -> Effect (Promise String)
@@ -55,9 +56,12 @@ fetchTxCborEffect = case _ of
   Koios      -> Koios.fetchTxCborEffect
 
 fetchValidationContextEffect :: Provider -> Network -> String -> Effect (Promise String)
-fetchValidationContextEffect = case _ of
-  Blockfrost -> Blockfrost.fetchValidationContextEffect
-  Koios      -> Koios.fetchValidationContextEffect
+fetchValidationContextEffect provider network key =
+  case provider of
+    Blockfrost ->
+      if key == "" then Koios.fetchValidationContextEffect network ""
+      else Blockfrost.fetchValidationContextEffect network key
+    Koios -> Koios.fetchValidationContextEffect network key
 
 resolutionProvider :: Provider -> String
 resolutionProvider = case _ of
@@ -75,4 +79,5 @@ foreign import resolveProducerTxContextImpl
   -> String -- tx.inspect response
   -> (String -> Effect (Promise String)) -- fetchTxCbor by tx id
   -> Effect (Promise String) -- fetch current validation context
+  -> Boolean -- fetch producer tx CBOR
   -> Effect (Promise String)

@@ -56,7 +56,7 @@ const providerValidationContext = async (fetchValidationContext, errors) => {
 };
 
 export const resolveProducerTxContextImpl =
-  (provider) => (source) => (inspectionResponse) => (fetchTxCbor) => (fetchValidationContext) => async () => {
+  (provider) => (source) => (inspectionResponse) => (fetchTxCbor) => (fetchValidationContext) => (fetchProducerTxs) => async () => {
     const { inputs, referenceInputs } = extractInspectionInputs(inspectionResponse);
     const requestedTxIds = [
       ...new Set([...inputs, ...referenceInputs].map((input) => input.tx_id)),
@@ -66,16 +66,21 @@ export const resolveProducerTxContextImpl =
     const errors = [];
     const validationContext = await providerValidationContext(fetchValidationContext, errors);
 
-    for (const txId of requestedTxIds) {
-      try {
-        const cbor = await fetchTxCbor(txId)();
-        producerTxs[txId] = {
-          tx_cbor: cbor,
-          source,
-        };
-      } catch (err) {
-        missing.push(txId);
-        errors.push(`${txId}: ${errorMessage(err)}`);
+    if (!fetchProducerTxs && requestedTxIds.length > 0) {
+      missing.push(...requestedTxIds);
+      errors.push("producer_txs: provider credentials not supplied");
+    } else {
+      for (const txId of requestedTxIds) {
+        try {
+          const cbor = await fetchTxCbor(txId)();
+          producerTxs[txId] = {
+            tx_cbor: cbor,
+            source,
+          };
+        } catch (err) {
+          missing.push(txId);
+          errors.push(`${txId}: ${errorMessage(err)}`);
+        }
       }
     }
 
