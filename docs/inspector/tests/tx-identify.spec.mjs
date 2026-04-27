@@ -236,6 +236,39 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
   expect(copied).toMatch(/^[0-9a-f]{64}$/);
 });
 
+test("keeps copy controls off non-value missing context rows", async ({ page }) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+
+  await installClipboardMock(page);
+  await page.route("https://api.koios.rest/api/v1/tip", async (route) => {
+    await route.abort();
+  });
+  await page.route("https://api.koios.rest/api/v1/cli_protocol_params", async (route) => {
+    await route.abort();
+  });
+
+  await page.goto("/");
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const missingContextSection = page
+    .locator(".validation-panel .witness-section")
+    .filter({ hasText: "Missing context" });
+  const protocolParametersRow = missingContextSection
+    .locator(".witness-row")
+    .filter({ hasText: "protocol parameters" })
+    .first();
+  await expect(protocolParametersRow).toBeVisible();
+  await expect(protocolParametersRow.getByRole("button", { name: "Copy" })).toHaveCount(0);
+
+  const sourceOutputRow = missingContextSection
+    .locator(".witness-row")
+    .filter({ hasText: "source output" })
+    .first();
+  await expect(sourceOutputRow.getByRole("button", { name: "Copy" })).toBeVisible();
+});
+
 test("passes producer transaction CBOR into witness planning", async ({
   page,
 }) => {
