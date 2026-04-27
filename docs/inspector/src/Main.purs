@@ -550,9 +550,13 @@ inspectorComponent initial =
     let
       presented = presentValidationRow sectionTitle row
     in
-      case sectionTitle of
-        "Checks" -> renderWitnessRowWithCopy state false presented
-        _        -> renderWitnessRow state presented
+      renderWitnessRowWithCopy state (validationRowCanCopy sectionTitle presented) presented
+
+  validationRowCanCopy sectionTitle row =
+    case sectionTitle of
+      "Checks" -> false
+      "Missing context" -> StringCodeUnits.length row.copyValue == 64
+      _ -> true
 
   presentValidationRow sectionTitle row =
     case sectionTitle of
