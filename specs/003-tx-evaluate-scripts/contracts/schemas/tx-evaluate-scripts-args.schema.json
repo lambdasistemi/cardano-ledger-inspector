@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-evaluate-scripts-args.schema.json",
+  "title": "tx.evaluate.scripts arguments",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "input_policy": {
+      "type": "string",
+      "enum": ["preserve"],
+      "default": "preserve"
+    },
+    "context": {
+      "$ref": "#/$defs/evaluationContext"
+    }
+  },
+  "$defs": {
+    "evaluationContext": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "producer_txs": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/producerTransaction"
+          }
+        },
+        "resolution": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "network": {
+          "type": "string"
+        },
+        "slot": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        },
+        "epoch": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        },
+        "protocol_parameters": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "cost_models": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "governance_state": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "cert_state": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "stake_distribution": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "producerTransaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tx_cbor"],
+      "properties": {
+        "tx_cbor": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]+$"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
