@@ -31,6 +31,9 @@ check-validate:
 build-extism-spike:
     nix build .#packages.x86_64-linux.wasm-extism-spike -o result-extism-spike
 
+build-extism-host:
+    nix build .#packages.x86_64-linux.extism-spike-host -o result-extism-host
+
 check-extism-spike:
     nix build .#checks.x86_64-linux.tx-extism-spike-smoke -o result-extism-spike-smoke
 

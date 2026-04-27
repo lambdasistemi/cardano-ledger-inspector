@@ -88,6 +88,8 @@
             ]
           );
 
+          hostTargets = import ./nix/host { inherit pkgs; };
+
           wasmTargets = import ./nix/wasm-targets.nix {
             inherit pkgs;
             libWasm = self.lib.wasm;
@@ -400,36 +402,38 @@
               invalid-network-request.json invalid-network-response.json $out/
           '';
 
-          # Spike: structural check on the Extism plugin artifact.
-          #
-          # Runtime invocation through `extism call` (extism-cli 1.6.3,
-          # July 2024) is blocked: the bundled wazero predates wasm
-          # tail-call support (wazero PR #2403, Aug 2025), and GHC
-          # 9.12's wasm32-wasi codegen relies on tail calls. Result:
-          # `hs_init_ghc → initAdjustors → allocHashTable` traps with
-          # an out-of-bounds memory access during runtime init.
-          #
-          # That is not our binary's fault — direct wasmtime confirms
-          # the plugin shape, and `wasm-objdump -x` confirms the
-          # exports. End-to-end execution requires a Wasmtime-backed
-          # host (Rust libextism, Haskell extism-host SDK, or a newer
-          # extism-cli once it picks up a tail-call-capable wazero).
+          # Spike: native Haskell host (libextism + Wasmtime) loads the
+          # plugin and calls tx_identify against the Conway fixture.
+          # The host is in nix/host/extism-spike-host; libextism is the
+          # prebuilt Rust runtime fetched from the upstream release.
           tx-extism-spike-smoke = pkgs.runCommand "tx-extism-spike-smoke" { } ''
             mkdir -p $out
-            ${pkgs.wabt}/bin/wasm-objdump -x \
+            # Wasmtime writes a compile cache; sandbox HOME is unwritable.
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq -nr \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '$tx | gsub("\\s"; "")' > tx.hex
+            ${hostTargets.extism-spike-host}/bin/extism-spike-host \
               ${wasmTargets.wasm-extism-spike}/wasm-extism-spike.wasm \
-              > exports.txt
-            grep -q '<tx_identify> -> "tx_identify"' exports.txt
-            grep -q '<hs_init> -> "hs_init"' exports.txt
-            ${pkgs.wabt}/bin/wasm-validate \
-              ${wasmTargets.wasm-extism-spike}/wasm-extism-spike.wasm
-            cp exports.txt $out/
+              < tx.hex > response.json
+            ${pkgs.jq}/bin/jq -e '
+              .era == "Conway"
+              and (.tx_id | test("^[0-9a-f]{64}$"))
+              and (.tx_size_bytes > 0)
+              and (.fee_lovelace | test("^[0-9]+$"))
+              and (.input_count >= 1)
+              and (.output_count >= 1)
+            ' response.json
+            cp tx.hex response.json $out/
           '';
         in
         {
           packages = {
             inherit (wasmTargets)
               wasm-smoke wasm-ledger-smoke wasm-tx-inspector wasm-extism-spike;
+            inherit (hostTargets) extism-spike-host libextism;
             inherit
               ledger-functional-openapi
               ledger-functional-openapi-generated

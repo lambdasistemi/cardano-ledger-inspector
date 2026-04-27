@@ -34,37 +34,47 @@ deliberately not part of the smoke (see "Runtime status" below).
 | `extism-pdk` co-exists with the Conway closure under `wasm32-wasi-ghc 9.12` | ✅ |
 | Cabal solver accepts the combined dep set at the inspector's index-state | ✅ |
 | Resulting `.wasm` is a valid Extism plugin shape (named exports + WASI) | ✅ |
-| `extism call` executes the plugin end-to-end | ❌ (wazero, see below) |
+| Plugin runs end-to-end against real Conway fixture (libextism + Wasmtime) | ✅ |
+| Plugin runs through `pkgs.extism-cli` (Go, wazero) | ❌ (see below) |
 
-## Runtime status
+End-to-end response on the canonical Conway fixture:
 
-`pkgs.extism-cli` (1.6.3, July 2024) embeds a wazero version that predates
+```json
+{"era":"Conway","fee_lovelace":"319463","input_count":1,"output_count":5,
+ "tx_id":"2e614d78...49da6f3","tx_size_bytes":1918}
+```
+
+## Two host paths — only one currently works
+
+**Works: native Haskell host (`nix/host/extism-spike-host`).**
+Uses the [`extism`](https://hackage.haskell.org/package/extism) Hackage
+package, which links libextism (Rust + Wasmtime). libextism is fetched
+prebuilt from the upstream release in `nix/host/libextism.nix`. This is
+the production conformance-harness path. Run with
+`just check-extism-spike`.
+
+**Blocked: `pkgs.extism-cli` (Go, wazero).** Version 1.6.3 (July 2024)
+embeds a wazero that predates
 [wazero PR #2403](https://github.com/tetratelabs/wazero/pull/2403)
-(merged Aug 2025), which adds wasm tail-call support. GHC 9.12's
-`wasm32-wasi` codegen relies on tail calls. Result:
+(Aug 2025), which added wasm tail-call support. GHC 9.12's wasm32-wasi
+codegen relies on tail calls, so `extism call` traps in wazero during
+GHC RTS init:
 
 ```
 hs_init_ghc → initAdjustors → allocHashTable
 Error: failed to initialize runtime: wasm error: out of bounds memory access
 ```
 
-The trap is in the host's wazero, not in the plugin. Direct `wasmtime
---invoke` confirms the plugin imports the standard Extism host functions
-(`extism:host/env::input_length`, etc.) — the binary is well-formed.
-
-End-to-end execution requires a Wasmtime-backed host:
-
-- Rust [extism](https://crates.io/crates/extism) (libextism, Wasmtime)
-- Haskell [extism](https://hackage.haskell.org/package/extism) (host SDK,
-  links libextism)
-- A future `extism-cli` release that picks up tail-call-capable wazero
+The trap is in the host's wazero, not in the plugin — same `.wasm`
+runs fine under Wasmtime via the Haskell host. A future `extism-cli`
+release that picks up tail-call-capable wazero will work without
+plugin changes.
 
 ## Next steps
 
-1. Add a native Haskell host program using the `extism` Hackage package
-   to load the spike plugin and call `tx_identify`. Run the existing
-   `tx-identify-smoke` shape assertions on its output.
-2. Promote `tx_identify` to a versioned contract — same export name on
+1. Promote `tx_identify` to a versioned contract — same export name on
    any future Amaru-PDK plugin.
-3. Add `tx_validate` and `apply_tx` exports once the contract shape is
+2. Add `tx_validate` and `apply_tx` exports once the contract shape is
    stable.
+3. Build the diff harness: same fixture vector → both plugins → byte
+   compare on serialized output.
