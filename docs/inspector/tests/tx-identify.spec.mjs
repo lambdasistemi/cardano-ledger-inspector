@@ -25,6 +25,28 @@ function producerCbor(context, txHash, fallback) {
   return context.producer_txs?.[txHash]?.tx_cbor || fallback;
 }
 
+async function mockKoiosValidationContext(page, validationContext) {
+  await page.route("https://api.koios.rest/api/v1/tip", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          abs_slot: Number(validationContext.slot),
+          epoch_no: Number(validationContext.epoch),
+        },
+      ]),
+    });
+  });
+  await page.route("https://api.koios.rest/api/v1/cli_protocol_params", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(validationContext.protocol_parameters),
+    });
+  });
+}
+
 function blockfrostParamsFromLedger(params) {
   const pool = params.poolVotingThresholds || {};
   const drep = params.dRepVotingThresholds || {};
@@ -82,8 +104,10 @@ function blockfrostParamsFromLedger(params) {
 
 async function decodeFixture(page) {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
 
   await installClipboardMock(page);
+  await mockKoiosValidationContext(page, validationContext);
 
   await page.goto("/");
   await page.getByRole("radio", { name: "CBOR hex" }).check();
@@ -186,17 +210,21 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
     validationPanel.getByText("Ledger validation needs more explicit context"),
   ).toHaveCount(0);
   await expect(
-    validationPanel.locator(".witness-row").filter({ hasText: "protocol parameters" }).first(),
+    validationPanel.getByText("Missing source outputs (3)."),
   ).toBeVisible();
+  const missingContextSection = validationPanel
+    .locator(".witness-section")
+    .filter({ hasText: "Missing context" });
+  await expect(
+    missingContextSection.locator(".witness-row").filter({ hasText: "protocol parameters" }),
+  ).toHaveCount(0);
+  await expect(validationPanel.getByText("koios.tip+cli_protocol_params")).toBeVisible();
   await expect(
     validationPanel
       .locator(".witness-section", { hasText: "Checks" })
       .getByRole("button", { name: "Copy" }),
   ).toHaveCount(0);
 
-  const missingContextSection = validationPanel
-    .locator(".witness-section")
-    .filter({ hasText: "Missing context" });
   const sourceOutputRow = missingContextSection
     .locator(".witness-row")
     .filter({ hasText: "source output" })
