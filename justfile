@@ -28,6 +28,9 @@ check-input-context:
 check-validate:
     nix build .#checks.x86_64-linux.tx-validate-smoke -o result-validate-smoke
 
+check-evaluate-scripts:
+    nix build .#checks.x86_64-linux.tx-evaluate-scripts-smoke -o result-evaluate-scripts-smoke
+
 build-extism-spike:
     nix build .#packages.x86_64-linux.wasm-extism-spike -o result-extism-spike
 
@@ -45,6 +48,7 @@ test:
     just check-witness-plan
     just check-input-context
     just check-validate
+    just check-evaluate-scripts
     just test-playwright
 
 build-smokes:

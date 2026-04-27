@@ -129,6 +129,31 @@
                     };
                   };
                 };
+                evaluateScripts = {
+                  summary = "Evaluate phase-2 scripts or report missing context";
+                  value = {
+                    ledger_functional_layer = "cardano-ledger-functional/v1";
+                    tx_cbor = "84a4...";
+                    op = "tx.evaluate.scripts";
+                    args = {
+                      input_policy = "preserve";
+                      context = {
+                        producer_txs = {
+                          "0000000000000000000000000000000000000000000000000000000000000000" = {
+                            tx_cbor = "84a4...";
+                            source = "blockfrost.txs.cbor";
+                          };
+                        };
+                        network = "mainnet";
+                        slot = "123456789";
+                        epoch = "507";
+                        protocol_parameters = {
+                          "_shape" = "complete Cardano.Ledger.Core.PParams ConwayEra JSON";
+                        };
+                      };
+                    };
+                  };
+                };
                 balance = {
                   summary = "Target shape for best-effort balancing";
                   value = {
@@ -394,6 +419,76 @@
                       };
                     };
                   };
+                  evaluateScripts = {
+                    summary = "Script evaluation response envelope";
+                    value = {
+                      ledger_functional_layer = "cardano-ledger-functional/v1";
+                      op = "tx.evaluate.scripts";
+                      result = {
+                        script_evaluation = {
+                          status = "incomplete";
+                          scripts_evaluate_for_supplied_context = null;
+                          complete = false;
+                          tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                          body_hash = "1111111111111111111111111111111111111111111111111111111111111111";
+                          redeemers = [
+                            {
+                              key = "spend#0";
+                              purpose = "spend";
+                              index = 0;
+                              status = "not_evaluated";
+                              path = [
+                                "body"
+                                "inputs"
+                                "#0"
+                              ];
+                              redeemer_data_hash = "2222222222222222222222222222222222222222222222222222222222222222";
+                              budget_ex_units = {
+                                memory = "1000000";
+                                steps = "500000000";
+                              };
+                              evaluated_ex_units = null;
+                              missing_context = [ "source_output" ];
+                              warnings = [ ];
+                            }
+                          ];
+                          total_ex_units = {
+                            memory = "0";
+                            steps = "0";
+                            partial = true;
+                          };
+                          failures = [ ];
+                          missing_context = [
+                            {
+                              kind = "source_output";
+                              message = "Supply producer transaction CBOR for the referenced transaction input.";
+                              path = [
+                                "body"
+                                "inputs"
+                                "#0"
+                              ];
+                              tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                              index = 0;
+                              input_kind = "input";
+                              required_for = [ "script.evaluate" ];
+                            }
+                          ];
+                          resolved_inputs = [ ];
+                          resolved_reference_inputs = [ ];
+                          context = {
+                            input_policy = "preserve";
+                            producer_tx_count = 0;
+                            decoded_producer_tx_count = 0;
+                            redeemer_count = 1;
+                            evaluated_redeemer_count = 0;
+                            unspent_status = "not_checked";
+                          };
+                          warnings = [ ];
+                          errors = [ ];
+                        };
+                      };
+                    };
+                  };
                 };
               };
             };
@@ -442,6 +537,9 @@
       };
       TxValidateResult = {
         "$ref" = "tx-validate-result.schema.json";
+      };
+      TxEvaluateScriptsResult = {
+        "$ref" = "tx-evaluate-scripts-result.schema.json";
       };
       ProducerTxContext = {
         "$ref" = "producer-tx-context.schema.json";

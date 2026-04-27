@@ -10,6 +10,7 @@ library
   exposed-modules:  Conway.Inspector
   other-modules:    Conway.Inspector.Common
                   , Conway.Inspector.Context
+                  , Conway.Inspector.Evaluation
                   , Conway.Inspector.Validation
   hs-source-dirs:   src
   build-depends:    base                  >=4.19 && <5
@@ -17,6 +18,7 @@ library
                   , base16-bytestring
                   , bytestring
                   , cardano-crypto-class
+                  , cardano-ledger-alonzo
                   , cardano-ledger-api
                   , cardano-ledger-binary
                   , cardano-ledger-conway

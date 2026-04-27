@@ -46,6 +46,9 @@
       "ProducerTxContext": {
         "$ref": "producer-tx-context.schema.json"
       },
+      "TxEvaluateScriptsResult": {
+        "$ref": "tx-evaluate-scripts-result.schema.json"
+      },
       "TxIdentifyResult": {
         "$ref": "tx-identify-result.schema.json"
       },
@@ -116,6 +119,31 @@
                     },
                     "ledger_functional_layer": "cardano-ledger-functional/v1",
                     "op": "tx.browse",
+                    "tx_cbor": "84a4..."
+                  }
+                },
+                "evaluateScripts": {
+                  "summary": "Evaluate phase-2 scripts or report missing context",
+                  "value": {
+                    "args": {
+                      "context": {
+                        "epoch": "507",
+                        "network": "mainnet",
+                        "producer_txs": {
+                          "0000000000000000000000000000000000000000000000000000000000000000": {
+                            "source": "blockfrost.txs.cbor",
+                            "tx_cbor": "84a4..."
+                          }
+                        },
+                        "protocol_parameters": {
+                          "_shape": "complete Cardano.Ledger.Core.PParams ConwayEra JSON"
+                        },
+                        "slot": "123456789"
+                      },
+                      "input_policy": "preserve"
+                    },
+                    "ledger_functional_layer": "cardano-ledger-functional/v1",
+                    "op": "tx.evaluate.scripts",
                     "tx_cbor": "84a4..."
                   }
                 },
@@ -205,6 +233,80 @@
             "content": {
               "application/json": {
                 "examples": {
+                  "evaluateScripts": {
+                    "summary": "Script evaluation response envelope",
+                    "value": {
+                      "ledger_functional_layer": "cardano-ledger-functional/v1",
+                      "op": "tx.evaluate.scripts",
+                      "result": {
+                        "script_evaluation": {
+                          "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "complete": false,
+                          "context": {
+                            "decoded_producer_tx_count": 0,
+                            "evaluated_redeemer_count": 0,
+                            "input_policy": "preserve",
+                            "producer_tx_count": 0,
+                            "redeemer_count": 1,
+                            "unspent_status": "not_checked"
+                          },
+                          "errors": [],
+                          "failures": [],
+                          "missing_context": [
+                            {
+                              "index": 0,
+                              "input_kind": "input",
+                              "kind": "source_output",
+                              "message": "Supply producer transaction CBOR for the referenced transaction input.",
+                              "path": [
+                                "body",
+                                "inputs",
+                                "#0"
+                              ],
+                              "required_for": [
+                                "script.evaluate"
+                              ],
+                              "tx_id": "0000000000000000000000000000000000000000000000000000000000000000"
+                            }
+                          ],
+                          "redeemers": [
+                            {
+                              "budget_ex_units": {
+                                "memory": "1000000",
+                                "steps": "500000000"
+                              },
+                              "evaluated_ex_units": null,
+                              "index": 0,
+                              "key": "spend#0",
+                              "missing_context": [
+                                "source_output"
+                              ],
+                              "path": [
+                                "body",
+                                "inputs",
+                                "#0"
+                              ],
+                              "purpose": "spend",
+                              "redeemer_data_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+                              "status": "not_evaluated",
+                              "warnings": []
+                            }
+                          ],
+                          "resolved_inputs": [],
+                          "resolved_reference_inputs": [],
+                          "scripts_evaluate_for_supplied_context": null,
+                          "status": "incomplete",
+                          "total_ex_units": {
+                            "memory": "0",
+                            "partial": true,
+                            "steps": "0"
+                          },
+                          "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "warnings": []
+                        }
+                      }
+                    }
+                  },
                   "identify": {
                     "summary": "Identity response envelope",
                     "value": {

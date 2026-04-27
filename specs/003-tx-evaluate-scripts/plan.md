@@ -134,7 +134,14 @@ No constitution violations or complexity exceptions are required.
 
 - Feature specification, research, data model, contract sketch, schema drafts,
   quickstart, and implementation task plan are created.
-- No Haskell, PureScript, generated OpenAPI, or docs-site artifacts have been
-  changed yet.
-- Next implementation phase should start with public contract/schema promotion
-  and a Nix smoke check for the incomplete-context path.
+- Public schema, generated OpenAPI, public API docs, README command notes, and
+  WASI dispatch are wired for `tx.evaluate.scripts`.
+- `Conway.Inspector.Evaluation` calls upstream `evalTxExUnitsWithLogs` when
+  producer transaction CBOR, network, slot, epoch, and protocol parameters are
+  supplied explicitly.
+- `just check-evaluate-scripts` verifies incomplete context, rejected
+  provider-style UTxO JSON, complete-context evaluation, per-redeemer execution
+  units, and deterministic repeated results.
+- Remaining follow-up scope: producer-id mismatch fixture, command-level
+  malformed request checks specific to this operation, richer multi-purpose
+  redeemer fixture coverage, and optional browser UI rendering.

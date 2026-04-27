@@ -54,6 +54,7 @@ import Conway.Inspector.Context (
     producerContextSupplied,
     resolvedTxInJson,
  )
+import Conway.Inspector.Evaluation (evaluateScriptsJson)
 import Conway.Inspector.Validation (validateTxJson)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -116,6 +117,7 @@ instance Aeson.FromJSON LedgerOperationRequest where
         normalizeOperation "identify" = "tx.identify"
         normalizeOperation "witness.plan" = "tx.witness.plan"
         normalizeOperation "validate" = "tx.validate"
+        normalizeOperation "evaluate.scripts" = "tx.evaluate.scripts"
         normalizeOperation op = op
 
 -- | Hex → bytes → Conway tx → JSON.
@@ -177,6 +179,12 @@ runLedgerOperation request = do
                 ledgerOperationResponse
                     (lorOperation request)
                     [ "validation" .= validateTxJson txBytes (lorArgs request) tx
+                    ]
+        "tx.evaluate.scripts" ->
+            pure $
+                ledgerOperationResponse
+                    (lorOperation request)
+                    [ "script_evaluation" .= evaluateScriptsJson (lorArgs request) tx
                     ]
         other -> Left (UnknownLedgerOperation other)
 

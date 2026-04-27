@@ -296,7 +296,7 @@ and null it is compact JSON.
 | `tx.identify` | implemented | Return stable identifiers and metadata such as transaction id, body hash, era, size, and witness counts. |
 | `tx.witness.plan` | implemented | Explain body-declared signer hashes, present witnesses, scripts, redeemers, datums, and reference inputs that are visible from the transaction alone. |
 | `tx.validate` | implemented | Report whether explicit validation context is usable or incomplete; run Conway `applyTx` when modeled context is complete. |
-| `tx.evaluate.scripts` | 0.1 target | Evaluate phase-2 scripts and report execution units or failures with explicit context. |
+| `tx.evaluate.scripts` | implemented | Evaluate phase-2 scripts and report per-redeemer execution units or failures with explicit context. |
 | `tx.patch` | 0.1 target | Apply a controlled structural patch and return new transaction CBOR. |
 | `tx.balance` | 0.1 target | Try to balance fees, change, collateral, and return value when explicit context gives enough slack. |
 | `tx.submit` | out of scope | Submission belongs to a node, wallet, or provider layer, not the ledger WASI layer. |
@@ -496,42 +496,78 @@ Result:
 
 The result never includes `tx_cbor` and never mutates the transaction.
 
-## 0.1 Target Operations
-
-These operations define the next API surface. They are intentionally explicit
-about context because a transaction alone is not enough for full ledger checks
-or balancing.
-
 ### `tx.evaluate.scripts`
 
-Evaluate scripts and report execution units or ledger failures.
+Decode the supplied Conway transaction and evaluate phase-2 scripts when the
+explicit evaluation context is complete. The operation reports every redeemer
+from the witness set with its purpose, index, budgeted execution units,
+evaluated execution units when available, failures, and missing context. It
+does not mutate the transaction and never returns replacement transaction CBOR.
 
 Arguments:
 
 ```json
 {
-  "network": "mainnet",
-  "slot": 0,
-  "protocol_parameters": {},
-  "utxo": {},
-  "cost_models": {}
+  "input_policy": "preserve",
+  "context": {
+    "producer_txs": {
+      "<producer tx id hex>": {
+        "tx_cbor": "<producer transaction CBOR hex>",
+        "source": "blockfrost.txs.cbor"
+      }
+    },
+    "network": "mainnet",
+    "slot": "123456789",
+    "epoch": "507",
+    "protocol_parameters": {}
+  }
 }
 ```
+
+`context.protocol_parameters` must be the complete
+`Cardano.Ledger.Core.PParams ConwayEra` JSON shape expected by the Haskell
+ledger package. `context.producer_txs` is the CBOR-backed source of regular and
+reference-input outputs. Provider-specific UTxO JSON is not accepted as ledger
+evidence.
+
+The implementation returns `status: "not_applicable"` for transactions with no
+phase-2 redeemers, `status: "incomplete"` with actionable `missing_context`
+when required context is absent, `status: "rejected"` with `errors` for
+malformed or contradictory context, or `status: "succeeded"`/`"failed"` from
+upstream ledger script evaluation when context is complete.
 
 Result:
 
 ```json
 {
-  "valid": true,
+  "status": "succeeded",
+  "scripts_evaluate_for_supplied_context": true,
+  "complete": true,
+  "tx_id": "<transaction id hex>",
+  "body_hash": "<transaction body hash hex>",
   "redeemers": [],
   "total_ex_units": {
     "memory": "0",
-    "steps": "0"
+    "steps": "0",
+    "partial": false
   },
   "failures": [],
+  "missing_context": [],
+  "resolved_inputs": [],
+  "resolved_reference_inputs": [],
+  "context": {},
+  "errors": [],
   "warnings": []
 }
 ```
+
+The result never includes `tx_cbor` and never mutates the transaction.
+
+## 0.1 Target Operations
+
+These operations define the next API surface. They are intentionally explicit
+about context because a transaction alone is not enough for full ledger checks
+or balancing.
 
 ### `tx.patch`
 
@@ -616,6 +652,7 @@ Machine-readable draft schemas are tracked next to this contract:
 - `../schemas/tx-identify-result.schema.json`
 - `../schemas/tx-witness-plan-result.schema.json`
 - `../schemas/tx-validate-result.schema.json`
+- `../schemas/tx-evaluate-scripts-result.schema.json`
 
 The OpenAPI document is packaged as the `ledger-functional-openapi` flake
 output and rendered by the published Swagger UI. The schemas describe the draft
