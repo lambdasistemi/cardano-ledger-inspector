@@ -1,0 +1,49 @@
+cabal-version: 3.0
+name:          wasm-extism-spike
+version:       0.1.0.0
+synopsis:
+  Extism plugin spike: ledger tx-id behind the Extism PDK
+
+author:        lambdasistemi
+license:       Apache-2.0
+build-type:    Simple
+
+-- Spike. Tests one hypothesis: a Haskell wasm32-wasi build can carry
+-- the cardano-ledger Conway closure AND the Extism PDK at the same
+-- time, exposing a ledger function (Conway tx decode + tx-id) as an
+-- Extism plugin export. If this builds and `extism call` returns the
+-- expected JSON for the canonical Conway fixture, conformance vectors
+-- via Extism are viable.
+
+library wasm-extism-spike-lib
+  exposed-modules:  Extism.Spike
+  hs-source-dirs:   src
+  build-depends:
+    , aeson
+    , base                  >=4.19 && <5
+    , base16-bytestring
+    , bytestring
+    , cardano-crypto-class
+    , cardano-ledger-api
+    , cardano-ledger-binary
+    , cardano-ledger-conway
+    , cardano-ledger-core
+    , extism-pdk
+    , microlens
+    , text
+
+  default-language: Haskell2010
+  ghc-options:      -Wall
+
+executable wasm-extism-spike
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  build-depends:
+    , base                   >=4.19 && <5
+    , wasm-extism-spike-lib
+
+  default-language: Haskell2010
+  ghc-options:
+    -Wall -no-hs-main -optl-mexec-model=reactor
+    "-optl-Wl,--export=hs_init" "-optl-Wl,--export=tx_identify"
+    "-optl-Wl,--allow-undefined"

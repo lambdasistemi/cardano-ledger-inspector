@@ -97,6 +97,7 @@
             smokeSrc = ./nix/wasm/smoke;
             ledgerSmokeSrc = ./nix/wasm/ledger-smoke;
             txInspectorSrc = ./nix/wasm/tx-inspector;
+            extismSpikeSrc = ./nix/wasm/extism-spike;
           };
 
           tx-inspector-ui = import ./nix/wasm-ui.nix {
@@ -398,10 +399,37 @@
               complete-context-response.json complete-context-response-2.json \
               invalid-network-request.json invalid-network-response.json $out/
           '';
+
+          # Spike: structural check on the Extism plugin artifact.
+          #
+          # Runtime invocation through `extism call` (extism-cli 1.6.3,
+          # July 2024) is blocked: the bundled wazero predates wasm
+          # tail-call support (wazero PR #2403, Aug 2025), and GHC
+          # 9.12's wasm32-wasi codegen relies on tail calls. Result:
+          # `hs_init_ghc → initAdjustors → allocHashTable` traps with
+          # an out-of-bounds memory access during runtime init.
+          #
+          # That is not our binary's fault — direct wasmtime confirms
+          # the plugin shape, and `wasm-objdump -x` confirms the
+          # exports. End-to-end execution requires a Wasmtime-backed
+          # host (Rust libextism, Haskell extism-host SDK, or a newer
+          # extism-cli once it picks up a tail-call-capable wazero).
+          tx-extism-spike-smoke = pkgs.runCommand "tx-extism-spike-smoke" { } ''
+            mkdir -p $out
+            ${pkgs.wabt}/bin/wasm-objdump -x \
+              ${wasmTargets.wasm-extism-spike}/wasm-extism-spike.wasm \
+              > exports.txt
+            grep -q '<tx_identify> -> "tx_identify"' exports.txt
+            grep -q '<hs_init> -> "hs_init"' exports.txt
+            ${pkgs.wabt}/bin/wasm-validate \
+              ${wasmTargets.wasm-extism-spike}/wasm-extism-spike.wasm
+            cp exports.txt $out/
+          '';
         in
         {
           packages = {
-            inherit (wasmTargets) wasm-smoke wasm-ledger-smoke wasm-tx-inspector;
+            inherit (wasmTargets)
+              wasm-smoke wasm-ledger-smoke wasm-tx-inspector wasm-extism-spike;
             inherit
               ledger-functional-openapi
               ledger-functional-openapi-generated
@@ -412,7 +440,13 @@
           };
 
           checks = {
-            inherit ledger-functional-openapi-check tx-identify-smoke tx-witness-plan-smoke tx-input-context-smoke tx-validate-smoke;
+            inherit
+              ledger-functional-openapi-check
+              tx-identify-smoke
+              tx-witness-plan-smoke
+              tx-input-context-smoke
+              tx-validate-smoke
+              tx-extism-spike-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
