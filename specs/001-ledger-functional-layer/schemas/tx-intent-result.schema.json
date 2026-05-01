@@ -30,6 +30,32 @@
     },
     "value": {
       "type": "object",
+      "properties": {
+        "net_spend_known": { "type": "boolean" },
+        "net_spend_note": { "type": "string" },
+        "signer_lovelace": {
+          "type": "object",
+          "properties": {
+            "known": { "type": "boolean" },
+            "resolved_input_lovelace": { "type": "string" },
+            "output_lovelace": { "type": "string" },
+            "external_or_script_output_lovelace": { "type": "string" },
+            "net_lovelace": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }]
+            },
+            "basis": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "resolved_input_buckets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/valueBucket" }
+        },
+        "output_buckets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/valueBucket" }
+        }
+      },
       "additionalProperties": true
     },
     "features": {
@@ -106,6 +132,21 @@
         "path": { "type": "string" },
         "copyValue": { "type": "string" },
         "detail": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "valueBucket": {
+      "type": "object",
+      "required": ["bucket", "label", "tx_out_count", "lovelace", "asset_class_count"],
+      "properties": {
+        "bucket": {
+          "type": "string",
+          "enum": ["signer_controlled", "external_key", "script", "bootstrap"]
+        },
+        "label": { "type": "string" },
+        "tx_out_count": { "type": "integer", "minimum": 0 },
+        "lovelace": { "type": "string" },
+        "asset_class_count": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": true
     }

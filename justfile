@@ -22,6 +22,9 @@ check-identify:
 check-witness-plan:
     nix build .#checks.x86_64-linux.tx-witness-plan-smoke -o result-witness-plan-smoke
 
+check-intent:
+    nix build .#checks.x86_64-linux.tx-intent-smoke -o result-intent-smoke
+
 check-input-context:
     nix build .#checks.x86_64-linux.tx-input-context-smoke -o result-input-context-smoke
 
@@ -46,6 +49,7 @@ test-playwright: build-ui
 test:
     just check-identify
     just check-witness-plan
+    just check-intent
     just check-input-context
     just check-validate
     just check-evaluate-scripts

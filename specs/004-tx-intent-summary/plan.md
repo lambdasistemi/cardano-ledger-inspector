@@ -7,7 +7,9 @@
 
 Add `tx.intent` as a ledger-backed WASI operation and render it in the PureScript
 browser inspector before lower-level decoded views. The operation returns both
-display-ready summary rows and structured fields for API consumers.
+display-ready summary rows and structured fields for API consumers, including
+conservative signer-perspective value accounting when input source outputs are
+resolved from explicit producer transaction CBOR.
 
 ## Technical Context
 
@@ -57,11 +59,13 @@ specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex
 
 1. Add `tx.intent` dispatch, result shape, metadata extraction, and summary rows
    to the Haskell ledger operation.
-2. Render `tx.intent` in PureScript before raw decoded views, keeping JavaScript
+2. Add signer value buckets and net ADA calculation in Haskell when producer
+   transaction context resolves every regular input.
+3. Render `tx.intent` in PureScript before raw decoded views, keeping JavaScript
    limited to JSON parse FFI.
-3. Add a real signing CBOR fixture and a Playwright first-viewport regression
+4. Add a real signing CBOR fixture and a Playwright first-viewport regression
    using `getBoundingClientRect`.
-4. Update contract/schema/OpenAPI/docs and run repository checks.
+5. Update contract/schema/OpenAPI/docs and run repository checks.
 
 ## Complexity Tracking
 

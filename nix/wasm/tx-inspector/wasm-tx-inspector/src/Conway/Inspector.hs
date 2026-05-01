@@ -18,6 +18,7 @@ module Conway.Inspector (
     InspectError (..),
 ) where
 
+import qualified Cardano.Ledger.Address as Addr
 import qualified Cardano.Ledger.Api as L
 import qualified Cardano.Ledger.BaseTypes as BaseTypes
 import qualified Cardano.Ledger.Coin as Coin
@@ -25,6 +26,7 @@ import qualified Cardano.Ledger.Conway as Conway
 import qualified Cardano.Ledger.Conway.Scripts as ConwayScripts
 import Cardano.Ledger.Core (TxLevel (..))
 import qualified Cardano.Ledger.Core as Core
+import qualified Cardano.Ledger.Credential as Credential
 import qualified Cardano.Ledger.Hashes as Hashes
 import qualified Cardano.Ledger.Keys as Keys
 import qualified Cardano.Ledger.Mary.Value as Mary
@@ -402,6 +404,8 @@ intentSummaryJson args tx =
                 <$> toList (wits ^. Core.bootAddrTxWitsL)
         presentSignerHexSet =
             Set.fromList (presentVKeyHexes <> presentBootstrapHexes)
+        signerHexSet =
+            Set.fromList (requiredSignerHexes <> presentVKeyHexes <> presentBootstrapHexes)
         missingSignerHexes =
             filter (`Set.notMember` presentSignerHexSet) requiredSignerHexes
         scriptWitnesses =
@@ -422,10 +426,39 @@ intentSummaryJson args tx =
             mapMaybe (producerTxOutput context) inputs
         resolvedInputLovelace =
             sum (txOutLovelace <$> resolvedInputOutputs)
+        inputValueBuckets =
+            txOutBucketTotals signerHexSet resolvedInputOutputs
+        outputValueBuckets =
+            txOutBucketTotals signerHexSet outputs
+        signerInputLovelace =
+            bucketLovelace SignerControlled inputValueBuckets
+        signerOutputLovelace =
+            bucketLovelace SignerControlled outputValueBuckets
+        externalOutputLovelace =
+            sum
+                [ vbtLovelace totals
+                | totals <- outputValueBuckets
+                , vbtBucket totals /= SignerControlled
+                ]
+        netSignerKnown =
+            producerContextSupplied context && null missingContextInputs
+        netSignerLovelace =
+            signerOutputLovelace - signerInputLovelace
         (mintedAssets, burnedAssets) =
             multiAssetDeltaCounts (body ^. L.mintTxBodyL)
         collateralInputs =
             toList (body ^. L.collateralInputsTxBodyL)
+        signerValueRows =
+            signerValueRowsJson
+                netSignerKnown
+                netSignerLovelace
+                signerInputLovelace
+                signerOutputLovelace
+                externalOutputLovelace
+                (bucketCount SignerControlled inputValueBuckets)
+                (bucketCount SignerControlled outputValueBuckets)
+                (length resolvedInputOutputs)
+                (length outputs)
         intentEffects =
             [
                 ( "Consumes inputs"
@@ -490,7 +523,7 @@ intentSummaryJson args tx =
             , "input_policy" .= inputPolicy
             , "metrics"
                 .= [ metricJson "Fee" (formatLovelace (Coin.unCoin (body ^. L.feeTxBodyL)))
-                   , metricJson "Outputs" (T.pack (show (length outputs)))
+                   , metricJson "Signer net ADA" (netSignerLovelaceLabel netSignerKnown netSignerLovelace)
                    , metricJson "Output total" (formatLovelace outputLovelace)
                    , metricJson "Required signers" (T.pack (show (length requiredSignerHexes)))
                    , metricJson "Missing signers" $
@@ -504,6 +537,10 @@ intentSummaryJson args tx =
             , "claims" .= map metadataClaimSummaryJson (metadataEntries tx)
             , "sections"
                 .= [ sectionJson
+                        "Signer value perspective"
+                        "No signer value perspective available."
+                        signerValueRows
+                   , sectionJson
                         "Critical effects"
                         "No transaction effects reported."
                         (zipWith effectRowJson [0 :: Int ..] intentEffects)
@@ -528,11 +565,26 @@ intentSummaryJson args tx =
                     , "resolved_input_count" .= length resolvedInputOutputs
                     , "input_lovelace_complete"
                         .= (producerContextSupplied context && null missingContextInputs)
-                    , "net_spend_known" .= False
-                    , "net_spend_note"
-                        .= ( "Output totals are ledger totals. Wallet-owned change cannot be inferred from transaction CBOR alone." ::
-                                T.Text
-                           )
+                    , "net_spend_known" .= netSignerKnown
+                    , "net_spend_note" .= netSignerNote netSignerKnown
+                    , "signer_lovelace"
+                        .= Aeson.object
+                            [ "known" .= netSignerKnown
+                            , "resolved_input_lovelace" .= T.pack (show signerInputLovelace)
+                            , "output_lovelace" .= T.pack (show signerOutputLovelace)
+                            , "external_or_script_output_lovelace"
+                                .= T.pack (show externalOutputLovelace)
+                            , "net_lovelace"
+                                .= if netSignerKnown
+                                    then Aeson.String (T.pack (show netSignerLovelace))
+                                    else Aeson.Null
+                            , "basis"
+                                .= ( "payment key credentials matching declared required signers or present key witnesses" ::
+                                        T.Text
+                                   )
+                            ]
+                    , "resolved_input_buckets" .= map valueBucketJson inputValueBuckets
+                    , "output_buckets" .= map valueBucketJson outputValueBuckets
                     ]
             , "features"
                 .= Aeson.object
@@ -623,6 +675,185 @@ rowJson label value path copyValue detail =
         , "copyValue" .= copyValue
         , "detail" .= detail
         ]
+
+data ValueBucket
+    = SignerControlled
+    | ExternalKeyControlled
+    | ScriptControlled
+    | BootstrapControlled
+    deriving (Eq)
+
+data ValueBucketTotals = ValueBucketTotals
+    { vbtBucket :: ValueBucket
+    , vbtCount :: Int
+    , vbtLovelace :: Integer
+    , vbtAssetCount :: Int
+    }
+
+txOutBucketTotals ::
+    Set.Set T.Text ->
+    [L.TxOut Conway.ConwayEra] ->
+    [ValueBucketTotals]
+txOutBucketTotals signerHashes txOuts =
+    filter ((> 0) . vbtCount) $
+        bucketTotals <$> allValueBuckets
+  where
+    bucketTotals bucket =
+        let matching =
+                filter ((== bucket) . txOutValueBucket signerHashes) txOuts
+         in ValueBucketTotals
+                { vbtBucket = bucket
+                , vbtCount = length matching
+                , vbtLovelace = sum (txOutLovelace <$> matching)
+                , vbtAssetCount = sum (txOutAssetCount <$> matching)
+                }
+
+allValueBuckets :: [ValueBucket]
+allValueBuckets =
+    [ SignerControlled
+    , ExternalKeyControlled
+    , ScriptControlled
+    , BootstrapControlled
+    ]
+
+txOutValueBucket ::
+    Set.Set T.Text ->
+    L.TxOut Conway.ConwayEra ->
+    ValueBucket
+txOutValueBucket signerHashes txOut =
+    case txOut ^. L.addrTxOutL of
+        Addr.Addr _ paymentCredential _ ->
+            case Credential.credKeyHash paymentCredential of
+                Just paymentKeyHash
+                    | keyHashHex paymentKeyHash `Set.member` signerHashes ->
+                        SignerControlled
+                Just _ ->
+                    ExternalKeyControlled
+                Nothing ->
+                    ScriptControlled
+        Addr.AddrBootstrap _ ->
+            BootstrapControlled
+
+txOutAssetCount :: L.TxOut Conway.ConwayEra -> Int
+txOutAssetCount txOut =
+    let Mary.MaryValue _ assets = txOut ^. L.valueTxOutL
+     in multiAssetClassCount assets
+
+multiAssetClassCount :: Mary.MultiAsset -> Int
+multiAssetClassCount (Mary.MultiAsset m) =
+    sum
+        [ length (filter (/= 0) (Map.elems assetMap))
+        | assetMap <- Map.elems m
+        ]
+
+bucketLovelace :: ValueBucket -> [ValueBucketTotals] -> Integer
+bucketLovelace bucket totals =
+    sum [vbtLovelace total | total <- totals, vbtBucket total == bucket]
+
+bucketCount :: ValueBucket -> [ValueBucketTotals] -> Int
+bucketCount bucket totals =
+    sum [vbtCount total | total <- totals, vbtBucket total == bucket]
+
+signerValueRowsJson ::
+    Bool ->
+    Integer ->
+    Integer ->
+    Integer ->
+    Integer ->
+    Int ->
+    Int ->
+    Int ->
+    Int ->
+    [Aeson.Value]
+signerValueRowsJson
+    netKnown
+    netSignerLovelace
+    signerInputLovelace
+    signerOutputLovelace
+    externalOutputLovelace
+    signerInputCount
+    signerOutputCount
+    resolvedInputCount
+    outputCount =
+        zipWith
+            valuePerspectiveRowJson
+            [0 :: Int ..]
+            [
+                ( "Net signer ADA"
+                , netSignerLovelaceLabel netKnown netSignerLovelace
+                , if netKnown
+                    then "negative means more signer-controlled ADA leaves than returns"
+                    else "producer transaction CBOR must resolve every regular input before signer net can be known"
+                )
+            ,
+                ( "Signer-controlled inputs"
+                , if netKnown || resolvedInputCount > 0
+                    then formatLovelace signerInputLovelace
+                    else "unknown"
+                , plural signerInputCount "resolved source output"
+                    <> " matched signer payment key hashes out of "
+                    <> plural resolvedInputCount "resolved input"
+                )
+            ,
+                ( "Signer-controlled outputs"
+                , formatLovelace signerOutputLovelace
+                , plural signerOutputCount "output"
+                    <> " matched signer payment key hashes out of "
+                    <> plural outputCount "output"
+                )
+            ,
+                ( "External/script outputs"
+                , formatLovelace externalOutputLovelace
+                , "outputs not controlled by declared or witnessed signer payment key hashes"
+                )
+            ]
+
+valuePerspectiveRowJson :: Int -> (T.Text, T.Text, T.Text) -> Aeson.Value
+valuePerspectiveRowJson index (label, value, detail) =
+    rowJson
+        label
+        value
+        (encodePath ["intent", "value", "signer_perspective", T.pack ("#" <> show index)])
+        value
+        detail
+
+netSignerLovelaceLabel :: Bool -> Integer -> T.Text
+netSignerLovelaceLabel False _ = "unknown"
+netSignerLovelaceLabel True lovelace = formatSignedLovelace lovelace
+
+formatSignedLovelace :: Integer -> T.Text
+formatSignedLovelace lovelace
+    | lovelace > 0 = "+" <> formatLovelace lovelace
+    | lovelace < 0 = "-" <> formatLovelace (abs lovelace)
+    | otherwise = "0 ADA"
+
+netSignerNote :: Bool -> T.Text
+netSignerNote True =
+    "Signer net is computed from resolved input TxOuts and output payment credentials matching declared or witnessed signer key hashes."
+netSignerNote False =
+    "Signer net is unknown until producer transaction CBOR resolves every regular input; output totals are still ledger facts."
+
+valueBucketJson :: ValueBucketTotals -> Aeson.Value
+valueBucketJson totals =
+    Aeson.object
+        [ "bucket" .= valueBucketName (vbtBucket totals)
+        , "label" .= valueBucketLabel (vbtBucket totals)
+        , "tx_out_count" .= vbtCount totals
+        , "lovelace" .= T.pack (show (vbtLovelace totals))
+        , "asset_class_count" .= vbtAssetCount totals
+        ]
+
+valueBucketName :: ValueBucket -> T.Text
+valueBucketName SignerControlled = "signer_controlled"
+valueBucketName ExternalKeyControlled = "external_key"
+valueBucketName ScriptControlled = "script"
+valueBucketName BootstrapControlled = "bootstrap"
+
+valueBucketLabel :: ValueBucket -> T.Text
+valueBucketLabel SignerControlled = "Signer-controlled"
+valueBucketLabel ExternalKeyControlled = "External key"
+valueBucketLabel ScriptControlled = "Script"
+valueBucketLabel BootstrapControlled = "Bootstrap"
 
 intentEffect :: (T.Text, T.Text, T.Text) -> Aeson.Value
 intentEffect (label, value, detail) =

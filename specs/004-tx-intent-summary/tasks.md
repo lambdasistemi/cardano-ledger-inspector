@@ -8,6 +8,7 @@
 - [x] T001 Add `tx.intent` operation normalization and dispatch in `nix/wasm/tx-inspector/wasm-tx-inspector/src/Conway/Inspector.hs`
 - [x] T002 Generate signer-focused metrics, metadata claims, effects, warnings, and structured fields in Haskell
 - [x] T003 Decode nested metadata text without hard-coding one auxiliary metadata layout
+- [x] T013 Add signer-perspective ADA net and payment-credential value buckets for complete producer context
 
 ## Phase 2: Browser Rendering
 
@@ -20,6 +21,7 @@
 - [x] T007 Add `specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex`
 - [x] T008 Add Playwright first-viewport assertions for signer-critical fields using explicit viewport geometry
 - [x] T009 Preserve existing identity, witness-plan, validation, and browser behavior tests
+- [x] T014 Add WASI smoke coverage for signer net and value buckets using a complete producer-context fixture
 
 ## Phase 4: Contracts And Docs
 

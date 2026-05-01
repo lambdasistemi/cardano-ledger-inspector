@@ -403,11 +403,28 @@
                               "value": "1.043795 ADA"
                             },
                             {
+                              "label": "Signer net ADA",
+                              "value": "unknown"
+                            },
+                            {
                               "label": "Missing signers",
                               "value": "2 missing required signers"
                             }
                           ],
                           "sections": [
+                            {
+                              "empty": "No signer value perspective available.",
+                              "rows": [
+                                {
+                                  "copyValue": "unknown",
+                                  "detail": "producer transaction CBOR must resolve every regular input before signer net can be known",
+                                  "label": "Net signer ADA",
+                                  "path": "[\"intent\",\"value\",\"signer_perspective\",\"#0\"]",
+                                  "value": "unknown"
+                                }
+                              ],
+                              "title": "Signer value perspective"
+                            },
                             {
                               "empty": "No transaction effects reported.",
                               "rows": [],
@@ -417,6 +434,28 @@
                           "subtitle": "1 metadata claim / 2 missing required signers / 2 redeemers",
                           "title": "Signing summary",
                           "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "value": {
+                            "net_spend_known": false,
+                            "net_spend_note": "Signer net is unknown until producer transaction CBOR resolves every regular input; output totals are still ledger facts.",
+                            "output_buckets": [
+                              {
+                                "asset_class_count": 0,
+                                "bucket": "script",
+                                "label": "Script",
+                                "lovelace": "1162532800000",
+                                "tx_out_count": 11
+                              }
+                            ],
+                            "resolved_input_buckets": [],
+                            "signer_lovelace": {
+                              "basis": "payment key credentials matching declared required signers or present key witnesses",
+                              "external_or_script_output_lovelace": "1212430755481",
+                              "known": false,
+                              "net_lovelace": null,
+                              "output_lovelace": "0",
+                              "resolved_input_lovelace": "0"
+                            }
+                          },
                           "warnings": [
                             "Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy."
                           ]

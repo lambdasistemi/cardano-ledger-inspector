@@ -50,7 +50,8 @@ metrics, claims, sections, warnings, and structured fields.
 1. **Given** the same transaction bytes and explicit context, **When** `tx.intent`
    is run repeatedly, **Then** the result is deterministic.
 2. **Given** producer transaction CBOR context, **When** `tx.intent` runs, **Then**
-   input context coverage is reported from decoded producer transactions.
+   input context coverage and signer-perspective net ADA are reported from
+   decoded producer transactions.
 
 ## Edge Cases
 
@@ -58,6 +59,8 @@ metrics, claims, sections, warnings, and structured fields.
   without hard-coding one metadata standard layout.
 - Transactions may have no metadata, no required signers, no redeemers, or no
   provider context.
+- Signer net value is unknown unless producer transaction CBOR resolves every
+  regular input, because the transaction body only names inputs by id and index.
 - The first viewport is runner-size dependent, so tests must pin or explicitly
   assert viewport geometry.
 
@@ -74,6 +77,13 @@ metrics, claims, sections, warnings, and structured fields.
   lower-level witness/validation panels.
 - **FR-005**: The Playwright regression MUST assert first-viewport placement
   using explicit viewport geometry, not only selector visibility.
+- **FR-006**: When all regular input source outputs are resolved from explicit
+  producer transaction CBOR, the intent result MUST compute signer-perspective
+  net ADA by comparing resolved signer-controlled inputs with signer-controlled
+  outputs.
+- **FR-007**: The result MUST bucket resolved input and output values by payment
+  credential ownership: signer-controlled key, external key, script, or
+  bootstrap/other.
 
 ### Key Entities
 
@@ -83,6 +93,8 @@ metrics, claims, sections, warnings, and structured fields.
   metadata.
 - **Critical Effect**: A visible transaction effect such as fee, outputs,
   withdrawals, mint/burn, collateral, scripts, or required signatures.
+- **Signer Value Perspective**: A conservative value summary based on payment
+  key credentials matching declared required signers or present key witnesses.
 
 ## Success Criteria
 
@@ -94,10 +106,13 @@ metrics, claims, sections, warnings, and structured fields.
   withdrawal count, and no mint/burn status.
 - **SC-003**: Existing identity, witness-plan, validation, and browser tests
   continue to pass.
+- **SC-004**: A complete producer-context fixture reports known signer net ADA
+  and structured signer/external/script value buckets.
 
 ## Assumptions
 
 - This feature is informational and does not sign, submit, balance, patch, or
   validate the transaction.
-- Wallet-owned change cannot be inferred from transaction CBOR alone, so the
-  summary avoids claiming a net wallet spend.
+- Wallet-owned change cannot be inferred from transaction CBOR alone. With
+  explicit producer transaction context, the summary can compute a conservative
+  signer-controlled ADA net by matching payment key credentials.

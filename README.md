@@ -65,7 +65,8 @@ through Nix and fail if it differs from the committed Swagger JSON.
 transaction fixture and verifies the `tx.identify` response shape.
 `tx.intent` is covered by the browser suite, including the
 `sundae-swap-usdm-disbursement.hex` fixture and a first-viewport signer summary
-regression.
+regression. `just check-intent` verifies signer-perspective value accounting
+against a complete producer-context fixture.
 `just check-witness-plan` verifies the implemented `tx.witness.plan` response
 shape against the same fixture.
 `just check-input-context` verifies that explicit `args.context.producer_txs`

@@ -279,6 +279,10 @@
                               value = "1.043795 ADA";
                             }
                             {
+                              label = "Signer net ADA";
+                              value = "unknown";
+                            }
+                            {
                               label = "Missing signers";
                               value = "2 missing required signers";
                             }
@@ -292,11 +296,46 @@
                           ];
                           sections = [
                             {
+                              title = "Signer value perspective";
+                              empty = "No signer value perspective available.";
+                              rows = [
+                                {
+                                  label = "Net signer ADA";
+                                  value = "unknown";
+                                  path = "[\"intent\",\"value\",\"signer_perspective\",\"#0\"]";
+                                  copyValue = "unknown";
+                                  detail = "producer transaction CBOR must resolve every regular input before signer net can be known";
+                                }
+                              ];
+                            }
+                            {
                               title = "Critical effects";
                               empty = "No transaction effects reported.";
                               rows = [ ];
                             }
                           ];
+                          value = {
+                            net_spend_known = false;
+                            net_spend_note = "Signer net is unknown until producer transaction CBOR resolves every regular input; output totals are still ledger facts.";
+                            signer_lovelace = {
+                              known = false;
+                              resolved_input_lovelace = "0";
+                              output_lovelace = "0";
+                              external_or_script_output_lovelace = "1212430755481";
+                              net_lovelace = null;
+                              basis = "payment key credentials matching declared required signers or present key witnesses";
+                            };
+                            resolved_input_buckets = [ ];
+                            output_buckets = [
+                              {
+                                bucket = "script";
+                                label = "Script";
+                                tx_out_count = 11;
+                                lovelace = "1162532800000";
+                                asset_class_count = 0;
+                              }
+                            ];
+                          };
                           warnings = [
                             "Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy."
                           ];
