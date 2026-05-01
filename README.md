@@ -63,6 +63,9 @@ split `prebuiltDeps` path and rebuild much faster after the cache exists.
 through Nix and fail if it differs from the committed Swagger JSON.
 `just check-identify` runs the WASI executable against a committed Conway
 transaction fixture and verifies the `tx.identify` response shape.
+`tx.intent` is covered by the browser suite, including the
+`sundae-swap-usdm-disbursement.hex` fixture and a first-viewport signer summary
+regression.
 `just check-witness-plan` verifies the implemented `tx.witness.plan` response
 shape against the same fixture.
 `just check-input-context` verifies that explicit `args.context.producer_txs`

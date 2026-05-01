@@ -71,6 +71,7 @@ Haskell ledger layer derives referenced outputs.
 | `tx.inspect` | Decode transaction CBOR with the Haskell ledger and return a compact summary plus the root browser view. |
 | `tx.browse` | Decode transaction CBOR and return a browser view at `args.path`. |
 | `tx.identify` | Return transaction id, body hash, era, byte size, fee, structural counts, and witness counts. |
+| `tx.intent` | Return a signer-focused summary of visible transaction effects, self-declared metadata intent, required signers, scripts, withdrawals, mint/burn, collateral, and context coverage. |
 | `tx.witness.plan` | Return signer, witness, script, redeemer, datum, reference-input, and explicit producer-transaction context coverage data. |
 | `tx.validate` | Decode explicit context, build a Conway ledger environment, run `applyTx` when context is complete, and report ledger failures without mutating CBOR. |
 | `tx.evaluate.scripts` | Decode explicit context, run upstream phase-2 script evaluation when context is complete, and report per-redeemer execution units or failures without mutating CBOR. |
@@ -112,6 +113,7 @@ The detailed contract and schemas are tracked in the repository:
 - [Producer transaction context schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/producer-tx-context.schema.json)
 - [Browser view schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/browser-view.schema.json)
 - [tx.identify result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-identify-result.schema.json)
+- [tx.intent result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-intent-result.schema.json)
 - [tx.witness.plan result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-witness-plan-result.schema.json)
 - [tx.validate result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-validate-result.schema.json)
 - [tx.evaluate.scripts result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-evaluate-scripts-result.schema.json)

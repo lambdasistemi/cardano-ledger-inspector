@@ -74,6 +74,17 @@
                     args = { };
                   };
                 };
+                intent = {
+                  summary = "Summarize signer-visible transaction intent";
+                  value = {
+                    ledger_functional_layer = "cardano-ledger-functional/v1";
+                    tx_cbor = "84a4...";
+                    op = "tx.intent";
+                    args = {
+                      input_policy = "preserve";
+                    };
+                  };
+                };
                 witnessPlan = {
                   summary = "Plan transaction witnesses";
                   value = {
@@ -245,6 +256,50 @@
                             redeemer = 0;
                             datum = 0;
                           };
+                        };
+                      };
+                    };
+                  };
+                  intent = {
+                    summary = "Signer-focused intent response envelope";
+                    value = {
+                      ledger_functional_layer = "cardano-ledger-functional/v1";
+                      op = "tx.intent";
+                      result = {
+                        intent = {
+                          title = "Signing summary";
+                          subtitle = "1 metadata claim / 2 missing required signers / 2 redeemers";
+                          tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                          body_hash = "1111111111111111111111111111111111111111111111111111111111111111";
+                          fee_lovelace = "1043795";
+                          input_policy = "preserve";
+                          metrics = [
+                            {
+                              label = "Fee";
+                              value = "1.043795 ADA";
+                            }
+                            {
+                              label = "Missing signers";
+                              value = "2 missing required signers";
+                            }
+                          ];
+                          claims = [
+                            {
+                              label = "Swap ADA<->USDM";
+                              value = "Swapping ADA for $100k at a rate of $0.245 per ADA";
+                              detail = "Required to pay Antithesis as vendor / destination Network Compliance's treasury / metadata label 1694 / self-declared";
+                            }
+                          ];
+                          sections = [
+                            {
+                              title = "Critical effects";
+                              empty = "No transaction effects reported.";
+                              rows = [ ];
+                            }
+                          ];
+                          warnings = [
+                            "Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy."
+                          ];
                         };
                       };
                     };
@@ -531,6 +586,9 @@
       };
       TxIdentifyResult = {
         "$ref" = "tx-identify-result.schema.json";
+      };
+      TxIntentResult = {
+        "$ref" = "tx-intent-result.schema.json";
       };
       TxWitnessPlanResult = {
         "$ref" = "tx-witness-plan-result.schema.json";

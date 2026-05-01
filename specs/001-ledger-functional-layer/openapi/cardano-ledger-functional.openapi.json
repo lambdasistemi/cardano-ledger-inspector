@@ -52,6 +52,9 @@
       "TxIdentifyResult": {
         "$ref": "tx-identify-result.schema.json"
       },
+      "TxIntentResult": {
+        "$ref": "tx-intent-result.schema.json"
+      },
       "TxValidateResult": {
         "$ref": "tx-validate-result.schema.json"
       },
@@ -162,6 +165,17 @@
                     "args": {},
                     "ledger_functional_layer": "cardano-ledger-functional/v1",
                     "op": "tx.inspect",
+                    "tx_cbor": "84a4..."
+                  }
+                },
+                "intent": {
+                  "summary": "Summarize signer-visible transaction intent",
+                  "value": {
+                    "args": {
+                      "input_policy": "preserve"
+                    },
+                    "ledger_functional_layer": "cardano-ledger-functional/v1",
+                    "op": "tx.intent",
                     "tx_cbor": "84a4..."
                   }
                 },
@@ -362,6 +376,50 @@
                         "inspection": {
                           "era": "Conway",
                           "fee_lovelace": "0"
+                        }
+                      }
+                    }
+                  },
+                  "intent": {
+                    "summary": "Signer-focused intent response envelope",
+                    "value": {
+                      "ledger_functional_layer": "cardano-ledger-functional/v1",
+                      "op": "tx.intent",
+                      "result": {
+                        "intent": {
+                          "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "claims": [
+                            {
+                              "detail": "Required to pay Antithesis as vendor / destination Network Compliance's treasury / metadata label 1694 / self-declared",
+                              "label": "Swap ADA<->USDM",
+                              "value": "Swapping ADA for $100k at a rate of $0.245 per ADA"
+                            }
+                          ],
+                          "fee_lovelace": "1043795",
+                          "input_policy": "preserve",
+                          "metrics": [
+                            {
+                              "label": "Fee",
+                              "value": "1.043795 ADA"
+                            },
+                            {
+                              "label": "Missing signers",
+                              "value": "2 missing required signers"
+                            }
+                          ],
+                          "sections": [
+                            {
+                              "empty": "No transaction effects reported.",
+                              "rows": [],
+                              "title": "Critical effects"
+                            }
+                          ],
+                          "subtitle": "1 metadata claim / 2 missing required signers / 2 redeemers",
+                          "title": "Signing summary",
+                          "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "warnings": [
+                            "Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy."
+                          ]
                         }
                       }
                     }

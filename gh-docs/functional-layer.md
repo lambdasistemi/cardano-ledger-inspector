@@ -87,6 +87,13 @@ producer transaction CBOR that could not be fetched.
 : Return stable transaction identifiers, byte-level metadata, and witness
   counts from the ledger-decoded transaction.
 
+`tx.intent`
+: Return the signer-focused answer to "what am I signing?" from the
+  ledger-decoded transaction: visible effects, self-declared metadata claims,
+  required signers, scripts, withdrawals, mint/burn, collateral, and explicit
+  context coverage. Metadata is surfaced as self-declared intent, not verified
+  off-chain truth.
+
 `tx.witness.plan`
 : Return transaction-derived signer, witness, script, redeemer, datum, and
   reference-input planning data. When `args.context.producer_txs` is present,
@@ -110,7 +117,7 @@ producer transaction CBOR that could not be fetched.
   and evaluated execution units, and preserves missing-context diagnostics. It
   never mutates or returns transaction CBOR.
 
-The browser inspector now calls `tx.inspect`, `tx.identify`,
+The browser inspector now calls `tx.inspect`, `tx.identify`, `tx.intent`,
 `tx.witness.plan`, and `tx.validate` from the same selected transaction CBOR.
 When provider credentials are available, producer transaction CBOR fetched by
 transaction id is passed as explicit `args.context.producer_txs`, and provider

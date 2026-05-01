@@ -11,6 +11,10 @@ const fixturePath =
     repoRoot,
     "specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex",
   );
+const signingIntentFixturePath = path.join(
+  repoRoot,
+  "specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex",
+);
 const validationFixturePath = path.join(
   repoRoot,
   "specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json",
@@ -102,8 +106,8 @@ function blockfrostParamsFromLedger(params) {
   };
 }
 
-async function decodeFixture(page) {
-  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+async function decodeFixture(page, txFixturePath = fixturePath) {
+  const txCbor = (await readFile(txFixturePath, "utf8")).trim();
   const validationContext = await loadValidationContext();
 
   await installClipboardMock(page);
@@ -117,6 +121,21 @@ async function decodeFixture(page) {
   await expect(
     page.getByRole("heading", { name: "Conway transaction identity" }),
   ).toBeVisible();
+}
+
+async function expectInFirstViewport(locator) {
+  await expect(locator).toBeVisible();
+  const box = await locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      innerHeight: window.innerHeight,
+    };
+  });
+
+  expect(box.top).toBeGreaterThanOrEqual(0);
+  expect(box.bottom).toBeLessThanOrEqual(box.innerHeight);
 }
 
 async function installClipboardMock(page) {
@@ -169,6 +188,26 @@ test("decodes a Conway transaction and exposes compact identity values", async (
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(bodyHash);
+});
+
+test("keeps signer-critical intent visible in the first viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await decodeFixture(page, signingIntentFixturePath);
+
+  const intentPanel = page.locator(".intent-panel");
+  const intentMetric = (label, value) =>
+    intentPanel
+      .locator(".metric-card", { hasText: label })
+      .getByText(value, { exact: true });
+  await expect(intentPanel.getByRole("heading", { name: "Signing summary" })).toBeVisible();
+  await expectInFirstViewport(intentPanel.getByText("Swap ADA<->USDM", { exact: true }));
+  await expectInFirstViewport(
+    intentPanel.getByText("Required to pay Antithesis as vendor"),
+  );
+  await expectInFirstViewport(intentMetric("Missing signers", "2 missing required signers"));
+  await expectInFirstViewport(intentMetric("Redeemers", "2 redeemers"));
+  await expectInFirstViewport(intentMetric("Withdrawals", "1 withdrawal"));
+  await expectInFirstViewport(intentMetric("Mint/burn", "No mint/burn"));
 });
 
 test("shows transaction-derived witness plan values", async ({ page }) => {
