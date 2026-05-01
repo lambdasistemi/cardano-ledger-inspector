@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-intent-result.schema.json",
+  "title": "Cardano Ledger WASI Transaction Intent Result",
+  "type": "object",
+  "required": ["title", "subtitle", "metrics", "claims", "sections", "warnings"],
+  "properties": {
+    "title": { "type": "string" },
+    "subtitle": { "type": "string" },
+    "tx_id": { "type": "string" },
+    "body_hash": { "type": "string" },
+    "fee_lovelace": { "type": "string" },
+    "input_policy": { "type": "string" },
+    "metrics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/metric" }
+    },
+    "claims": {
+      "type": "array",
+      "description": "Human-readable metadata claims extracted from transaction auxiliary metadata. These are self-declared claims, not independently verified facts.",
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "metadata_claims": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "value": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "effects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/effect" }
+    },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/section" }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "required": ["label", "value"],
+      "properties": {
+        "label": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "claim": {
+      "type": "object",
+      "required": ["label", "value", "detail"],
+      "properties": {
+        "label": { "type": "string" },
+        "value": { "type": "string" },
+        "detail": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "effect": {
+      "type": "object",
+      "required": ["label", "value", "detail"],
+      "properties": {
+        "label": { "type": "string" },
+        "value": { "type": "string" },
+        "detail": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "section": {
+      "type": "object",
+      "required": ["title", "empty", "rows"],
+      "properties": {
+        "title": { "type": "string" },
+        "empty": { "type": "string" },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/row" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "row": {
+      "type": "object",
+      "required": ["label", "value", "path", "copyValue", "detail"],
+      "properties": {
+        "label": { "type": "string" },
+        "value": { "type": "string" },
+        "path": { "type": "string" },
+        "copyValue": { "type": "string" },
+        "detail": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

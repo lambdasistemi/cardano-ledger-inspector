@@ -8,6 +8,14 @@ export const prettyImpl = (text) => {
   }
 };
 
+export const parseJsonImpl = (raw) => (onOk) => (onError) => {
+  try {
+    return onOk(JSON.parse(raw));
+  } catch (_err) {
+    return onError;
+  }
+};
+
 export const operationArgsWithPathImpl = (argsText) => (pathText) => {
   let args = {};
   try {

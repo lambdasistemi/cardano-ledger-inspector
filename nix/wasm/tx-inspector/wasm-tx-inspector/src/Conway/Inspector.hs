@@ -27,6 +27,7 @@ import Cardano.Ledger.Core (TxLevel (..))
 import qualified Cardano.Ledger.Core as Core
 import qualified Cardano.Ledger.Hashes as Hashes
 import qualified Cardano.Ledger.Keys as Keys
+import qualified Cardano.Ledger.Mary.Value as Mary
 import qualified Cardano.Ledger.Plutus.Data as PData
 import qualified Cardano.Ledger.Plutus.ExUnits as ExUnits
 import qualified Cardano.Ledger.TxIn as TxIn
@@ -52,6 +53,7 @@ import Conway.Inspector.Context (
     missingContextTxIns,
     producerContextFromArgs,
     producerContextSupplied,
+    producerTxOutput,
     resolvedTxInJson,
  )
 import Conway.Inspector.Evaluation (evaluateScriptsJson)
@@ -61,14 +63,16 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
 import Data.Foldable (toList)
 import Data.List (foldl', stripPrefix)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import Data.Word (Word64)
 import Lens.Micro ((^.))
 import Text.Read (readMaybe)
 
@@ -114,6 +118,7 @@ instance Aeson.FromJSON LedgerOperationRequest where
 
         normalizeOperation "inspect" = "tx.inspect"
         normalizeOperation "browse" = "tx.browse"
+        normalizeOperation "intent" = "tx.intent"
         normalizeOperation "identify" = "tx.identify"
         normalizeOperation "witness.plan" = "tx.witness.plan"
         normalizeOperation "validate" = "tx.validate"
@@ -167,6 +172,12 @@ runLedgerOperation request = do
                 ledgerOperationResponse
                     (lorOperation request)
                     [ "identification" .= identifyJson txBytes tx
+                    ]
+        "tx.intent" ->
+            pure $
+                ledgerOperationResponse
+                    (lorOperation request)
+                    [ "intent" .= intentSummaryJson (lorArgs request) tx
                     ]
         "tx.witness.plan" ->
             pure $
@@ -264,6 +275,10 @@ valueSummary value =
 plural :: Int -> T.Text -> T.Text
 plural n label =
     T.pack (show n) <> " " <> label <> if n == 1 then "" else "s"
+
+pluralWith :: Int -> T.Text -> T.Text -> T.Text
+pluralWith n singular pluralLabel =
+    T.pack (show n) <> " " <> if n == 1 then singular else pluralLabel
 
 shortText :: T.Text -> T.Text
 shortText text =
@@ -363,6 +378,439 @@ identifyJson txBytes tx =
                     , "datum" .= Map.size (L.unTxDats (wits ^. L.datsTxWitsL))
                     ]
             ]
+
+intentSummaryJson ::
+    Aeson.Value ->
+    L.Tx TopTx Conway.ConwayEra ->
+    Aeson.Value
+intentSummaryJson args tx =
+    let body = tx ^. L.bodyTxL
+        wits = tx ^. Core.witsTxL
+        context = producerContextFromArgs args
+        inputPolicy = inputPolicyFromArgs args
+        inputs = toList (body ^. L.inputsTxBodyL)
+        referenceInputs = toList (body ^. L.referenceInputsTxBodyL)
+        outputs = toList (body ^. L.outputsTxBodyL)
+        certs = toList (body ^. L.certsTxBodyL)
+        withdrawals = body ^. L.withdrawalsTxBodyL
+        requiredSignerHexes =
+            keyHashHex <$> toList (body ^. L.reqSignerHashesTxBodyL)
+        presentVKeyHexes =
+            keyHashHex . Keys.witVKeyHash <$> toList (wits ^. Core.addrTxWitsL)
+        presentBootstrapHexes =
+            keyHashHex . Keys.bootstrapWitKeyHash
+                <$> toList (wits ^. Core.bootAddrTxWitsL)
+        presentSignerHexSet =
+            Set.fromList (presentVKeyHexes <> presentBootstrapHexes)
+        missingSignerHexes =
+            filter (`Set.notMember` presentSignerHexSet) requiredSignerHexes
+        scriptWitnesses =
+            Map.toList (wits ^. Core.scriptTxWitsL)
+        redeemers =
+            Map.toList (L.unRedeemers (wits ^. L.rdmrsTxWitsL))
+        datums =
+            Map.toList (L.unTxDats (wits ^. L.datsTxWitsL))
+        missingContextInputs =
+            missingContextTxIns context inputs
+        missingContextReferenceInputs =
+            missingContextTxIns context referenceInputs
+        metadataClaims =
+            map metadataClaimJson (metadataEntries tx)
+        outputLovelace =
+            sum (txOutLovelace <$> outputs)
+        resolvedInputOutputs =
+            mapMaybe (producerTxOutput context) inputs
+        resolvedInputLovelace =
+            sum (txOutLovelace <$> resolvedInputOutputs)
+        (mintedAssets, burnedAssets) =
+            multiAssetDeltaCounts (body ^. L.mintTxBodyL)
+        collateralInputs =
+            toList (body ^. L.collateralInputsTxBodyL)
+        intentEffects =
+            [
+                ( "Consumes inputs"
+                , plural (length inputs) "input"
+                , if producerContextSupplied context
+                    then
+                        plural (length resolvedInputOutputs) "source output"
+                            <> " resolved from producer transaction CBOR"
+                    else "source outputs not supplied"
+                )
+            ,
+                ( "Creates outputs"
+                , plural (length outputs) "output"
+                , T.pack (show outputLovelace) <> " lovelace total across all outputs"
+                )
+            ,
+                ( "Pays fee"
+                , T.pack (show (Coin.unCoin (body ^. L.feeTxBodyL))) <> " lovelace"
+                , ""
+                )
+            ,
+                ( "Required signatures"
+                , plural (length requiredSignerHexes) "signer"
+                , if null missingSignerHexes
+                    then "all declared signer hashes have witnesses"
+                    else plural (length missingSignerHexes) "declared signer" <> " missing from witnesses"
+                )
+            ,
+                ( "Scripts"
+                , plural (length redeemers) "redeemer"
+                , pluralWith (length scriptWitnesses) "script witness" "script witnesses"
+                )
+            ,
+                ( "Reference inputs"
+                , plural (length referenceInputs) "read-only input"
+                , "reference inputs are available to scripts but are not spent"
+                )
+            ,
+                ( "Withdrawals"
+                , plural (withdrawalsCount withdrawals) "withdrawal"
+                , ""
+                )
+            ,
+                ( "Mint/burn"
+                , mintBurnLabel mintedAssets burnedAssets
+                , ""
+                )
+            ,
+                ( "Collateral"
+                , plural (length collateralInputs) "collateral input"
+                , collateralLabel (body ^. L.totalCollateralTxBodyL) (body ^. L.collateralReturnTxBodyL)
+                )
+            ]
+        warnings =
+            intentWarnings missingSignerHexes
+     in Aeson.object
+            [ "title" .= ("Signing summary" :: T.Text)
+            , "subtitle" .= intentSubtitle metadataClaims missingSignerHexes redeemers
+            , "tx_id" .= txIdHex (Core.txIdTx tx)
+            , "body_hash" .= txIdHex (Core.txIdTxBody body)
+            , "fee_lovelace" .= T.pack (show (Coin.unCoin (body ^. L.feeTxBodyL)))
+            , "input_policy" .= inputPolicy
+            , "metrics"
+                .= [ metricJson "Fee" (formatLovelace (Coin.unCoin (body ^. L.feeTxBodyL)))
+                   , metricJson "Outputs" (T.pack (show (length outputs)))
+                   , metricJson "Output total" (formatLovelace outputLovelace)
+                   , metricJson "Required signers" (T.pack (show (length requiredSignerHexes)))
+                   , metricJson "Missing signers" $
+                        if null missingSignerHexes
+                            then "none"
+                            else plural (length missingSignerHexes) "missing required signer"
+                   , metricJson "Redeemers" (plural (length redeemers) "redeemer")
+                   , metricJson "Withdrawals" (plural (withdrawalsCount withdrawals) "withdrawal")
+                   , metricJson "Mint/burn" (mintBurnLabel mintedAssets burnedAssets)
+                   ]
+            , "claims" .= map metadataClaimSummaryJson (metadataEntries tx)
+            , "sections"
+                .= [ sectionJson
+                        "Critical effects"
+                        "No transaction effects reported."
+                        (zipWith effectRowJson [0 :: Int ..] intentEffects)
+                   , sectionJson
+                        "Missing required signers"
+                        "None missing."
+                        (zipWith missingSignerRowJson [0 :: Int ..] missingSignerHexes)
+                   ]
+            , "metadata_claims" .= metadataClaims
+            , "signing"
+                .= Aeson.object
+                    [ "required_signer_count" .= length requiredSignerHexes
+                    , "present_vkey_witness_count" .= length presentVKeyHexes
+                    , "present_bootstrap_witness_count" .= length presentBootstrapHexes
+                    , "missing_vkey_witness_count" .= length missingSignerHexes
+                    , "missing_vkey_witnesses" .= map missingSignerJson missingSignerHexes
+                    ]
+            , "value"
+                .= Aeson.object
+                    [ "output_lovelace" .= T.pack (show outputLovelace)
+                    , "resolved_input_lovelace" .= T.pack (show resolvedInputLovelace)
+                    , "resolved_input_count" .= length resolvedInputOutputs
+                    , "input_lovelace_complete"
+                        .= (producerContextSupplied context && null missingContextInputs)
+                    , "net_spend_known" .= False
+                    , "net_spend_note"
+                        .= ( "Output totals are ledger totals. Wallet-owned change cannot be inferred from transaction CBOR alone." ::
+                                T.Text
+                           )
+                    ]
+            , "features"
+                .= Aeson.object
+                    [ "input_count" .= length inputs
+                    , "reference_input_count" .= length referenceInputs
+                    , "output_count" .= length outputs
+                    , "cert_count" .= length certs
+                    , "withdrawal_count" .= withdrawalsCount withdrawals
+                    , "script_count" .= length scriptWitnesses
+                    , "redeemer_count" .= length redeemers
+                    , "datum_count" .= length datums
+                    , "minted_asset_count" .= mintedAssets
+                    , "burned_asset_count" .= burnedAssets
+                    , "collateral_input_count" .= length collateralInputs
+                    , "has_collateral_return" .= hasStrictMaybe (body ^. L.collateralReturnTxBodyL)
+                    , "has_total_collateral" .= hasStrictMaybe (body ^. L.totalCollateralTxBodyL)
+                    ]
+            , "effects" .= map intentEffect intentEffects
+            , "context"
+                .= contextSummaryJson
+                    inputPolicy
+                    context
+                    inputs
+                    referenceInputs
+                    missingContextInputs
+                    missingContextReferenceInputs
+            , "warnings" .= warnings
+            ]
+
+intentSubtitle :: [Aeson.Value] -> [T.Text] -> [a] -> T.Text
+intentSubtitle metadataClaims missingSignerHexes redeemers =
+    let claimCount = length metadataClaims
+        signerText =
+            if null missingSignerHexes
+                then "required signer witnesses present"
+                else plural (length missingSignerHexes) "missing required signer"
+     in plural claimCount "metadata claim"
+            <> " / "
+            <> signerText
+            <> " / "
+            <> plural (length redeemers) "redeemer"
+
+intentWarnings ::
+    [T.Text] ->
+    [T.Text]
+intentWarnings missingSignerHexes =
+    [ "Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy." ::
+        T.Text
+    ]
+        <> [ "Declared required signer hashes are absent from the witness set."
+           | not (null missingSignerHexes)
+           ]
+
+metricJson :: T.Text -> T.Text -> Aeson.Value
+metricJson label value =
+    Aeson.object
+        [ "label" .= label
+        , "value" .= value
+        ]
+
+sectionJson :: T.Text -> T.Text -> [Aeson.Value] -> Aeson.Value
+sectionJson title empty rows =
+    Aeson.object
+        [ "title" .= title
+        , "empty" .= empty
+        , "rows" .= rows
+        ]
+
+effectRowJson :: Int -> (T.Text, T.Text, T.Text) -> Aeson.Value
+effectRowJson index (label, value, detail) =
+    rowJson label value (encodePath ["intent", "effects", T.pack ("#" <> show index)]) value detail
+
+missingSignerRowJson :: Int -> T.Text -> Aeson.Value
+missingSignerRowJson index signerHash =
+    rowJson
+        "declared required signer not present in vkey or bootstrap witnesses"
+        signerHash
+        (encodePath ["intent", "signing", "missing_vkey_witnesses", T.pack ("#" <> show index), "hash"])
+        signerHash
+        "declared required signer not present in vkey or bootstrap witnesses"
+
+rowJson :: T.Text -> T.Text -> T.Text -> T.Text -> T.Text -> Aeson.Value
+rowJson label value path copyValue detail =
+    Aeson.object
+        [ "label" .= label
+        , "value" .= value
+        , "path" .= path
+        , "copyValue" .= copyValue
+        , "detail" .= detail
+        ]
+
+intentEffect :: (T.Text, T.Text, T.Text) -> Aeson.Value
+intentEffect (label, value, detail) =
+    Aeson.object
+        [ "label" .= label
+        , "value" .= value
+        , "detail" .= detail
+        ]
+
+formatLovelace :: Integer -> T.Text
+formatLovelace lovelace =
+    let (ada, fractional) = lovelace `quotRem` 1000000
+        fractionText =
+            T.dropWhileEnd
+                (== '0')
+                (T.justifyRight 6 '0' (T.pack (show (abs fractional))))
+     in if fractional == 0
+            then T.pack (show ada) <> " ADA"
+            else T.pack (show ada) <> "." <> fractionText <> " ADA"
+
+txOutLovelace :: L.TxOut Conway.ConwayEra -> Integer
+txOutLovelace txOut =
+    let Mary.MaryValue c _ = txOut ^. L.valueTxOutL
+     in Coin.unCoin c
+
+multiAssetDeltaCounts :: Mary.MultiAsset -> (Int, Int)
+multiAssetDeltaCounts (Mary.MultiAsset m) =
+    foldl' countPolicy (0, 0) (Map.elems m)
+  where
+    countPolicy (minted, burned) assets =
+        foldl' countQuantity (minted, burned) (Map.elems assets)
+    countQuantity (minted, burned) q
+        | q > 0 = (minted + 1, burned)
+        | q < 0 = (minted, burned + 1)
+        | otherwise = (minted, burned)
+
+mintBurnLabel :: Int -> Int -> T.Text
+mintBurnLabel 0 0 = "No mint/burn"
+mintBurnLabel minted 0 = plural minted "minted asset"
+mintBurnLabel 0 burned = plural burned "burned asset"
+mintBurnLabel minted burned =
+    plural minted "minted asset" <> " / " <> plural burned "burned asset"
+
+collateralLabel ::
+    BaseTypes.StrictMaybe Coin.Coin ->
+    BaseTypes.StrictMaybe (L.TxOut Conway.ConwayEra) ->
+    T.Text
+collateralLabel totalCollateral collateralReturn =
+    let totalText = case totalCollateral of
+            BaseTypes.SNothing -> ""
+            BaseTypes.SJust coin ->
+                "total " <> T.pack (show (Coin.unCoin coin)) <> " lovelace"
+        returnText = case collateralReturn of
+            BaseTypes.SNothing -> ""
+            BaseTypes.SJust txOut ->
+                "return " <> T.pack (show (txOutLovelace txOut)) <> " lovelace"
+     in case filter (not . T.null) [totalText, returnText] of
+            [] -> ""
+            parts -> T.intercalate " / " parts
+
+hasStrictMaybe :: BaseTypes.StrictMaybe a -> Bool
+hasStrictMaybe BaseTypes.SNothing = False
+hasStrictMaybe (BaseTypes.SJust _) = True
+
+metadataEntries :: L.Tx TopTx Conway.ConwayEra -> [(Word64, L.Metadatum)]
+metadataEntries tx =
+    case tx ^. L.auxDataTxL of
+        BaseTypes.SNothing -> []
+        BaseTypes.SJust auxData ->
+            Map.toList (auxData ^. L.metadataTxAuxDataL)
+
+metadataClaimSummaryJson :: (Word64, L.Metadatum) -> Aeson.Value
+metadataClaimSummaryJson (label, datum) =
+    let title =
+            fromMaybe
+                ("Metadata " <> T.pack (show label))
+                (metadataTextAt ["label"] datum)
+        value =
+            fromMaybe
+                (fromMaybe "" (metadataTextAt ["event"] datum))
+                (metadataTextAt ["description"] datum)
+        detail =
+            T.intercalate
+                " / "
+                ( filter
+                    (not . T.null)
+                    [ fromMaybe "" (metadataTextAt ["justification"] datum)
+                    , maybePrefix "destination " (metadataTextAt ["destination", "label"] datum)
+                    , "metadata label " <> T.pack (show label)
+                    , "self-declared"
+                    ]
+                )
+     in Aeson.object
+            [ "label" .= title
+            , "value" .= value
+            , "detail" .= detail
+            ]
+
+maybePrefix :: T.Text -> Maybe T.Text -> T.Text
+maybePrefix _ Nothing = ""
+maybePrefix prefix (Just value) = prefix <> value
+
+metadataClaimJson :: (Word64, L.Metadatum) -> Aeson.Value
+metadataClaimJson (label, datum) =
+    let title = metadataTextAt ["label"] datum
+        event = metadataTextAt ["event"] datum
+        description = metadataTextAt ["description"] datum
+        destination = metadataTextAt ["destination", "label"] datum
+        justification = metadataTextAt ["justification"] datum
+        context = metadataTextAt ["context"] datum
+        hashValue = metadataTextAt ["hash"] datum
+        hashAlgorithm = metadataTextAt ["hashAlgorithm"] datum
+     in Aeson.object
+            [ "label" .= T.pack (show label)
+            , "self_declared" .= True
+            , "title" .= fromMaybe "" title
+            , "event" .= fromMaybe "" event
+            , "description" .= fromMaybe "" description
+            , "destination" .= fromMaybe "" destination
+            , "justification" .= fromMaybe "" justification
+            , "context" .= fromMaybe "" context
+            , "hash" .= fromMaybe "" hashValue
+            , "hash_algorithm" .= fromMaybe "" hashAlgorithm
+            , "value" .= metadatumJson datum
+            ]
+
+metadataTextAt :: [T.Text] -> L.Metadatum -> Maybe T.Text
+metadataTextAt [] datum = metadataText datum
+metadataTextAt path datum =
+    case metadataTextAtDirect path datum of
+        Just value -> Just value
+        Nothing -> firstJust (metadataTextAt path <$> metadataChildren datum)
+
+metadataTextAtDirect :: [T.Text] -> L.Metadatum -> Maybe T.Text
+metadataTextAtDirect [] datum = metadataText datum
+metadataTextAtDirect (key : rest) datum = do
+    fields <- metadataTextMap datum
+    child <- lookup key fields
+    metadataTextAtDirect rest child
+
+metadataChildren :: L.Metadatum -> [L.Metadatum]
+metadataChildren (L.Map entries) = snd <$> entries
+metadataChildren (L.List items) = items
+metadataChildren _ = []
+
+firstJust :: [Maybe a] -> Maybe a
+firstJust [] = Nothing
+firstJust (Just value : _) = Just value
+firstJust (Nothing : rest) = firstJust rest
+
+metadataText :: L.Metadatum -> Maybe T.Text
+metadataText (L.S textValue) = Just textValue
+metadataText (L.List items) =
+    let pieces = mapMaybe metadataText items
+     in if null pieces then Nothing else Just (T.intercalate " " pieces)
+metadataText _ = Nothing
+
+metadataTextMap :: L.Metadatum -> Maybe [(T.Text, L.Metadatum)]
+metadataTextMap (L.Map entries) =
+    traverse textKey entries
+  where
+    textKey (L.S key, value) = Just (key, value)
+    textKey _ = Nothing
+metadataTextMap _ = Nothing
+
+metadatumJson :: L.Metadatum -> Aeson.Value
+metadatumJson (L.I n) = Aeson.toJSON (T.pack (show n))
+metadatumJson (L.B bytes) =
+    Aeson.String (T.decodeUtf8 (B16.encode bytes))
+metadatumJson (L.S textValue) =
+    Aeson.String textValue
+metadatumJson (L.List values) =
+    Aeson.toJSON (metadatumJson <$> values)
+metadatumJson datum@(L.Map entries) =
+    case metadataTextMap datum of
+        Just textEntries ->
+            Aeson.object
+                [ AesonKey.fromText key .= metadatumJson value
+                | (key, value) <- textEntries
+                ]
+        Nothing ->
+            Aeson.toJSON
+                [ Aeson.object
+                    [ "key" .= metadatumJson key
+                    , "value" .= metadatumJson value
+                    ]
+                | (key, value) <- entries
+                ]
 
 witnessPlanJson ::
     Aeson.Value ->

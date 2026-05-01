@@ -440,7 +440,8 @@
         gap: 16px;
       }
 
-      .identity-panel {
+      .identity-panel,
+      .intent-panel {
         display: grid;
         gap: 12px;
         border: 1px solid var(--border);
@@ -448,6 +449,44 @@
         background: #ffffff;
         padding: 12px;
         margin-top: 14px;
+      }
+
+      .intent-panel {
+        border-color: #92d0d5;
+        background: #fbfefe;
+      }
+
+      .intent-metrics {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .intent-claims {
+        display: grid;
+        gap: 8px;
+      }
+
+      .intent-claim {
+        display: grid;
+        gap: 0.35rem;
+        border: 1px solid #c8e7ea;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 0.72rem 0.82rem;
+      }
+
+      .intent-claim strong,
+      .intent-claim p {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .intent-claim strong {
+        font-size: 0.96rem;
+      }
+
+      .intent-claim p {
+        color: var(--muted);
+        font-size: 0.86rem;
       }
 
       .identity-heading {
@@ -801,6 +840,10 @@
           grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
+        .intent-metrics {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
         .identity-grid {
           grid-template-columns: 1fr;
         }
@@ -859,6 +902,10 @@
         }
 
         .metric-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .intent-metrics {
           grid-template-columns: 1fr;
         }
 

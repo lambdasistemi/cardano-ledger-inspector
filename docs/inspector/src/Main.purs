@@ -15,7 +15,7 @@ import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationValidation, operationWitnessPlan, pretty) as Json
+import FFI.Json (Browser, Identification, IntentSummary, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationValidation, operationWitnessPlan, pretty) as Json
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
@@ -83,6 +83,7 @@ type State =
   , operationArgs :: String
   , browser :: Maybe Json.Browser
   , identification :: Maybe Json.Identification
+  , intent :: Maybe Json.IntentSummary
   , witnessPlan :: Maybe Json.WitnessPlan
   , validation :: Maybe Json.Validation
   , browserNodes :: Array BrowserNode
@@ -141,6 +142,7 @@ inspectorComponent initial =
         , operationArgs: "{}"
         , browser: Nothing
         , identification: Nothing
+        , intent: Nothing
         , witnessPlan: Nothing
         , validation: Nothing
         , browserNodes: []
@@ -182,11 +184,16 @@ inspectorComponent initial =
           [ renderProvider state
           , HH.div
               [ classNames [ "workspace-main" ] ]
-              [ renderModeTabs state
-              , renderResult state
-              ]
+              (renderWorkspaceMain state)
           ]
       ]
+
+  renderWorkspaceMain state =
+    case state.fetchError of
+      Just _ -> [ renderResult state, renderModeTabs state ]
+      Nothing -> case state.result of
+        Just _  -> [ renderResult state, renderModeTabs state ]
+        Nothing -> [ renderModeTabs state, renderResult state ]
 
   renderProvider state =
     HH.section
@@ -424,6 +431,7 @@ inspectorComponent initial =
                         else HH.text ""
                     ]
                 ]
+              <> renderIntentMaybe state
               <> ( if r.exitOk && summary.valid
                      then renderInspection summary
                      else []
@@ -435,6 +443,13 @@ inspectorComponent initial =
               <> [ renderRawJson r.stdout ]
               <> renderStderr r.stderr
               )
+
+  renderIntentMaybe state =
+    case state.intent of
+      Just intent ->
+        if intent.valid then [ renderIntentSummary state intent ]
+        else []
+      Nothing -> []
 
   renderIdentificationMaybe state =
     case state.identification of
@@ -472,6 +487,62 @@ inspectorComponent initial =
             (map renderMetric summary.metrics)
         ]
     ]
+
+  renderIntentSummary state intent =
+    HH.div
+      [ classNames [ "intent-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text intent.title ]
+              , HH.p_ [ HH.text intent.subtitle ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "metric-grid", "intent-metrics" ] ]
+          (map renderMetric intent.metrics)
+      , renderIntentClaims intent.claims
+      , renderWitnessWarnings intent.warnings
+      , HH.div_
+          (map (renderIntentSection state) intent.sections)
+      ]
+
+  renderIntentClaims claims =
+    if Array.null claims then
+      HH.text ""
+    else
+      HH.div
+        [ classNames [ "intent-claims" ] ]
+        (map renderIntentClaim claims)
+
+  renderIntentClaim claim =
+    HH.div
+      [ classNames [ "intent-claim" ] ]
+      [ HH.span
+          [ classNames [ "identity-section-title" ] ]
+          [ HH.text claim.label ]
+      , HH.strong_ [ HH.text claim.value ]
+      , if claim.detail == "" then
+          HH.text ""
+        else
+          HH.p_ [ HH.text claim.detail ]
+      ]
+
+  renderIntentSection state section =
+    HH.div
+      [ classNames [ "witness-section" ] ]
+      [ HH.div
+          [ classNames [ "identity-section-title" ] ]
+          [ HH.text section.title ]
+      , if Array.null section.rows then
+          HH.div
+            [ classNames [ "witness-empty" ] ]
+            [ HH.text section.empty ]
+        else
+          HH.div
+            [ classNames [ "witness-row-list" ] ]
+            (map (renderWitnessRowWithCopy state false) section.rows)
+      ]
 
   renderIdentification state identification =
     HH.div
@@ -897,6 +968,7 @@ inspectorComponent initial =
           , operationArgs = "{}"
           , browser = Nothing
           , identification = Nothing
+          , intent = Nothing
           , witnessPlan = Nothing
           , validation = Nothing
           , browserNodes = []
@@ -951,12 +1023,14 @@ inspectorComponent initial =
                 Left _     -> pure "{}"
             else pure "{}"
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
+          intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
           validationResult <- H.liftAff (runLedgerOperation h "tx.validate" inputContextArgs)
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
             identification = Json.operationIdentification identifyResult.stdout
+            intent = Json.operationIntentSummary intentResult.stdout
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
             validation = Json.operationValidation validationResult.stdout
           H.modify_
@@ -968,6 +1042,9 @@ inspectorComponent initial =
               , browser = if operationResult.exitOk && browser.valid then Just browser else Nothing
               , identification =
                   if identifyResult.exitOk && identification.valid then Just identification
+                  else Nothing
+              , intent =
+                  if intentResult.exitOk && intent.valid then Just intent
                   else Nothing
               , witnessPlan =
                   if witnessPlanResult.exitOk && witnessPlan.valid then Just witnessPlan
