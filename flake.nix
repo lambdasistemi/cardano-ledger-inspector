@@ -208,6 +208,32 @@
             cp request.json response.json $out/
           '';
 
+          tx-intent-smoke = pkgs.runCommand "tx-intent-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq '.op = "tx.intent"' \
+              ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < request.json > response.json
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.intent"
+              and any(.result.intent.metrics[]; .label == "Signer net ADA" and .value == "-5.900913 ADA")
+              and .result.intent.sections[0].title == "Signer value perspective"
+              and .result.intent.value.net_spend_known == true
+              and .result.intent.value.signer_lovelace.known == true
+              and .result.intent.value.signer_lovelace.net_lovelace == "-5900913"
+              and any(.result.intent.value.resolved_input_buckets[]; .bucket == "signer_controlled" and .lovelace == "7015148761")
+              and any(.result.intent.value.output_buckets[]; .bucket == "signer_controlled" and .lovelace == "7009247848")
+              and any(.result.intent.value.output_buckets[]; .bucket == "script" and .tx_out_count == 4)
+            ' response.json
+            cp request.json response.json $out/
+          '';
+
           tx-input-context-smoke = pkgs.runCommand "tx-input-context-smoke" { } ''
             mkdir -p $out
             export HOME="$PWD"
@@ -625,6 +651,7 @@
               ledger-functional-openapi-check
               tx-identify-smoke
               tx-witness-plan-smoke
+              tx-intent-smoke
               tx-input-context-smoke
               tx-validate-smoke
               tx-evaluate-scripts-smoke

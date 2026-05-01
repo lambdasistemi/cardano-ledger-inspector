@@ -204,6 +204,7 @@ test("keeps signer-critical intent visible in the first viewport", async ({ page
   await expectInFirstViewport(
     intentPanel.getByText("Required to pay Antithesis as vendor"),
   );
+  await expectInFirstViewport(intentMetric("Signer net ADA", "unknown"));
   await expectInFirstViewport(intentMetric("Missing signers", "2 missing required signers"));
   await expectInFirstViewport(intentMetric("Redeemers", "2 redeemers"));
   await expectInFirstViewport(intentMetric("Withdrawals", "1 withdrawal"));
