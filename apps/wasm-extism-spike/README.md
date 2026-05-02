@@ -18,8 +18,8 @@ this Haskell ledger by feeding identical inputs to both.
 - `cabal-wasm.project` — same fork overrides as `tx-inspector` plus
   `allow-newer` punches for `extism-pdk` / `extism-manifest` /
   `messagepack` / `json` against bytestring/containers/binary. Lists
-  both `extism-spike/wasm-extism-spike` and
-  `tx-inspector/wasm-tx-inspector` as path packages.
+  both `.` (this package) and `../../libs/cardano-ledger-inspector`
+  as path packages.
 
 ## Build
 

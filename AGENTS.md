@@ -15,11 +15,14 @@ Last updated: 2026-04-26
 ## Project Structure
 
 ```text
-nix/wasm/tx-inspector/       # WASI Haskell ledger operation package
-docs/inspector/              # Browser workbench and Playwright tests
-specs/                       # Spec Kit artifacts and public API contracts
-gh-docs/                     # MkDocs pages published to GitHub Pages
-nix/                         # Nix builders, generated OpenAPI source, checks
+libs/cardano-ledger-inspector/   # Conway tx inspector library (lib + wasm Main.hs)
+apps/tx-deep-diagnosis/          # Native Haskell CLI for layered tx diagnosis
+apps/extism-spike-host/          # Native Extism host loading the wasm spike
+apps/wasm-extism-spike/          # Wasm Extism plugin spike
+docs/inspector/                  # Browser workbench and Playwright tests
+specs/                           # Spec Kit artifacts and public API contracts
+gh-docs/                         # MkDocs pages published to GitHub Pages
+nix/                             # Nix builders, generated OpenAPI source, checks
 ```
 
 ## Commands

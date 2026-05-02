@@ -65,13 +65,14 @@ in
     dependenciesHash = "sha256-KmY5jyyPc2NFXZSP133Tq6rQWp3d7STwT4O51h7Ukys=";
   };
 
-  # Spike: depends on wasm-tx-inspector via path package, so the src
-  # has to span both subdirs (extism-spike + tx-inspector). The
-  # spike's project file lives at extism-spike/cabal-wasm.project.
+  # Spike depends on cardano-ledger-inspector by path, so its src spans
+  # both apps/wasm-extism-spike (project file + spike package) and
+  # libs/cardano-ledger-inspector. The simplest src that contains both
+  # is the repo root.
   wasm-extism-spike = libWasm.mkCardanoLedgerWasm {
     inherit pkgs ghcWasmMeta wasiSdk chap;
     src = extismSpikeSrc;
-    projectFile = "extism-spike/cabal-wasm.project";
+    projectFile = "apps/wasm-extism-spike/cabal-wasm.project";
     packages = [ "wasm-extism-spike" ];
     srpForks = fullLedgerForks;
     withCLibs = true;
