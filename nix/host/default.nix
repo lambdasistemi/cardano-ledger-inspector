@@ -36,7 +36,12 @@ let
     "extism-spike-host"
     ./extism-spike-host
     { };
+
+  tx-deep-diagnosis = pkgs.haskellPackages.callCabal2nix
+    "tx-deep-diagnosis"
+    ./tx-deep-diagnosis
+    { };
 in
 {
-  inherit libextism extism-spike-host;
+  inherit libextism extism-spike-host tx-deep-diagnosis;
 }
