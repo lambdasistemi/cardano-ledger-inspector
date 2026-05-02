@@ -50,7 +50,7 @@ main :: IO ()
 main = do
     opts <- execParser
         (info (parseOpts <**> helper)
-            (progDesc "Layered Conway tx diagnosis using cardano-ledger-conway via wasm-tx-inspector library"))
+            (progDesc "Layered Conway tx diagnosis using cardano-ledger-conway via cardano-ledger-inspector library"))
     pidFromEnv <- lookupEnv "BLOCKFROST_PROJECT_ID"
     let mpid = fmap Text.pack (optProjectId opts) <|> fmap Text.pack pidFromEnv
     hex <- Text.strip <$> TIO.readFile (optCborFile opts)
