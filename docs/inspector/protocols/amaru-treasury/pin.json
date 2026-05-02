@@ -1,0 +1,15 @@
+{
+  "source": "github.com/pragma-org/amaru-treasury",
+  "ref": "99600d8cedf0e3c4894fe7f45d5e8abad2289d76",
+  "fetched_at": "2026-05-02",
+  "kind": "deployment_registry",
+  "schema": "amaru-treasury-journal-v1",
+  "files": [
+    {
+      "path": "journal-2026.json",
+      "upstream_path": "journal/2026/metadata.json",
+      "describes": "Applied script hashes, owners, addresses, and deployment outrefs for the 5 Amaru treasury scopes (core_development, ops_and_use_cases, network_compliance, middleware, contingency)."
+    }
+  ],
+  "refresh_command": "gh api -H 'Accept: application/vnd.github.raw' 'repos/pragma-org/amaru-treasury/contents/journal/2026/metadata.json?ref=<NEW_REF>' > journal-2026.json"
+}
