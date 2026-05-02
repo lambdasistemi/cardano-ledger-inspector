@@ -34,7 +34,7 @@ let
 
   extism-spike-host = haskellPackages.callCabal2nix
     "extism-spike-host"
-    ./extism-spike-host
+    ../../apps/extism-spike-host
     { };
 
   txDeepDiagnosisNative =
