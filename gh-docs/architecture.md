@@ -49,7 +49,7 @@ browser loads the executable with `@bjorn3/browser_wasi_shim`.
 
 ### Extism Layer
 
-`nix/wasm/extism-spike/` packages the same inspector library as an Extism PDK
+`apps/wasm-extism-spike/` packages the same inspector library as an Extism PDK
 plugin. The exported functions are operation entry points such as
 `tx_identify`, `tx_validate`, and `tx_evaluate_scripts`; each one accepts the
 same JSON envelope as the WASI reactor and delegates to the shared inspector

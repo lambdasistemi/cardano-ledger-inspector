@@ -32,8 +32,8 @@ index-state:
   , cardano-haskell-packages 2026-04-15T11:20:53Z
 
 packages:
-  extism-spike/wasm-extism-spike
-  tx-inspector/wasm-tx-inspector
+  apps/wasm-extism-spike
+  libs/cardano-ledger-inspector
 
 -- Package flags mirrored from nix/wasm/forks.json.
 package cardano-crypto-praos

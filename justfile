@@ -60,7 +60,7 @@ build-smokes:
     nix build .#packages.x86_64-linux.wasm-ledger-smoke
 
 format-check:
-    nix develop --quiet -c find nix/wasm -type f -name '*.hs' -exec fourmolu -m check {} +
+    nix develop --quiet -c find libs apps nix/wasm -type f -name '*.hs' -exec fourmolu -m check {} +
 
 ui-check:
     nix develop --quiet -c sh -c 'cd docs/inspector && spago build'

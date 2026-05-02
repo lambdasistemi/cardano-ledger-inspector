@@ -98,8 +98,8 @@
             chap = CHaP;
             smokeSrc = ./nix/wasm/smoke;
             ledgerSmokeSrc = ./nix/wasm/ledger-smoke;
-            txInspectorSrc = ./nix/wasm/tx-inspector;
-            extismSpikeSrc = ./nix/wasm;
+            txInspectorSrc = ./libs/cardano-ledger-inspector;
+            extismSpikeSrc = ./.;
           };
 
           tx-inspector-ui = import ./nix/wasm-ui.nix {

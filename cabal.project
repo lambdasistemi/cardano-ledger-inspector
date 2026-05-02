@@ -20,7 +20,7 @@ index-state:
   , cardano-haskell-packages 2026-04-15T11:20:53Z
 
 packages:
-  nix/wasm/tx-inspector/wasm-tx-inspector
+  libs/cardano-ledger-inspector
   apps/tx-deep-diagnosis
 
 package cardano-crypto-praos
