@@ -37,21 +37,16 @@ let
     ./extism-spike-host
     { };
 
-  tx-deep-diagnosis = pkgs.haskellPackages.callCabal2nix
-    "tx-deep-diagnosis"
-    ./tx-deep-diagnosis
-    { };
-
   txDeepDiagnosisNative =
     if CHaP == null
       then null
       else import ./tx-deep-diagnosis-native { inherit CHaP pkgs; };
 
-  tx-deep-diagnosis-native =
+  tx-deep-diagnosis =
     if txDeepDiagnosisNative == null
       then null
       else txDeepDiagnosisNative.tx-deep-diagnosis;
 in
 {
-  inherit libextism extism-spike-host tx-deep-diagnosis tx-deep-diagnosis-native;
+  inherit libextism extism-spike-host tx-deep-diagnosis;
 }
