@@ -636,7 +636,7 @@
           packages = {
             inherit (wasmTargets)
               wasm-smoke wasm-ledger-smoke wasm-tx-inspector wasm-extism-spike;
-            inherit (hostTargets) extism-spike-host libextism;
+            inherit (hostTargets) extism-spike-host libextism tx-deep-diagnosis;
             inherit
               ledger-functional-openapi
               ledger-functional-openapi-generated
