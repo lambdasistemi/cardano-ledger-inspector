@@ -3,7 +3,7 @@
 # Builds extism-spike-host with the Haskell `extism` Hackage SDK, which
 # links libextism — the Rust + Wasmtime runtime that supports wasm
 # tail-calls (unlike the wazero embedded in pkgs.extism-cli).
-{ pkgs }:
+{ pkgs, CHaP ? null }:
 
 let
   libextism = pkgs.callPackage ./libextism.nix { };
@@ -41,7 +41,17 @@ let
     "tx-deep-diagnosis"
     ./tx-deep-diagnosis
     { };
+
+  txDeepDiagnosisNative =
+    if CHaP == null
+      then null
+      else import ./tx-deep-diagnosis-native { inherit CHaP pkgs; };
+
+  tx-deep-diagnosis-native =
+    if txDeepDiagnosisNative == null
+      then null
+      else txDeepDiagnosisNative.tx-deep-diagnosis;
 in
 {
-  inherit libextism extism-spike-host tx-deep-diagnosis;
+  inherit libextism extism-spike-host tx-deep-diagnosis tx-deep-diagnosis-native;
 }
