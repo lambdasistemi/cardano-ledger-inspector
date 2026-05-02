@@ -28,17 +28,33 @@ data Options = Options
     }
 
 parseOpts :: Parser Options
-parseOpts = Options
-    <$> strOption (long "cbor" <> metavar "FILE"
-        <> help "Path to a file containing the Conway tx CBOR hex")
-    <*> strOption (long "registry" <> metavar "DIR"
-        <> value "docs/inspector/protocols"
-        <> help "Path to the protocol registry directory")
-    <*> option parseNet (long "network" <> metavar "NETWORK"
-        <> value Mainnet
-        <> help "mainnet | preprod | preview")
-    <*> optional (strOption (long "blockfrost-id" <> metavar "PROJECT_ID"
-        <> help "Blockfrost project_id (or BLOCKFROST_PROJECT_ID env var)"))
+parseOpts =
+    Options
+        <$> strOption
+            ( long "cbor"
+                <> metavar "FILE"
+                <> help "Path to a file containing the Conway tx CBOR hex"
+            )
+        <*> strOption
+            ( long "registry"
+                <> metavar "DIR"
+                <> value "docs/inspector/protocols"
+                <> help "Path to the protocol registry directory"
+            )
+        <*> option
+            parseNet
+            ( long "network"
+                <> metavar "NETWORK"
+                <> value Mainnet
+                <> help "mainnet | preprod | preview"
+            )
+        <*> optional
+            ( strOption
+                ( long "blockfrost-id"
+                    <> metavar "PROJECT_ID"
+                    <> help "Blockfrost project_id (or BLOCKFROST_PROJECT_ID env var)"
+                )
+            )
   where
     parseNet = eitherReader $ \s -> case s of
         "mainnet" -> Right Mainnet
@@ -48,9 +64,12 @@ parseOpts = Options
 
 main :: IO ()
 main = do
-    opts <- execParser
-        (info (parseOpts <**> helper)
-            (progDesc "Layered Conway tx diagnosis using cardano-ledger-conway via cardano-ledger-inspector library"))
+    opts <-
+        execParser
+            ( info
+                (parseOpts <**> helper)
+                (progDesc "Layered Conway tx diagnosis using cardano-ledger-conway via cardano-ledger-inspector library")
+            )
     pidFromEnv <- lookupEnv "BLOCKFROST_PROJECT_ID"
     let mpid = fmap Text.pack (optProjectId opts) <|> fmap Text.pack pidFromEnv
     hex <- Text.strip <$> TIO.readFile (optCborFile opts)
@@ -62,7 +81,8 @@ main = do
     let producerHashes = extractProducerHashes intent
     producerCbors <- case mpid of
         Nothing -> do
-            hPutStrLn stderr
+            hPutStrLn
+                stderr
                 "WARNING: no Blockfrost project_id; tx.validate will run with empty context."
             pure Map.empty
         Just pid -> do
@@ -72,20 +92,25 @@ main = do
         Left e -> die ("validate error: " <> e)
         Right v -> pure v
     TIO.putStr
-        (renderTopLevel
-            ("tx-deep-diagnosis  ("
+        ( renderTopLevel
+            ( "tx-deep-diagnosis  ("
                 <> Text.pack (show (Map.size producerCbors))
-                <> " producer txs resolved)")
-            intent validate reg)
+                <> " producer txs resolved)"
+            )
+            intent
+            validate
+            reg
+        )
 
-fetchProducer
-    :: Manager -> Network -> Text -> Text -> IO (Text, Either String Text)
+fetchProducer ::
+    Manager -> Network -> Text -> Text -> IO (Text, Either String Text)
 fetchProducer mgr net pid h = do
     eCbor <- fetchTxCbor mgr net pid h
     case eCbor of
         Right c -> pure (h, Right c)
         Left e -> do
-            hPutStrLn stderr
+            hPutStrLn
+                stderr
                 ("producer fetch failed for " <> Text.unpack h <> ": " <> e)
             pure (h, Left e)
 

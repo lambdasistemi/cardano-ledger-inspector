@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TxDeepDiagnosisHost.Blockfrost
-    ( Network (..)
-    , networkBaseUrl
-    , ResolvedOutput (..)
-    , ResolvedAsset (..)
-    , fetchTxUtxos
-    , fetchTxCbor
-    , fetchOutputAtIndex
-    ) where
+module TxDeepDiagnosisHost.Blockfrost (
+    Network (..),
+    networkBaseUrl,
+    ResolvedOutput (..),
+    ResolvedAsset (..),
+    fetchTxUtxos,
+    fetchTxCbor,
+    fetchOutputAtIndex,
+) where
 
-import Control.Exception (try, SomeException)
-import Data.Aeson (FromJSON (..), withObject, (.:), (.:?), (.!=), eitherDecode)
+import Control.Exception (SomeException, try)
+import Data.Aeson (FromJSON (..), eitherDecode, withObject, (.!=), (.:), (.:?))
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
@@ -53,7 +53,7 @@ instance FromJSON ResolvedAsset where
             s -> case reads s of
                 [(n, "")] -> pure n
                 _ -> fail ("bad quantity: " <> s)
-        pure ResolvedAsset { rAssetUnit = unit, rAssetQty = qty }
+        pure ResolvedAsset{rAssetUnit = unit, rAssetQty = qty}
 
 instance FromJSON ResolvedOutput where
     parseJSON = withObject "ResolvedOutput" $ \o ->
@@ -65,13 +65,13 @@ instance FromJSON ResolvedOutput where
             <*> o .:? "data_hash"
             <*> o .:? "reference_script_hash"
 
-data UtxosResponse = UtxosResponse { urOutputs :: ![ResolvedOutput] }
+data UtxosResponse = UtxosResponse {urOutputs :: ![ResolvedOutput]}
 
 instance FromJSON UtxosResponse where
     parseJSON = withObject "UtxosResponse" $ \o ->
         UtxosResponse <$> o .:? "outputs" .!= []
 
-data CborResponse = CborResponse { crCbor :: !Text }
+data CborResponse = CborResponse {crCbor :: !Text}
 
 instance FromJSON CborResponse where
     parseJSON = withObject "CborResponse" $ \o -> CborResponse <$> o .: "cbor"
@@ -96,33 +96,41 @@ fetchTxCbor mgr net pid txHash = do
             Left e -> Left ("JSON decode error: " <> e)
             Right (CborResponse h) -> Right h
 
-fetchOutputAtIndex
-    :: Manager
-    -> Network
-    -> Text
-    -> Text
-    -> Int
-    -> IO (Either String (Maybe ResolvedOutput))
+fetchOutputAtIndex ::
+    Manager ->
+    Network ->
+    Text ->
+    Text ->
+    Int ->
+    IO (Either String (Maybe ResolvedOutput))
 fetchOutputAtIndex mgr net pid txHash ix = do
     eOuts <- fetchTxUtxos mgr net pid txHash
-    pure $ fmap (\outs -> case [o | o <- outs, rOutIx o == ix] of
-        (o:_) -> Just o
-        [] -> Nothing) eOuts
+    pure $
+        fmap
+            ( \outs -> case [o | o <- outs, rOutIx o == ix] of
+                (o : _) -> Just o
+                [] -> Nothing
+            )
+            eOuts
 
 callBlockfrost :: Manager -> Text -> Text -> IO (Either String BSL.ByteString)
 callBlockfrost mgr url pid = do
-    eResult <- try (do
-        initReq <- parseUrlThrow (Text.unpack url)
-        let req = initReq
-                { requestHeaders = [(hAccept, "application/json"), ("project_id", TE.encodeUtf8 pid)]
-                , method = "GET"
-                }
-        resp <- httpLbs req mgr
-        let code = statusCode (responseStatus resp)
-        if code == 200
-            then pure $ Right (responseBody resp)
-            else pure $ Left ("Blockfrost " <> show code <> ": " <> Text.unpack url))
-        :: IO (Either SomeException (Either String BSL.ByteString))
+    eResult <-
+        try
+            ( do
+                initReq <- parseUrlThrow (Text.unpack url)
+                let req =
+                        initReq
+                            { requestHeaders = [(hAccept, "application/json"), ("project_id", TE.encodeUtf8 pid)]
+                            , method = "GET"
+                            }
+                resp <- httpLbs req mgr
+                let code = statusCode (responseStatus resp)
+                if code == 200
+                    then pure $ Right (responseBody resp)
+                    else pure $ Left ("Blockfrost " <> show code <> ": " <> Text.unpack url)
+            ) ::
+            IO (Either SomeException (Either String BSL.ByteString))
     case eResult of
         Left e -> pure $ Left ("HTTP error: " <> show e)
         Right r -> pure r

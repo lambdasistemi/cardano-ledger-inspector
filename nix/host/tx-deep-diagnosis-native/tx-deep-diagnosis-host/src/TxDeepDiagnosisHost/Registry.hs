@@ -1,20 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TxDeepDiagnosisHost.Registry
-    ( ProtocolRegistry (..)
-    , RegistryValidator (..)
-    , RegistryInstance (..)
-    , AmaruScope (..)
-    , AmaruScript (..)
-    , AmaruJournal (..)
-    , loadRegistry
-    , identifyByHash
-    , findScopeByOwner
-    , findScopeByRefOutref
-    , Identification (..)
-    ) where
+module TxDeepDiagnosisHost.Registry (
+    ProtocolRegistry (..),
+    RegistryValidator (..),
+    RegistryInstance (..),
+    AmaruScope (..),
+    AmaruScript (..),
+    AmaruJournal (..),
+    loadRegistry,
+    identifyByHash,
+    findScopeByOwner,
+    findScopeByRefOutref,
+    Identification (..),
+) where
 
-import Data.Aeson (FromJSON (..), eitherDecodeFileStrict, withObject, (.:), (.:?), (.!=))
+import Data.Aeson (FromJSON (..), eitherDecodeFileStrict, withObject, (.!=), (.:), (.:?))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -116,13 +116,13 @@ instance FromJSON AmaruJournal where
         owners <- o .: "scope_owners"
         treasuriesObj <- o .: "treasuries"
         let scopes = mapMaybe parseScope (KeyMap.toList treasuriesObj)
-        pure AmaruJournal { ajScopeOwners = owners, ajScopes = scopes }
+        pure AmaruJournal{ajScopeOwners = owners, ajScopes = scopes}
       where
         parseScope (k, v) =
             let name = Key.toText k
-            in case A.parseEither (parseScopeBody name) v of
-                Right s -> Just s
-                Left _ -> Nothing
+             in case A.parseEither (parseScopeBody name) v of
+                    Right s -> Just s
+                    Left _ -> Nothing
         parseScopeBody name = withObject "Scope" $ \so ->
             AmaruScope name
                 <$> so .:? "owner"
@@ -146,11 +146,12 @@ loadRegistry root = do
         if exists
             then either (const Nothing) Just <$> eitherDecodeFileStrict amaruPath
             else pure Nothing
-    pure ProtocolRegistry
-        { prValidators = rfValidators rf
-        , prInstances = rfInstances rf
-        , prAmaru = aj
-        }
+    pure
+        ProtocolRegistry
+            { prValidators = rfValidators rf
+            , prInstances = rfInstances rf
+            , prAmaru = aj
+            }
 
 data Identification
     = IdValidator !RegistryValidator
@@ -168,7 +169,7 @@ identifyByHash reg hh =
                 let scope = case prAmaru reg of
                         Just j -> findAmaruScopeByTreasury j hh
                         Nothing -> Nothing
-                in IdInstance inst scope
+                 in IdInstance inst scope
             Nothing -> case prAmaru reg of
                 Just j -> case findAmaruRole j hh of
                     Just (s, role) -> IdAmaruRole s role
@@ -185,9 +186,9 @@ findAmaruRole j hh =
             | asHash (ascPermissionsScript s) == hh = Just (s, "permissions")
             | asHash (ascRegistryScript s) == hh = Just (s, "registry")
             | otherwise = Nothing
-    in case mapMaybe check (ajScopes j) of
-        (m:_) -> Just m
-        [] -> Nothing
+     in case mapMaybe check (ajScopes j) of
+            (m : _) -> Just m
+            [] -> Nothing
 
 findScopeByOwner :: AmaruJournal -> Text -> Maybe AmaruScope
 findScopeByOwner j ownerHex =
@@ -200,6 +201,6 @@ findScopeByRefOutref j outref =
             | asDeployedAt (ascPermissionsScript s) == outref = Just (s, "permissions_script")
             | asDeployedAt (ascRegistryScript s) == outref = Just (s, "registry_script")
             | otherwise = Nothing
-    in case mapMaybe check (ajScopes j) of
-        (m:_) -> Just m
-        [] -> Nothing
+     in case mapMaybe check (ajScopes j) of
+            (m : _) -> Just m
+            [] -> Nothing
