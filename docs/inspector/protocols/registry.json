@@ -1,0 +1,43 @@
+{
+  "$schema_note": "Draft shape for the inspector's protocol registry. Spec under iteration in https://github.com/lambdasistemi/cardano-ledger-wasi/issues/35.",
+  "blueprints": [
+    {
+      "id": "sundaeswap-v3",
+      "path": "sundaeswap-v3/plutus.json",
+      "pin": "sundaeswap-v3/pin.json"
+    },
+    {
+      "id": "sundaeswap-treasury-v3",
+      "path": "sundaeswap-treasury-v3/plutus.json",
+      "pin": "sundaeswap-treasury-v3/pin.json"
+    }
+  ],
+  "validators": [
+    {
+      "on_chain_hash": "fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f3077",
+      "blueprint": "sundaeswap-v3",
+      "validator": "order.spend",
+      "parameterized": false,
+      "label": "SundaeSwap V3 order"
+    }
+  ],
+  "instances": [
+    {
+      "on_chain_hash": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+      "blueprint": "sundaeswap-treasury-v3",
+      "validator": "treasury.treasury.spend",
+      "parameterized": true,
+      "parameters_known": false,
+      "label": "Amaru Network Compliance treasury",
+      "labelled_by": "amaru-treasury/journal-2026.json#treasuries.network_compliance"
+    }
+  ],
+  "deployment_registries": [
+    {
+      "id": "amaru-treasury-2026",
+      "path": "amaru-treasury/journal-2026.json",
+      "pin": "amaru-treasury/pin.json",
+      "schema": "amaru-treasury-journal-v1"
+    }
+  ]
+}

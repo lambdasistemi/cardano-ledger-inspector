@@ -1,0 +1,16 @@
+{
+  "source": "github.com/SundaeSwap-finance/treasury-contracts",
+  "ref": "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b",
+  "metadata_cited_ref": "ad4316d0d36cdef780f85fc2ec8b307e645ddc2a",
+  "fetched_at": "2026-05-02",
+  "license": "Apache-2.0",
+  "validators_used": [
+    {
+      "title": "treasury.treasury.spend",
+      "template_hash": "03d983a118dbba6bb2d54a5a7ce7757c8a646964e7ffb0193bf7f6ed",
+      "parameterized": true,
+      "note": "On-chain instances differ in hash because they apply the template to deployment-specific parameters (oneshot policy, owner, config)."
+    }
+  ],
+  "refresh_command": "gh api -H 'Accept: application/vnd.github.raw' 'repos/SundaeSwap-finance/treasury-contracts/contents/plutus.json?ref=<NEW_REF>' > plutus.json"
+}
