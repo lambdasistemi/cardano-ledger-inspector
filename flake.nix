@@ -88,7 +88,7 @@
             ]
           );
 
-          hostTargets = import ./nix/host { inherit pkgs; };
+          hostTargets = import ./nix/host { inherit pkgs CHaP; };
 
           wasmTargets = import ./nix/wasm-targets.nix {
             inherit pkgs;
@@ -636,7 +636,8 @@
           packages = {
             inherit (wasmTargets)
               wasm-smoke wasm-ledger-smoke wasm-tx-inspector wasm-extism-spike;
-            inherit (hostTargets) extism-spike-host libextism tx-deep-diagnosis;
+            inherit (hostTargets)
+              extism-spike-host libextism tx-deep-diagnosis tx-deep-diagnosis-native;
             inherit
               ledger-functional-openapi
               ledger-functional-openapi-generated

@@ -1,0 +1,52 @@
+cabal-version: 3.0
+name:          tx-deep-diagnosis-host
+version:       0.1.0.0
+synopsis:      Layered Conway tx diagnosis using the upstream ledger code via the wasm-tx-inspector library
+author:        lambdasistemi
+license:       Apache-2.0
+build-type:    Simple
+
+library
+  hs-source-dirs:   src
+  exposed-modules:
+    TxDeepDiagnosisHost.Blockfrost
+    TxDeepDiagnosisHost.Diagnosis
+    TxDeepDiagnosisHost.Registry
+    TxDeepDiagnosisHost.Report
+
+  build-depends:
+    , aeson                 >=2.0
+    , aeson-pretty
+    , base                  >=4.18 && <5
+    , base16-bytestring
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , http-client
+    , http-client-tls
+    , http-types
+    , scientific
+    , text
+    , wasm-tx-inspector
+
+  default-language: Haskell2010
+  ghc-options:      -Wall -Wno-name-shadowing -Wno-unused-imports
+
+executable tx-deep-diagnosis
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  build-depends:
+    , aeson
+    , base                  >=4.18 && <5
+    , bytestring
+    , containers
+    , http-client
+    , http-client-tls
+    , optparse-applicative
+    , text
+    , tx-deep-diagnosis-host
+    , wasm-tx-inspector
+
+  default-language: Haskell2010
+  ghc-options:      -Wall
