@@ -1,7 +1,7 @@
 cabal-version: 3.0
 name:          tx-deep-diagnosis-host
 version:       0.1.0.0
-synopsis:      Layered Conway tx diagnosis using the upstream ledger code via the wasm-tx-inspector library
+synopsis:      Layered Conway tx diagnosis using cardano-ledger-conway via the cardano-ledger-inspector library
 author:        lambdasistemi
 license:       Apache-2.0
 build-type:    Simple
@@ -28,7 +28,7 @@ library
     , http-types
     , scientific
     , text
-    , wasm-tx-inspector
+    , cardano-ledger-inspector
 
   default-language: Haskell2010
   ghc-options:      -Wall -Wno-name-shadowing -Wno-unused-imports
@@ -46,7 +46,7 @@ executable tx-deep-diagnosis
     , optparse-applicative
     , text
     , tx-deep-diagnosis-host
-    , wasm-tx-inspector
+    , cardano-ledger-inspector
 
   default-language: Haskell2010
   ghc-options:      -Wall
