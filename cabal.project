@@ -21,7 +21,7 @@ index-state:
 
 packages:
   nix/wasm/tx-inspector/wasm-tx-inspector
-  nix/host/tx-deep-diagnosis-native/tx-deep-diagnosis-host
+  apps/tx-deep-diagnosis
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
