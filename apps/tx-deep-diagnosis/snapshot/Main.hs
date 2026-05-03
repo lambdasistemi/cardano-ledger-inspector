@@ -34,6 +34,7 @@ import System.IO (hPutStrLn, stderr)
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry, loadRegistries)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc, parseDiagnosisDoc)
 import TxDeepDiagnosisHost.Render.Parties (renderPartiesMermaid)
+import TxDeepDiagnosisHost.Render.Topology (renderTopologyMermaid)
 import TxDeepDiagnosisHost.Render.ValueFlow (renderValueFlowTsv)
 
 {- | Static registry of (relative file name, producer) pairs. Each
@@ -43,6 +44,7 @@ renderers :: [(FilePath, ProtocolRegistry -> DiagnosisDoc -> Text)]
 renderers =
     [ ("parties.mmd", renderPartiesMermaid)
     , ("value-flow.tsv", renderValueFlowTsv)
+    , ("topology.mmd", renderTopologyMermaid)
     ]
 
 main :: IO ()
