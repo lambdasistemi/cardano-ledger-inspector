@@ -1,4 +1,4 @@
-# cardano-ledger-wasi Development Guidelines
+# cardano-ledger-inspector Development Guidelines
 
 Auto-generated from feature plans, then curated for this repository.
 Last updated: 2026-04-26

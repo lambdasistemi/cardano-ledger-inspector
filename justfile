@@ -77,7 +77,7 @@ build-pages-site:
 
 deploy-surge-preview:
     nix build .#packages.x86_64-linux.tx-inspector-ui
-    rm -rf /tmp/cardano-ledger-wasi-surge
-    mkdir -p /tmp/cardano-ledger-wasi-surge
-    cp -rL result/* /tmp/cardano-ledger-wasi-surge/
-    nix shell 'nixpkgs#nodejs_20' -c npx --yes surge /tmp/cardano-ledger-wasi-surge cardano-tx-inspector.surge.sh
+    rm -rf /tmp/cardano-ledger-inspector-surge
+    mkdir -p /tmp/cardano-ledger-inspector-surge
+    cp -rL result/* /tmp/cardano-ledger-inspector-surge/
+    nix shell 'nixpkgs#nodejs_20' -c npx --yes surge /tmp/cardano-ledger-inspector-surge cardano-tx-inspector.surge.sh

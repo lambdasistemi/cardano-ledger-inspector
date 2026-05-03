@@ -3,7 +3,7 @@
   "release-type": "simple",
   "packages": {
     ".": {
-      "package-name": "cardano-ledger-wasi",
+      "package-name": "cardano-ledger-inspector",
       "include-component-in-tag": false,
       "initial-version": "0.1.0"
     }

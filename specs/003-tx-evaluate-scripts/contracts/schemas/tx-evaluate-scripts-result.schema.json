@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-evaluate-scripts-result.schema.json",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-evaluate-scripts-result.schema.json",
   "title": "tx.evaluate.scripts result",
   "type": "object",
   "additionalProperties": false,

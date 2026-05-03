@@ -106,17 +106,17 @@ workspace management stay outside the ledger WASI layer.
 
 The detailed contract and schemas are tracked in the repository:
 
-- [Functional API contract](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
-- [OpenAPI document](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json)
-- [Request schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-request.schema.json)
-- [Response schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-response.schema.json)
-- [Producer transaction context schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/producer-tx-context.schema.json)
-- [Browser view schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/browser-view.schema.json)
-- [tx.identify result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-identify-result.schema.json)
-- [tx.intent result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-intent-result.schema.json)
-- [tx.witness.plan result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-witness-plan-result.schema.json)
-- [tx.validate result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-validate-result.schema.json)
-- [tx.evaluate.scripts result schema](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/schemas/tx-evaluate-scripts-result.schema.json)
+- [Functional API contract](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
+- [OpenAPI document](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json)
+- [Request schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-request.schema.json)
+- [Response schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/ledger-operation-response.schema.json)
+- [Producer transaction context schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/producer-tx-context.schema.json)
+- [Browser view schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/browser-view.schema.json)
+- [tx.identify result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-identify-result.schema.json)
+- [tx.intent result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-intent-result.schema.json)
+- [tx.witness.plan result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-witness-plan-result.schema.json)
+- [tx.validate result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-validate-result.schema.json)
+- [tx.evaluate.scripts result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-evaluate-scripts-result.schema.json)
 
 The same OpenAPI bundle is a flake output:
 

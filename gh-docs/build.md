@@ -117,8 +117,8 @@ Amaru Network Compliance treasury", not just the bare hex.
 ## Build From GitHub
 
 ```bash
-nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.wasm-tx-inspector
-nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.tx-inspector-ui
+nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.wasm-tx-inspector
+nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.tx-inspector-ui
 ```
 
 ## Download CI Artifacts
@@ -133,11 +133,11 @@ Every `CI` workflow run uploads downloadable artifacts:
 
 Download them from the artifact section of a CI run:
 
-[CI workflow runs](https://github.com/lambdasistemi/cardano-ledger-wasi/actions/workflows/ci.yml)
+[CI workflow runs](https://github.com/lambdasistemi/cardano-ledger-inspector/actions/workflows/ci.yml)
 
 ## Published Documentation Site
 
 GitHub Pages publishes this documentation site and mounts the transaction
 inspector at:
 
-<https://lambdasistemi.github.io/cardano-ledger-wasi/inspector/>
+<https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>

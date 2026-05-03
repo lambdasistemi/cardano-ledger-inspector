@@ -1,5 +1,5 @@
 site_name: Cardano Ledger WASI
-site_url: https://lambdasistemi.github.io/cardano-ledger-wasi/
+site_url: https://lambdasistemi.github.io/cardano-ledger-inspector/
 docs_dir: gh-docs
 
 theme:
@@ -33,7 +33,7 @@ nav:
   - API Definition: api.md
   - Swagger UI: swagger.md
   - Build and Artifacts: build.md
-  - Repository: https://github.com/lambdasistemi/cardano-ledger-wasi
+  - Repository: https://github.com/lambdasistemi/cardano-ledger-inspector
 
 plugins:
   - search

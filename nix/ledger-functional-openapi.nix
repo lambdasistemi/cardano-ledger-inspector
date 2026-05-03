@@ -7,12 +7,12 @@
     version = "0.1.0-draft";
     license = {
       name = "Apache-2.0";
-      url = "https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/LICENSE";
+      url = "https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/LICENSE";
     };
   };
   externalDocs = {
     description = "Functional API contract";
-    url = "https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md";
+    url = "https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md";
   };
   servers = [
     {

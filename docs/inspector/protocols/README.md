@@ -6,9 +6,9 @@ typed schemas.
 
 This directory is **data only** at this stage. The decoder primitive that
 consumes it is tracked in
-[issue #35](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/35);
+[issue #35](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/35);
 the SundaeSwap V3 wiring in
-[issue #36](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/36).
+[issue #36](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/36).
 
 ## Layout
 

@@ -1,4 +1,4 @@
-# cardano-ledger-wasi
+# cardano-ledger-inspector
 
 Cardano ledger operations compiled to WASI, with a browser transaction
 workbench that exercises the same Haskell ledger code.
@@ -48,8 +48,8 @@ walkthrough on the SundaeSwap fixture.
 You can also build directly from GitHub:
 
 ```bash
-nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.wasm-tx-inspector
-nix build github:lambdasistemi/cardano-ledger-wasi#packages.x86_64-linux.tx-inspector-ui
+nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.wasm-tx-inspector
+nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.tx-inspector-ui
 ```
 
 ## Development
@@ -97,13 +97,13 @@ data, and complete-context execution-unit reporting.
 
 ## Published Site
 
-Repository docs: <https://lambdasistemi.github.io/cardano-ledger-wasi/>
+Repository docs: <https://lambdasistemi.github.io/cardano-ledger-inspector/>
 
-Functional API definition: <https://lambdasistemi.github.io/cardano-ledger-wasi/api/>
+Functional API definition: <https://lambdasistemi.github.io/cardano-ledger-inspector/api/>
 
-Swagger UI: <https://lambdasistemi.github.io/cardano-ledger-wasi/swagger/>
+Swagger UI: <https://lambdasistemi.github.io/cardano-ledger-inspector/swagger/>
 
-Transaction inspector: <https://lambdasistemi.github.io/cardano-ledger-wasi/inspector/>
+Transaction inspector: <https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>
 
 Pull-request previews are published to Surge by the `PR preview` workflow.
 
@@ -128,7 +128,7 @@ conventional-commit history. Each release attaches:
   JSON envelope.
 - `SHA256SUMS-<tag>.txt` — checksums.
 
-Releases: <https://github.com/lambdasistemi/cardano-ledger-wasi/releases>
+Releases: <https://github.com/lambdasistemi/cardano-ledger-inspector/releases>
 
 ## CI Artifacts (per-run, ephemeral)
 
@@ -142,7 +142,7 @@ anything you depend on.
   `SHA256SUMS`.
 
 Open a workflow run under
-<https://github.com/lambdasistemi/cardano-ledger-wasi/actions/workflows/ci.yml>
+<https://github.com/lambdasistemi/cardano-ledger-inspector/actions/workflows/ci.yml>
 and download them from the run's **Artifacts** section.
 
 ## License

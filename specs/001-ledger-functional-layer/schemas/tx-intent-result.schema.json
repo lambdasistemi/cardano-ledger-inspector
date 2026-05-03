@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-intent-result.schema.json",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-intent-result.schema.json",
   "title": "Cardano Ledger WASI Transaction Intent Result",
   "type": "object",
   "required": ["title", "subtitle", "metrics", "claims", "sections", "warnings"],

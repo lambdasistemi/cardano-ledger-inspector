@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/ledger-operation-request.schema.json",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/ledger-operation-request.schema.json",
   "title": "Cardano Ledger WASI Ledger Operation Request",
   "type": "object",
   "required": ["tx_cbor", "op"],
