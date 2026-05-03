@@ -659,6 +659,46 @@
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
+          apps =
+            let
+              format-check = pkgs.writeShellApplication {
+                name = "format-check";
+                runtimeInputs = [ pkgs.haskellPackages.fourmolu pkgs.findutils ];
+                text = ''
+                  find libs apps nix/wasm -type f -name '*.hs' \
+                    -exec fourmolu -m check {} +
+                '';
+              };
+              test-playwright = pkgs.writeShellApplication {
+                name = "test-playwright";
+                runtimeInputs = [
+                  pkgs.playwright-test
+                  pkgs.nodejs_20
+                  pkgs.coreutils
+                ];
+                excludeShellChecks = [ "SC2046" "SC2086" ];
+                text = ''
+                  set -euo pipefail
+                  cd docs/inspector
+                  ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules
+                  TX_INSPECTOR_SITE_DIR=${tx-inspector-ui} \
+                    PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers} \
+                    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+                    playwright test --reporter=list
+                '';
+              };
+            in
+            {
+              format-check = {
+                type = "app";
+                program = pkgs.lib.getExe format-check;
+              };
+              test-playwright = {
+                type = "app";
+                program = pkgs.lib.getExe test-playwright;
+              };
+            };
+
           devShells.default = pkgs.mkShell {
             buildInputs = [
               pkgs.just
