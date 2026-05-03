@@ -25,6 +25,7 @@ library
     TxDeepDiagnosisHost.Blockfrost
     TxDeepDiagnosisHost.Diagnosis
     TxDeepDiagnosisHost.Registry
+    TxDeepDiagnosisHost.Render.Doc
     TxDeepDiagnosisHost.Report
 
   build-depends:
