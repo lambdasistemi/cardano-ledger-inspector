@@ -129,7 +129,7 @@ validation diagnostics rather than being guessed by the UI.
 browser panel can be added separately once its UI flow is selected.
 
 A complete positive request is committed at
-[`specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json).
+[`specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json).
 It validates the current mainnet fixture with producer transaction CBOR,
 network, slot, epoch, and protocol parameters, and the smoke check asserts
 `status: "valid"` and `valid_for_supplied_context: true`.
@@ -139,7 +139,7 @@ network, slot, epoch, and protocol parameters, and the smoke check asserts
 The readable API page and detailed contract are tracked here:
 
 - [API definition](api.md)
-- [`specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
+- [`specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
 
 ## Direction
 

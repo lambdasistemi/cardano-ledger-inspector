@@ -24,13 +24,13 @@ and a browsable transaction result.
 
 ## Important Links
 
-- Repository: [lambdasistemi/cardano-ledger-wasi](https://github.com/lambdasistemi/cardano-ledger-wasi)
+- Repository: [lambdasistemi/cardano-ledger-inspector](https://github.com/lambdasistemi/cardano-ledger-inspector)
 - Inspector page: [GitHub Pages inspector](inspector/)
 - API definition: [Functional API](api.md)
 - Swagger UI: [OpenAPI reference](swagger.md)
-- CI artifacts: [CI workflow runs](https://github.com/lambdasistemi/cardano-ledger-wasi/actions/workflows/ci.yml)
-- Constitution: [`.specify/memory/constitution.md`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/.specify/memory/constitution.md)
-- Functional API contract: [`specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`](https://github.com/lambdasistemi/cardano-ledger-wasi/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
+- CI artifacts: [CI workflow runs](https://github.com/lambdasistemi/cardano-ledger-inspector/actions/workflows/ci.yml)
+- Constitution: [`.specify/memory/constitution.md`](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/.specify/memory/constitution.md)
+- Functional API contract: [`specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/contracts/ledger-functional-api.md)
 
 ## Design Commitments
 

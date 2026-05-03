@@ -1,5 +1,5 @@
 {
-  "$schema_note": "Draft shape for the inspector's protocol registry. Spec under iteration in https://github.com/lambdasistemi/cardano-ledger-wasi/issues/35.",
+  "$schema_note": "Draft shape for the inspector's protocol registry. Spec under iteration in https://github.com/lambdasistemi/cardano-ledger-inspector/issues/35.",
   "blueprints": [
     {
       "id": "sundaeswap-v3",

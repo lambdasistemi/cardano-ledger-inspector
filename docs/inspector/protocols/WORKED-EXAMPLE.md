@@ -1,15 +1,15 @@
 # Issue #31 fixture, fully decoded by hand
 
 Reference for what the inspector should produce once issues
-[#32](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/32),
-[#33](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/33),
-[#34](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/34),
-[#35](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/35),
-[#36](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/36) and
-[#37](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/37) ship.
+[#32](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/32),
+[#33](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/33),
+[#34](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/34),
+[#35](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/35),
+[#36](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/36) and
+[#37](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/37) ship.
 
 Fixture: `specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex`
-(the tx from [issue #31](https://github.com/lambdasistemi/cardano-ledger-wasi/issues/31)).
+(the tx from [issue #31](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/31)).
 
 ## Sources used
 

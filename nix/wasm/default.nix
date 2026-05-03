@@ -1,4 +1,4 @@
-# Public API surface for cardano-ledger-wasi.lib.wasm.
+# Public API surface for cardano-ledger-inspector.lib.wasm.
 #
 # Module is system-agnostic: only nixpkgs `lib` is needed to build strings.
 # Per-system `pkgs` and `ghcWasmMeta` flow through `mkCardanoLedgerWasm`'s own

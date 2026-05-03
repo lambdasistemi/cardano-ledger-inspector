@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://lambdasistemi.github.io/cardano-ledger-wasi/schemas/tx-witness-plan-result.schema.json",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-witness-plan-result.schema.json",
   "title": "Cardano Ledger WASI tx.witness.plan Result",
   "type": "object",
   "required": [
