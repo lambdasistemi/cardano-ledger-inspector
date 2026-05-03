@@ -10,12 +10,22 @@ library.
 
 ## What Is Here
 
-- `nix/wasm/` — reusable Nix machinery for compiling selected Cardano ledger
-  Haskell packages to `wasm32-wasi`.
-- `nix/wasm/tx-inspector/` — Haskell WASI executable that accepts transaction
-  CBOR and ledger operation requests on stdin.
+- `libs/cardano-ledger-inspector/` — Haskell library implementing the Conway
+  ledger operations (`tx.intent`, `tx.validate`, `tx.evaluate.scripts`, …).
+  The library plus a 25-line WASI `Main.hs` compile to
+  `wasm-tx-inspector.wasm`; the same library is also linked natively by the
+  CLI below.
+- `apps/tx-deep-diagnosis/` — native CLI that links the inspector library
+  directly, resolves producer transactions via Blockfrost, and labels script
+  hashes against the protocol registry to produce a layered diagnosis report.
+- `apps/wasm-extism-spike/` — wasm Extism plugin exposing the inspector's
+  operations as named exports for cross-implementation conformance testing.
+- `apps/extism-spike-host/` — native Extism host that loads the wasm spike
+  via libextism for CI-side conformance checks.
 - `docs/inspector/` — PureScript/Halogen browser workbench embedding the WASI
   artifact with `@bjorn3/browser_wasi_shim`.
+- `nix/wasm/` — reusable Nix machinery for compiling selected Cardano ledger
+  Haskell packages to `wasm32-wasi`.
 - `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md` —
   current JSON-control / CBOR-data operation contract.
 
@@ -25,12 +35,15 @@ library.
 nix build .#packages.x86_64-linux.wasm-tx-inspector -o result-wasm
 nix build .#packages.x86_64-linux.tx-inspector-ui -o result-site
 nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
+nix build .#packages.x86_64-linux.tx-deep-diagnosis -o result-cli
 ```
 
 The WASI executable is `./result-wasm/wasm-tx-inspector.wasm`. The built
 browser bundle is `./result-site/{index.html,index.js}` after the UI build.
 The OpenAPI/Swagger artifact is `./result-openapi/cardano-ledger-functional.openapi.json`
-with the JSON schemas it references.
+with the JSON schemas it references. The native CLI is
+`./result-cli/bin/tx-deep-diagnosis` — see `gh-docs/build.md` for a
+walkthrough on the SundaeSwap fixture.
 
 You can also build directly from GitHub:
 
