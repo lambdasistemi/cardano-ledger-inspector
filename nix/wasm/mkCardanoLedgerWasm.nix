@@ -128,6 +128,19 @@ let
     EOF
   '';
 
+  # Stable sandbox name shared by srcMetadata (used by deps + prebuiltDeps)
+  # and the renamed src (used by wasm). /build/<name> must be byte-identical
+  # between the metadata-only and full-source phases — cabal bakes absolute
+  # paths into dist-newstyle, so mismatched sandbox dirs make the cached
+  # closure look stale and force a full rebuild.
+  #
+  # We deliberately do NOT derive the name from `toString src`. When the
+  # caller passes `./.` from a flake, `toString src` resolves to
+  # `/nix/store/<flake-tree-hash>-source`, so `baseNameOf` returns
+  # `<flake-tree-hash>-source` — a name that changes on every Haskell edit
+  # and re-keys the prebuiltDeps drv. A hardcoded constant pins it.
+  sandboxName = "cardano-ledger-wasm-src";
+
   # Metadata-only tree used by dependency-cache derivations.
   #
   # This intentionally does not pass the raw cabal files through to
@@ -136,16 +149,6 @@ let
   # closure, but they used to change the prebuiltDeps derivation and trigger a
   # full ledger rebuild. Build-dependency fields still remain in the generated
   # cabal files, so real dependency changes continue to invalidate the cache.
-  #
-  # CRITICAL: set `name` to match the underlying src's final path component
-  # so the extracted sandbox path (`/build/<name>`) is identical between
-  # prebuiltDeps and wasm. Cabal bakes absolute paths into dist-newstyle
-  # metadata and compiled artifacts; mismatched sandbox paths cause cabal
-  # to treat the cached compile as stale and rebuild the whole closure.
-  #
-  # `cleanSourceWith` defaults `name` to "source" when not set, regardless
-  # of the underlying src's directory name — that's what broke the cache in
-  # the first attempt.
   sourceTreeNames = [ "app" "src" "test" "tests" "bench" "benchmarks" ];
   moduleInventoryFields =
     [ "exposed-modules" "other-modules" "autogen-modules" "signatures" ];
@@ -206,7 +209,7 @@ let
         })
       (collectMetadataFiles "" src);
 
-  srcMetadata = pkgs.runCommand (builtins.baseNameOf (toString src)) {} (
+  srcMetadata = pkgs.runCommand sandboxName {} (
     lib.concatMapStringsSep "\n"
       (file:
         let
@@ -220,6 +223,17 @@ let
         '')
       metadataFiles
   );
+
+  # Rewrap src under the same hardcoded `sandboxName`, so the wasm
+  # derivation extracts to `/build/${sandboxName}` and matches the path
+  # cabal recorded inside prebuiltDeps' dist-newstyle. The wrapper drv's
+  # hash still tracks the real src content (so .hs edits properly
+  # rebuild the wasm phase), but its `name` is constant — which keeps
+  # prebuiltDeps' sandbox path in sync.
+  renamedSrc = pkgs.runCommand sandboxName {} ''
+    mkdir -p $out
+    cp -rL ${src}/. $out/
+  '';
 
   buildTargetsArg = lib.concatStringsSep " \\\n      " packages;
 
@@ -394,7 +408,7 @@ let
   wasm = pkgs.stdenv.mkDerivation {
     pname = "cardano-ledger-wasm";
     version = "0.1.0";
-    inherit src;
+    src = renamedSrc;
 
     nativeBuildInputs = [ ghcWasmMeta pkgs.git ] ++ cLibsInputs;
 
