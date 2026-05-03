@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -55,6 +56,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Lens.Micro ((^.))
+import qualified PlutusLedgerApi.V1 as PV1
 
 data InspectError
     = MalformedHex String
@@ -166,8 +168,74 @@ datumJson (PData.Datum bd) =
     Aeson.object
         [ "kind" .= ("inline_datum" :: T.Text)
         , "cbor_hex" .= T.decodeUtf8 (B16.encode (Hashes.originalBytes bd))
-        , "note" .= ("Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes" :: T.Text)
+        , "decoded" .= case PData.binaryDataToData bd of
+            d -> plutusDataJson (PData.getPlutusData d)
         ]
+
+{- | Render a Plutus Data AST node as structured JSON so consumers can
+read order parameters / certificate payloads / etc. without further
+tooling. Untyped: the JSON shape is the AST, not blueprint-driven
+record fields, because CIP-57 blueprints frequently leave datums as
+opaque @Data@.
+
+Mapping:
+
+* @Constr i fields@ → @{ \"kind\": \"constr\", \"index\": i, \"fields\": [...] }@
+* @Map kvs@         → @{ \"kind\": \"map\", \"entries\": [{ \"k\": ..., \"v\": ... }] }@
+* @List xs@         → @{ \"kind\": \"list\", \"items\": [...] }@
+* @I n@             → @{ \"kind\": \"int\", \"value\": \"<decimal-string>\" }@ (string-encoded
+                       to preserve precision for arbitrary-size ints)
+* @B bs@            → @{ \"kind\": \"bytes\", \"hex\": \"<hex>\", \"len\": N }@; when
+                       the byte string is plausibly UTF-8 readable, an
+                       additional @\"utf8\"@ field is included.
+-}
+plutusDataJson :: PV1.Data -> Aeson.Value
+plutusDataJson = \case
+    PV1.Constr i fields ->
+        Aeson.object
+            [ "kind" .= ("constr" :: T.Text)
+            , "index" .= i
+            , "fields" .= map plutusDataJson fields
+            ]
+    PV1.Map entries ->
+        Aeson.object
+            [ "kind" .= ("map" :: T.Text)
+            , "entries"
+                .= [ Aeson.object
+                    [ "k" .= plutusDataJson k
+                    , "v" .= plutusDataJson v
+                    ]
+                   | (k, v) <- entries
+                   ]
+            ]
+    PV1.List xs ->
+        Aeson.object
+            [ "kind" .= ("list" :: T.Text)
+            , "items" .= map plutusDataJson xs
+            ]
+    PV1.I n ->
+        Aeson.object
+            [ "kind" .= ("int" :: T.Text)
+            , "value" .= T.pack (show n)
+            ]
+    PV1.B bs ->
+        let hex = T.decodeUtf8 (B16.encode (PV1.fromBuiltin (PV1.toBuiltin bs)))
+            asUtf8 = case T.decodeUtf8' bs of
+                Right t
+                    | not (T.null t) && T.all isPrintable t -> Just t
+                _ -> Nothing
+            base =
+                [ "kind" .= ("bytes" :: T.Text)
+                , "hex" .= hex
+                , "len" .= BS.length bs
+                ]
+         in Aeson.object
+                ( base
+                    <> maybe [] (\u -> ["utf8" .= u]) asUtf8
+                )
+  where
+    isPrintable c =
+        c >= ' ' && c <= '~' || c == '\t' || c == '\n'
 
 txInJson :: TxIn.TxIn -> Aeson.Value
 txInJson (TxIn.TxIn (TxIn.TxId safeHash) (BaseTypes.TxIx ix)) =
