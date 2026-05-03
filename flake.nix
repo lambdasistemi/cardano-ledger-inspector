@@ -661,9 +661,31 @@
 
           apps =
             let
+              mkSmokeApp = name: smoke: pkgs.writeShellApplication {
+                name = "${name}-runner";
+                runtimeInputs = [ pkgs.coreutils ];
+                text = ''
+                  set -euo pipefail
+                  echo "=== ${name} ==="
+                  echo "smoke artifacts: ${smoke}"
+                  if [ -f ${smoke}/request.json ]; then
+                    echo "--- request.json ---"
+                    cat ${smoke}/request.json
+                  fi
+                  echo
+                  if [ -f ${smoke}/response.json ]; then
+                    echo "--- response.json ---"
+                    cat ${smoke}/response.json
+                  fi
+                '';
+              };
+              mkApp = drv: { type = "app"; program = pkgs.lib.getExe drv; };
               format-check = pkgs.writeShellApplication {
                 name = "format-check";
-                runtimeInputs = [ pkgs.haskellPackages.fourmolu pkgs.findutils ];
+                runtimeInputs = [
+                  pkgs.haskellPackages.fourmolu
+                  pkgs.findutils
+                ];
                 text = ''
                   find libs apps nix/wasm -type f -name '*.hs' \
                     -exec fourmolu -m check {} +
@@ -674,13 +696,19 @@
                 runtimeInputs = [
                   pkgs.playwright-test
                   pkgs.nodejs_20
+                  pkgs.python3
                   pkgs.coreutils
                 ];
-                excludeShellChecks = [ "SC2046" "SC2086" ];
+                excludeShellChecks = [
+                  "SC2046"
+                  "SC2086"
+                ];
                 text = ''
                   set -euo pipefail
                   cd docs/inspector
-                  ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules
+                  ln -sfn \
+                    $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules \
+                    node_modules
                   TX_INSPECTOR_SITE_DIR=${tx-inspector-ui} \
                     PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers} \
                     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
@@ -689,14 +717,28 @@
               };
             in
             {
-              format-check = {
-                type = "app";
-                program = pkgs.lib.getExe format-check;
-              };
-              test-playwright = {
-                type = "app";
-                program = pkgs.lib.getExe test-playwright;
-              };
+              format-check = mkApp format-check;
+              test-playwright = mkApp test-playwright;
+              tx-identify-smoke =
+                mkApp (mkSmokeApp "tx-identify-smoke" tx-identify-smoke);
+              tx-witness-plan-smoke =
+                mkApp (mkSmokeApp "tx-witness-plan-smoke" tx-witness-plan-smoke);
+              tx-intent-smoke =
+                mkApp (mkSmokeApp "tx-intent-smoke" tx-intent-smoke);
+              tx-validate-smoke =
+                mkApp (mkSmokeApp "tx-validate-smoke" tx-validate-smoke);
+              tx-evaluate-scripts-smoke =
+                mkApp (mkSmokeApp "tx-evaluate-scripts-smoke" tx-evaluate-scripts-smoke);
+              tx-input-context-smoke =
+                mkApp (mkSmokeApp "tx-input-context-smoke" tx-input-context-smoke);
+              tx-extism-spike-smoke =
+                mkApp (mkSmokeApp "tx-extism-spike-smoke" tx-extism-spike-smoke);
+              ledger-functional-openapi-check =
+                mkApp (mkSmokeApp "ledger-functional-openapi-check"
+                  ledger-functional-openapi-check);
+              ledger-functional-swagger-check =
+                mkApp (mkSmokeApp "ledger-functional-swagger-check"
+                  ledger-functional-openapi-check);
             };
 
           devShells.default = pkgs.mkShell {

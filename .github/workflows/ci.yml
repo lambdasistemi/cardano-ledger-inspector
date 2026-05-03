@@ -88,7 +88,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.ledger-functional-openapi-check
+      - run: nix run --quiet .#ledger-functional-openapi-check
 
   swagger-check:
     name: Swagger alias check
@@ -100,7 +100,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.ledger-functional-swagger-check
+      - run: nix run --quiet .#ledger-functional-swagger-check
 
   tx-identify-smoke:
     name: Smoke tx.identify
@@ -112,7 +112,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.tx-identify-smoke
+      - run: nix run --quiet .#tx-identify-smoke
 
   tx-witness-plan-smoke:
     name: Smoke tx.witness.plan
@@ -124,7 +124,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.tx-witness-plan-smoke
+      - run: nix run --quiet .#tx-witness-plan-smoke
 
   tx-intent-smoke:
     name: Smoke tx.intent
@@ -136,7 +136,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.tx-intent-smoke
+      - run: nix run --quiet .#tx-intent-smoke
 
   tx-validate-smoke:
     name: Smoke tx.validate
@@ -148,7 +148,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.tx-validate-smoke
+      - run: nix run --quiet .#tx-validate-smoke
 
   tx-evaluate-scripts-smoke:
     name: Smoke tx.evaluate.scripts
@@ -160,7 +160,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.tx-evaluate-scripts-smoke
+      - run: nix run --quiet .#tx-evaluate-scripts-smoke
 
   tx-input-context-smoke:
     name: Smoke explicit UTxO input context
@@ -172,7 +172,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.tx-input-context-smoke
+      - run: nix run --quiet .#tx-input-context-smoke
 
   tx-extism-spike-smoke:
     name: Smoke Extism conformance vs WASI
@@ -184,7 +184,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix build --quiet .#checks.x86_64-linux.tx-extism-spike-smoke
+      - run: nix run --quiet .#tx-extism-spike-smoke
 
   format-check:
     name: Format (fourmolu)
