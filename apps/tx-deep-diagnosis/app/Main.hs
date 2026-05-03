@@ -19,12 +19,13 @@ import System.IO (hPutStrLn, stderr)
 
 import TxDeepDiagnosisHost.Blockfrost
 import TxDeepDiagnosisHost.Diagnosis
-import TxDeepDiagnosisHost.Registry (loadRegistry)
+import TxDeepDiagnosisHost.Registry (loadRegistries)
 import TxDeepDiagnosisHost.Report (renderTopLevel)
 
 data Options = Options
     { optCborFile :: !FilePath
-    , optRegistryDir :: !(Maybe FilePath)
+    , optExtraRegistries :: ![FilePath]
+    , optNoBundledRegistry :: !Bool
     , optNetwork :: !Network
     , optProjectId :: !(Maybe String)
     }
@@ -37,15 +38,25 @@ parseOpts =
                 <> metavar "FILE"
                 <> help "Path to a file containing the Conway tx CBOR hex"
             )
-        <*> optional
+        <*> many
             ( strOption
                 ( long "registry"
                     <> metavar "DIR"
                     <> help
-                        ( "Path to the protocol registry directory "
-                            <> "(default: the registry vendored into this binary at build time)"
+                        ( "Extra protocol registry directory to layer on top of "
+                            <> "the bundled one. Repeat to add several. Validator + "
+                            <> "instance entries from extra roots concat onto the "
+                            <> "bundled list; the Amaru journal is last-wins."
                         )
                 )
+            )
+        <*> switch
+            ( long "no-bundled-registry"
+                <> help
+                    ( "Skip the registry vendored into this binary at build "
+                        <> "time. Only the directories passed via --registry are "
+                        <> "consulted. Rare; meant for testing a clean replacement."
+                    )
             )
         <*> option
             parseNet
@@ -82,8 +93,10 @@ main = do
     let mpid = fmap Text.pack (optProjectId opts) <|> fmap Text.pack pidFromEnv
     hex <- Text.strip <$> TIO.readFile (optCborFile opts)
     bundledRegistry <- Paths.getDataDir
-    let registryDir = fromMaybe bundledRegistry (optRegistryDir opts)
-    reg <- loadRegistry registryDir
+    let registryRoots =
+            (if optNoBundledRegistry opts then [] else [bundledRegistry])
+                <> optExtraRegistries opts
+    reg <- loadRegistries registryRoots
     intent <- case runIntent hex of
         Left e -> die ("intent error: " <> e)
         Right v -> pure v

@@ -8,6 +8,7 @@ module TxDeepDiagnosisHost.Registry (
     AmaruScript (..),
     AmaruJournal (..),
     loadRegistry,
+    loadRegistries,
     identifyByHash,
     findScopeByOwner,
     findScopeByRefOutref,
@@ -132,6 +133,8 @@ instance FromJSON AmaruJournal where
                 <*> so .: "permissions_script"
                 <*> so .: "registry_script"
 
+-- Load a single registry root. Use 'loadRegistries' to layer multiple
+-- (e.g. the bundled registry plus user-supplied overlays).
 loadRegistry :: FilePath -> IO ProtocolRegistry
 loadRegistry root = do
     let registryPath = root </> "registry.json"
@@ -152,6 +155,25 @@ loadRegistry root = do
             , prInstances = rfInstances rf
             , prAmaru = aj
             }
+
+-- Layer multiple registry roots into one. Validator and instance lists
+-- are concatenated (later entries shadow earlier ones at lookup time
+-- via 'find'); the Amaru journal is last-wins since it is keyed once
+-- per project. Roots are processed in left-to-right order, so the
+-- canonical call site is `loadRegistries [bundled, userExtra1, ...]`.
+loadRegistries :: [FilePath] -> IO ProtocolRegistry
+loadRegistries roots = do
+    rs <- mapM loadRegistry roots
+    pure
+        ProtocolRegistry
+            { prValidators = concatMap prValidators rs
+            , prInstances = concatMap prInstances rs
+            , prAmaru = lastJust (map prAmaru rs)
+            }
+  where
+    lastJust = foldr (\x acc -> case x of Just _ -> x; Nothing -> acc) Nothing
+    -- ^ folds RIGHT-to-left, so the LAST Just wins (= the rightmost
+    -- registry root with an Amaru journal overrides any earlier one).
 
 data Identification
     = IdValidator !RegistryValidator
