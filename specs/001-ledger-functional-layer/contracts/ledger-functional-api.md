@@ -422,8 +422,60 @@ it does not sign, validate, submit, balance, patch, or mutate the transaction.
         "title": "Critical effects",
         "empty": "No transaction effects reported.",
         "rows": []
+      },
+      {
+        "title": "Declared required signers",
+        "empty": "No declared required signers.",
+        "rows": [
+          {
+            "label": "declared required signer",
+            "value": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+            "path": "[\"intent\",\"signing\",\"required_signers\",\"#0\",\"hash\"]",
+            "copyValue": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+            "detail": "declared required signer not present in vkey or bootstrap witnesses"
+          }
+        ]
+      },
+      {
+        "title": "Missing required signers",
+        "empty": "None missing.",
+        "rows": [
+          {
+            "label": "declared required signer not present in vkey or bootstrap witnesses",
+            "value": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+            "path": "[\"intent\",\"signing\",\"missing_vkey_witnesses\",\"#0\",\"hash\"]",
+            "copyValue": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+            "detail": "declared required signer not present in vkey or bootstrap witnesses"
+          }
+        ]
       }
     ],
+    "signing": {
+      "missing_vkey_witness_count": 2,
+      "missing_vkey_witnesses": [
+        {
+          "hash": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+          "reason": "declared required signer not present in vkey or bootstrap witnesses"
+        }
+      ],
+      "present_bootstrap_witness_count": 0,
+      "present_bootstrap_witnesses": [],
+      "present_vkey_witness_count": 0,
+      "present_vkey_witnesses": [],
+      "required_signer_count": 2,
+      "required_signers": [
+        {
+          "hash": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+          "source": "tx_body.required_signers",
+          "witness_status": "missing"
+        },
+        {
+          "hash": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+          "source": "tx_body.required_signers",
+          "witness_status": "missing"
+        }
+      ]
+    },
     "withdrawals": [
       {
         "index": 0,
@@ -470,7 +522,10 @@ may render `metrics`, `claims`, `sections`, and `warnings` directly, while the
 additional structured fields (`metadata_claims`, `signing`, `value`,
 `features`, `withdrawals`, `effects`, and `context`) remain available for API
 consumers. Each `withdrawals[]` row exposes the serialized reward-account hex,
-its network and staking credential, and the withdrawn lovelace amount.
+its network and staking credential, and the withdrawn lovelace amount. Each
+`signing.required_signers[]` row exposes the declared signer hash, its source,
+and whether that signer is already covered by a vkey witness, a bootstrap
+witness, or still missing.
 When `context.producer_txs` resolves every regular input, `value.signer_lovelace`
 reports a known net ADA amount from resolved signer-controlled inputs minus
 signer-controlled outputs. Ownership is intentionally conservative: only output

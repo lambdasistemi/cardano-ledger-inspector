@@ -404,6 +404,10 @@ intentSummaryJson args tx =
         presentBootstrapHexes =
             keyHashHex . Keys.bootstrapWitKeyHash
                 <$> toList (wits ^. Core.bootAddrTxWitsL)
+        presentVKeyHexSet =
+            Set.fromList presentVKeyHexes
+        presentBootstrapHexSet =
+            Set.fromList presentBootstrapHexes
         presentSignerHexSet =
             Set.fromList (presentVKeyHexes <> presentBootstrapHexes)
         signerHexSet =
@@ -461,6 +465,11 @@ intentSummaryJson args tx =
                 (bucketCount SignerControlled outputValueBuckets)
                 (length resolvedInputOutputs)
                 (length outputs)
+        requiredSignerRows =
+            zipWith
+                (requiredSignerCoverageRowJson presentVKeyHexSet presentBootstrapHexSet)
+                [0 :: Int ..]
+                requiredSignerHexes
         intentEffects =
             [
                 ( "Consumes inputs"
@@ -549,6 +558,10 @@ intentSummaryJson args tx =
                         "No transaction effects reported."
                         (zipWith effectRowJson [0 :: Int ..] intentEffects)
                    , sectionJson
+                        "Declared required signers"
+                        "No declared required signers."
+                        requiredSignerRows
+                   , sectionJson
                         "Missing required signers"
                         "None missing."
                         (zipWith missingSignerRowJson [0 :: Int ..] missingSignerHexes)
@@ -557,8 +570,16 @@ intentSummaryJson args tx =
             , "signing"
                 .= Aeson.object
                     [ "required_signer_count" .= length requiredSignerHexes
+                    , "required_signers"
+                        .= map
+                            (requiredSignerCoverageJson presentVKeyHexSet presentBootstrapHexSet)
+                            requiredSignerHexes
                     , "present_vkey_witness_count" .= length presentVKeyHexes
+                    , "present_vkey_witnesses"
+                        .= map presentVKeyWitnessJson presentVKeyHexes
                     , "present_bootstrap_witness_count" .= length presentBootstrapHexes
+                    , "present_bootstrap_witnesses"
+                        .= map presentBootstrapWitnessJson presentBootstrapHexes
                     , "missing_vkey_witness_count" .= length missingSignerHexes
                     , "missing_vkey_witnesses" .= map missingSignerJson missingSignerHexes
                     ]
@@ -676,6 +697,20 @@ missingSignerRowJson index signerHash =
         signerHash
         "declared required signer not present in vkey or bootstrap witnesses"
 
+requiredSignerCoverageRowJson ::
+    Set.Set T.Text ->
+    Set.Set T.Text ->
+    Int ->
+    T.Text ->
+    Aeson.Value
+requiredSignerCoverageRowJson presentVKeyHexSet presentBootstrapHexSet index signerHash =
+    rowJson
+        "declared required signer"
+        signerHash
+        (encodePath ["intent", "signing", "required_signers", T.pack ("#" <> show index), "hash"])
+        signerHash
+        (requiredSignerCoverageDetail (signerWitnessStatus presentVKeyHexSet presentBootstrapHexSet signerHash))
+
 rowJson :: T.Text -> T.Text -> T.Text -> T.Text -> T.Text -> Aeson.Value
 rowJson label value path copyValue detail =
     Aeson.object
@@ -685,6 +720,37 @@ rowJson label value path copyValue detail =
         , "copyValue" .= copyValue
         , "detail" .= detail
         ]
+
+requiredSignerCoverageJson ::
+    Set.Set T.Text ->
+    Set.Set T.Text ->
+    T.Text ->
+    Aeson.Value
+requiredSignerCoverageJson presentVKeyHexSet presentBootstrapHexSet signerHash =
+    Aeson.object
+        [ "hash" .= signerHash
+        , "source" .= ("tx_body.required_signers" :: T.Text)
+        , "witness_status"
+            .= signerWitnessStatus presentVKeyHexSet presentBootstrapHexSet signerHash
+        ]
+
+signerWitnessStatus ::
+    Set.Set T.Text ->
+    Set.Set T.Text ->
+    T.Text ->
+    T.Text
+signerWitnessStatus presentVKeyHexSet presentBootstrapHexSet signerHash
+    | signerHash `Set.member` presentVKeyHexSet = "present_vkey"
+    | signerHash `Set.member` presentBootstrapHexSet = "present_bootstrap"
+    | otherwise = "missing"
+
+requiredSignerCoverageDetail :: T.Text -> T.Text
+requiredSignerCoverageDetail "present_vkey" =
+    "declared required signer already covered by a vkey witness"
+requiredSignerCoverageDetail "present_bootstrap" =
+    "declared required signer already covered by a bootstrap witness"
+requiredSignerCoverageDetail _ =
+    "declared required signer not present in vkey or bootstrap witnesses"
 
 data ValueBucket
     = SignerControlled
