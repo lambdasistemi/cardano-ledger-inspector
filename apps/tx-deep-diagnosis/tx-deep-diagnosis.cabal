@@ -26,6 +26,7 @@ library
     TxDeepDiagnosisHost.Diagnosis
     TxDeepDiagnosisHost.Registry
     TxDeepDiagnosisHost.Render.Doc
+    TxDeepDiagnosisHost.Render.Names
     TxDeepDiagnosisHost.Report
 
   build-depends:
