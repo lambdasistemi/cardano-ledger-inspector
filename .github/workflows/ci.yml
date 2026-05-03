@@ -196,7 +196,7 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix develop --quiet -c just format-check
+      - run: nix run --quiet .#format-check
 
   playwright:
     name: Playwright
@@ -208,4 +208,4 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix develop --quiet -c just test-playwright
+      - run: nix run --quiet .#test-playwright
