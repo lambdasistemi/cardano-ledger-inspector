@@ -9,6 +9,19 @@ Tx id: `30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f`
 - 6/6 producer txs resolved, network=mainnet
 - ledger validation: **invalid**
 
+## Observations
+
+Input parties (registry-resolved):
+
+- input #0 — **key d2626d** (`TruncatedHex`) — 50007239276 lovelace
+- input #1 — **Amaru Network Compliance treasury (0baa0d)** (`FromInstance`) — 1450000000000 lovelace
+
+Metadata-declared destinations (self-declared, _not verified against actual output addresses_):
+
+- _Network Compliance's treasury_
+
+Output addresses are not exposed by the diagnosis envelope at this layer; of the 12 outputs (11 under script credentials), whether any returns to a party listed above cannot be confirmed without per-output address data.
+
 ## Claims
 
 | Label | Value | Detail |
