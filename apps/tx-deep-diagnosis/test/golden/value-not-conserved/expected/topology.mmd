@@ -1,0 +1,36 @@
+%% L3 — full topology for tx 30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f
+flowchart TD
+    classDef body fill:#fffefa,stroke:#000,stroke-width:2px
+    classDef bodyFail fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
+    classDef inputNode fill:#f0f0f0,stroke:#666
+    classDef inputFail fill:#ffe6e6,stroke:#cc0000
+    classDef refInput fill:#f8f8f0,stroke:#999,stroke-dasharray:4 4
+    classDef collateral fill:#fff0f0,stroke:#aa6666
+    classDef bucket fill:#e6f0ff,stroke:#3366cc
+    classDef signer fill:#fff8dc,stroke:#cc9900
+    classDef signerFail fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
+    body["tx body\nfee 1043795 lovelace\nredeemers 2\nwithdrawals 1\nno mint/burn\ncollateral 1"]:::bodyFail
+    in0["input #0\nkey d2626d\n50007239276 lovelace"]:::inputNode
+    in0 --> body
+    in1["input #1\nAmaru Network Compliance treasury (0baa0d)\n1450000000000 lovelace"]:::inputNode
+    in1 --> body
+    out0["External key bucket\n1 outputs / 49897955481 lovelace"]:::bucket
+    body --> out0
+    out1["Script bucket\n11 outputs / 1162532800000 lovelace"]:::bucket
+    body --> out1
+    ref0["ref #0\n5a7350fe…35614365"]:::refInput
+    ref0 -. read .-> body
+    ref1["ref #1\nkey e15954"]:::refInput
+    ref1 -. read .-> body
+    ref2["ref #2\nkey e15954"]:::refInput
+    ref2 -. read .-> body
+    ref3["ref #3\nnetwork_compliance registry"]:::refInput
+    ref3 -. read .-> body
+    coll["collateral input"]:::collateral
+    coll -. fee guard .-> body
+    collret["collateral return"]:::collateral
+    body -. on script fail .-> collret
+    sig0["signer 8bd03209…b24fb1c1"]:::signerFail
+    sig0 -. required .-> body
+    sig1["signer f3ab64b0…04d23e2e"]:::signerFail
+    sig1 -. required .-> body
