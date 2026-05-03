@@ -68,3 +68,20 @@ executable tx-deep-diagnosis
 
   default-language: Haskell2010
   ghc-options:      -Wall
+
+executable tx-deep-diagnosis-render-snapshot
+  main-is:          Main.hs
+  hs-source-dirs:   snapshot
+  other-modules:    Paths_tx_deep_diagnosis
+  autogen-modules:  Paths_tx_deep_diagnosis
+  build-depends:
+    , aeson
+    , base                  >=4.18 && <5
+    , bytestring
+    , directory
+    , filepath
+    , text
+    , tx-deep-diagnosis
+
+  default-language: Haskell2010
+  ghc-options:      -Wall

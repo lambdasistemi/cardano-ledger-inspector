@@ -631,12 +631,24 @@
               evaluate-scripts-response.json wasi-evaluate-scripts-response.json \
               $out/
           '';
+
+          # Snapshot harness for the explain-artifact renderers. Walks
+          # apps/tx-deep-diagnosis/test/golden/<case>/ and asserts each
+          # produced artifact equals expected/<file> byte-for-byte. The
+          # binary calls only pure renderers — no ledger / no network.
+          tx-explain-render-smoke = pkgs.runCommand "tx-explain-render-smoke" { } ''
+            mkdir -p $out
+            ${hostTargets.tx-deep-diagnosis-render-snapshot}/bin/tx-deep-diagnosis-render-snapshot \
+              ${./apps/tx-deep-diagnosis/test/golden} \
+              | tee $out/snapshot.log
+          '';
         in
         {
           packages = {
             inherit (wasmTargets)
               wasm-smoke wasm-ledger-smoke wasm-tx-inspector wasm-extism-spike;
-            inherit (hostTargets) extism-spike-host libextism tx-deep-diagnosis;
+            inherit (hostTargets) extism-spike-host libextism
+              tx-deep-diagnosis tx-deep-diagnosis-render-snapshot;
             inherit
               ledger-functional-openapi
               ledger-functional-openapi-generated
@@ -655,7 +667,8 @@
               tx-input-context-smoke
               tx-validate-smoke
               tx-evaluate-scripts-smoke
-              tx-extism-spike-smoke;
+              tx-extism-spike-smoke
+              tx-explain-render-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
@@ -733,6 +746,8 @@
                 mkApp (mkSmokeApp "tx-input-context-smoke" tx-input-context-smoke);
               tx-extism-spike-smoke =
                 mkApp (mkSmokeApp "tx-extism-spike-smoke" tx-extism-spike-smoke);
+              tx-explain-render-smoke =
+                mkApp (mkSmokeApp "tx-explain-render-smoke" tx-explain-render-smoke);
               ledger-functional-openapi-check =
                 mkApp (mkSmokeApp "ledger-functional-openapi-check"
                   ledger-functional-openapi-check);
