@@ -773,6 +773,7 @@ validationContextSummaryJson
                 ]
                     <> optionalFields
 
+-- Cache-hit verification edit for issue #51.
 maybeTextField :: AesonKey.Key -> Maybe T.Text -> [(AesonKey.Key, Aeson.Value)]
 maybeTextField key =
     maybe [] (\value -> [key .= value])
