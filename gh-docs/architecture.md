@@ -9,28 +9,37 @@ flowchart TB
   Tx[Transaction CBOR]
   Context[Explicit context]
   Envelope[Operation envelope]
-  Inspector[Conway inspector library]
+  Inspector["libs/cardano-ledger-inspector<br/>(Conway inspector library)"]
   WASI[wasm-tx-inspector.wasm]
   Extism[wasm-extism-spike.wasm]
+  Native["apps/tx-deep-diagnosis<br/>(native binary linking the lib)"]
   UI[PureScript inspector UI]
-  Host[Host application]
+  ExtHost[apps/extism-spike-host]
   Ledger[Cardano ledger packages]
   JSON[JSON result]
 
-  Host --> Envelope
-  UI --> Envelope
   Tx --> Envelope
   Context --> Envelope
+  UI --> Envelope
+  ExtHost --> Envelope
+  Native --> Envelope
   Envelope --> WASI
   Envelope --> Extism
+  Envelope --> Inspector
   WASI --> Inspector
   Extism --> Inspector
   Inspector --> Ledger
   Ledger --> Inspector
   Inspector --> JSON
-  JSON --> Host
   JSON --> UI
+  JSON --> ExtHost
+  JSON --> Native
 ```
+
+The same `cardano-ledger-inspector` Haskell library is compiled three ways:
+to wasm32-wasi (loaded by the browser), to wasm32-wasi as an Extism plugin,
+and natively (linked into `apps/tx-deep-diagnosis`). Every consumer talks to
+the same dispatcher and gets the same JSON contract.
 
 ## Layers
 
@@ -41,11 +50,21 @@ fetching or accepting transaction CBOR, managing local browser state, invoking
 the WASI module, and presenting operation results. The browser bundle embeds
 the built `wasm-tx-inspector.wasm` artifact at build time.
 
+### Inspector library
+
+`libs/cardano-ledger-inspector/` is the canonical Haskell library. Modules
+under `src/Conway/Inspector*` decode Conway transaction CBOR via the upstream
+`cardano-ledger-conway` packages, run `applyTx`, evaluate Plutus scripts, and
+return typed JSON results behind a single dispatcher entry
+(`runLedgerOperationInput`). Three executables compile this library to
+different targets, all from the same source.
+
 ### WASI Layer
 
-`nix/wasm/tx-inspector/` contains the Haskell executable compiled to
-`wasm32-wasi`. It reads operation requests from stdin and emits JSON. The
-browser loads the executable with `@bjorn3/browser_wasi_shim`.
+The library's `app/Main.hs` is a 25-line WASI reactor that reads one JSON
+envelope from stdin and writes one JSON response. Its wasm build, configured
+by `libs/cardano-ledger-inspector/cabal-wasm.project`, produces
+`wasm-tx-inspector.wasm`. The browser loads it with `@bjorn3/browser_wasi_shim`.
 
 ### Extism Layer
 
@@ -55,16 +74,27 @@ plugin. The exported functions are operation entry points such as
 same JSON envelope as the WASI reactor and delegates to the shared inspector
 dispatcher.
 
-`nix/host/extism-spike-host/` is a native Haskell host used for conformance
-checks. It links the prebuilt `libextism` runtime from `nix/host/libextism.nix`
-because the current nixpkgs `extism-cli` path is blocked by wazero tail-call
-support.
+`apps/extism-spike-host/` is a native Haskell host used for conformance checks.
+It links the prebuilt `libextism` runtime from `nix/host/libextism.nix` because
+the current nixpkgs `extism-cli` path is blocked by wazero tail-call support.
+
+### Native CLI Layer
+
+`apps/tx-deep-diagnosis/` is a native Haskell host that links the inspector
+library directly (no wasm in the loop). It calls
+`Conway.Inspector.runLedgerOperationInput` for `tx.intent` and `tx.validate`,
+adds Blockfrost producer-tx resolution, and labels script hashes against
+vendored CIP-57 blueprints + the Amaru deployment journal under
+`docs/inspector/protocols/`. Built via `pkgs.haskell-nix.cabalProject'` with
+CHaP and the same GHC 9.8.4 setup the cardano-mpfs-offchain project uses.
 
 ### Ledger Layer
 
-The Haskell executable depends on Cardano ledger packages and uses those APIs
-for transaction decoding and operations. This keeps the browser tool aligned
-with ledger behavior instead of maintaining a second transaction model.
+`cardano-ledger-conway`, `cardano-ledger-api`, `plutus-ledger-api` and friends
+provide all transaction-decoding and validation logic. Both the wasm and native
+builds of the inspector library link the same versions (pinned via CHaP). This
+keeps every consumer aligned with ledger behaviour instead of maintaining a
+second transaction model.
 
 ## State Model
 
@@ -121,6 +151,7 @@ per-system `pkgs`, `ghc-wasm-meta`, CHaP source, and target source tree into
 | `packages.<system>.wasm-tx-inspector` | `wasm-tx-inspector.wasm` | Main WASI functional layer module. It reads one JSON envelope from stdin and writes one JSON response. |
 | `packages.<system>.wasm-extism-spike` | `wasm-extism-spike.wasm` | Extism PDK plugin exposing the same ledger operation contract through named exports. |
 | `packages.<system>.extism-spike-host` | Native executable `extism-spike-host` | Wasmtime-backed host used to call the Extism plugin in checks. |
+| `packages.<system>.tx-deep-diagnosis` | Native executable `tx-deep-diagnosis` | Native CLI that links the inspector library, resolves inputs via Blockfrost, and labels script hashes against vendored blueprints + the Amaru journal. Produces a layered diagnosis report. |
 | `packages.<system>.libextism` | Native `libextism` library and headers | Prebuilt Extism runtime used by the native host package. |
 | `packages.<system>.tx-inspector-ui` | `index.html`, `index.js` | Browser workbench bundle. The WASI inspector bytes are embedded during the PureScript/esbuild build. |
 | `packages.<system>.ledger-functional-openapi-generated` | Generated `cardano-ledger-functional.openapi.json` | Deterministic OpenAPI JSON generated from the Nix source definition. |
