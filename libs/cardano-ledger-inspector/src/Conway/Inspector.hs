@@ -19,6 +19,7 @@ module Conway.Inspector (
 ) where
 
 import qualified Cardano.Ledger.Address as Addr
+import qualified Cardano.Ledger.Alonzo.Scripts as AlonzoScripts
 import qualified Cardano.Ledger.Api as L
 import qualified Cardano.Ledger.BaseTypes as BaseTypes
 import qualified Cardano.Ledger.Coin as Coin
@@ -606,6 +607,7 @@ intentSummaryJson args tx =
                     , "has_collateral_return" .= hasStrictMaybe (body ^. L.collateralReturnTxBodyL)
                     , "has_total_collateral" .= hasStrictMaybe (body ^. L.totalCollateralTxBodyL)
                     ]
+            , "scripts" .= map (redeemerEntryJson inputs) redeemers
             , "effects" .= map intentEffect intentEffects
             , "context"
                 .= contextSummaryJson
@@ -728,6 +730,65 @@ txOutBucketTotals signerHashes txOuts =
 txOutAddressHex :: L.TxOut Conway.ConwayEra -> T.Text
 txOutAddressHex txOut =
     T.decodeUtf8 (B16.encode (Addr.serialiseAddr (txOut ^. L.addrTxOutL)))
+
+{- | One row per redeemer in @intent.scripts[]@. Captures purpose,
+target description, the redeemer's own CBOR (so consumers can decode
+order parameters etc.), and ex_units committed.
+
+Targets are described with as much detail as the @AsIx@ tag allows:
+spending purposes resolve through the canonical input ordering to
+emit the @TxIn@; minting purposes carry the policy id; cert / vote
+/ propose / reward purposes carry the index plus the type. Decoding
+the typed item from the index needs the producer-tx context for
+spending and the body for the others; this output gives the reader
+enough to find the target without re-running the inspector.
+-}
+redeemerEntryJson ::
+    [TxIn.TxIn] ->
+    (ConwayScripts.ConwayPlutusPurpose AlonzoScripts.AsIx Conway.ConwayEra, (PData.Data Conway.ConwayEra, ExUnits.ExUnits)) ->
+    Aeson.Value
+redeemerEntryJson canonicalInputs (purpose, (datum, exu)) =
+    Aeson.object
+        ( purposeFields
+            <> [ "redeemer_cbor_hex"
+                    .= T.decodeUtf8 (B16.encode (Hashes.originalBytes datum))
+               ,
+                   ( "ex_units_committed"
+                   , Aeson.object
+                        [ "memory" .= T.pack (show (ExUnits.exUnitsMem exu))
+                        , "steps" .= T.pack (show (ExUnits.exUnitsSteps exu))
+                        ]
+                   )
+               ]
+        )
+  where
+    purposeFields = case purpose of
+        ConwayScripts.ConwaySpending (AlonzoScripts.AsIx ix) ->
+            [ "purpose" .= ("spending" :: T.Text)
+            , "index" .= ix
+            , "input"
+                .= maybe Aeson.Null txInJson (listAt (fromIntegral ix) canonicalInputs)
+            ]
+        ConwayScripts.ConwayMinting (AlonzoScripts.AsIx ix) ->
+            [ "purpose" .= ("minting" :: T.Text)
+            , "index" .= ix
+            ]
+        ConwayScripts.ConwayCertifying (AlonzoScripts.AsIx ix) ->
+            [ "purpose" .= ("certifying" :: T.Text)
+            , "index" .= ix
+            ]
+        ConwayScripts.ConwayRewarding (AlonzoScripts.AsIx ix) ->
+            [ "purpose" .= ("rewarding" :: T.Text)
+            , "index" .= ix
+            ]
+        ConwayScripts.ConwayVoting (AlonzoScripts.AsIx ix) ->
+            [ "purpose" .= ("voting" :: T.Text)
+            , "index" .= ix
+            ]
+        ConwayScripts.ConwayProposing (AlonzoScripts.AsIx ix) ->
+            [ "purpose" .= ("proposing" :: T.Text)
+            , "index" .= ix
+            ]
 
 {- | Per-output detail emitted under @intent.value.outputs[]@. Adds
 @index@ + @bucket@ to the existing 'txOutJson' shape so consumers can
