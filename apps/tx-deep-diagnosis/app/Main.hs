@@ -68,7 +68,9 @@ main = do
         execParser
             ( info
                 (parseOpts <**> helper)
-                (progDesc "Layered Conway tx diagnosis using cardano-ledger-conway via cardano-ledger-inspector library")
+                ( progDesc
+                    "Layered Conway tx diagnosis using cardano-ledger-conway via cardano-ledger-inspector library"
+                )
             )
     pidFromEnv <- lookupEnv "BLOCKFROST_PROJECT_ID"
     let mpid = fmap Text.pack (optProjectId opts) <|> fmap Text.pack pidFromEnv
@@ -78,24 +80,58 @@ main = do
         Left e -> die ("intent error: " <> e)
         Right v -> pure v
     mgr <- newTlsManager
-    let producerHashes = extractProducerHashes intent
-    producerCbors <- case mpid of
+    -- Phase 1: probe validate with no context to discover what producer
+    -- txs + which validation-context fields the validator needs.
+    probe <- case runValidate hex emptyContext of
+        Left e -> die ("validate probe error: " <> e)
+        Right v -> pure v
+    let producerHashes = extractProducerTxIds probe
+    -- Phase 2: fetch producer CBORs + latest block + protocol params.
+    (producerCbors, mLatest, mPParams) <- case mpid of
         Nothing -> do
             hPutStrLn
                 stderr
-                "WARNING: no Blockfrost project_id; tx.validate will run with empty context."
-            pure Map.empty
+                "WARNING: no Blockfrost project_id; tx.validate will run with empty context (only the probe response is shown)."
+            pure (Map.empty, Nothing, Nothing)
         Just pid -> do
             entries <- mapM (fetchProducer mgr (optNetwork opts) pid) producerHashes
-            pure (Map.fromList [(h, c) | (h, Right c) <- entries])
-    validate <- case runValidate hex producerCbors of
+            let prods =
+                    Map.fromList
+                        [(h, c) | (h, Right c) <- entries]
+            mLb <- fetchLatestBlock mgr (optNetwork opts) pid
+            mPp <- fetchProtocolParametersJson mgr (optNetwork opts) pid
+            case (mLb, mPp) of
+                (Right lb, Right pp) ->
+                    pure (prods, Just lb, Just (remapPParamsToLedger pp))
+                (lbErr, ppErr) -> do
+                    case lbErr of
+                        Left e -> hPutStrLn stderr ("blocks/latest fetch failed: " <> e)
+                        _ -> pure ()
+                    case ppErr of
+                        Left e -> hPutStrLn stderr ("protocol-parameters fetch failed: " <> e)
+                        _ -> pure ()
+                    pure (prods, Nothing, Nothing)
+    -- Phase 3: validate again with everything we collected.
+    let fullCtx =
+            ValidationContext
+                { vcProducerTxs = producerCbors
+                , vcNetwork = Just (networkLedgerName (optNetwork opts))
+                , vcSlot = fmap lbSlot mLatest
+                , vcEpoch = fmap lbEpoch mLatest
+                , vcProtocolParameters = mPParams
+                }
+    validate <- case runValidate hex fullCtx of
         Left e -> die ("validate error: " <> e)
         Right v -> pure v
     TIO.putStr
         ( renderTopLevel
             ( "tx-deep-diagnosis  ("
                 <> Text.pack (show (Map.size producerCbors))
-                <> " producer txs resolved)"
+                <> "/"
+                <> Text.pack (show (length producerHashes))
+                <> " producer txs resolved, network="
+                <> networkLedgerName (optNetwork opts)
+                <> ")"
             )
             intent
             validate
@@ -113,6 +149,3 @@ fetchProducer mgr net pid h = do
                 stderr
                 ("producer fetch failed for " <> Text.unpack h <> ": " <> e)
             pure (h, Left e)
-
-extractProducerHashes :: Aeson.Value -> [Text]
-extractProducerHashes _ = []
