@@ -4,26 +4,34 @@ module TxDeepDiagnosisHost.Blockfrost (
     Network (..),
     networkBaseUrl,
     networkLedgerName,
+    CredentialKind (..),
     ResolvedOutput (..),
     ResolvedAsset (..),
     LatestBlock (..),
+    AccountInfo (..),
     fetchTxUtxos,
     fetchTxCbor,
     fetchOutputAtIndex,
     fetchLatestBlock,
     fetchProtocolParametersJson,
+    fetchAccountInfo,
     remapPParamsToLedger,
+    stakeAddressBech32,
 ) where
 
+import qualified Codec.Binary.Bech32 as Bech32
 import Control.Exception (SomeException, try)
 import Data.Aeson (FromJSON (..), eitherDecode, withObject, (.!=), (.:), (.:?))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
+import Data.Word (Word8)
 import Network.HTTP.Client
 import Network.HTTP.Types.Header (hAccept)
 import Network.HTTP.Types.Status (statusCode)
@@ -263,6 +271,97 @@ remapPParamsToLedger raw = case raw of
     numberOrNull (Just v@(A.Number _)) = v
     numberOrNull (Just A.Null) = A.Null
     numberOrNull (Just other) = other
+
+{- | Whether a stake credential is a key hash or a script hash. The
+ encoding only differs in one bit of the address header byte.
+-}
+data CredentialKind = KeyCred | ScriptCred
+    deriving (Eq, Show)
+
+{- | The handful of fields the deep-diagnosis tool needs from
+ @GET /accounts/{stake_address}@. Other fields (delegation,
+ rewards_sum, controlled_amount, …) are intentionally ignored.
+-}
+data AccountInfo = AccountInfo
+    { aiActive :: !Bool
+    -- ^ Whether the credential is currently delegated to a stake pool.
+    -- For trigger-only stake scripts (SundaeSwap, Indigo, …) this is
+    -- usually @false@ even when the account is fully registered and
+    -- usable as a withdraw-zero target — they never delegate ADA.
+    , aiRegistered :: !Bool
+    -- ^ Whether the credential has *ever* been registered. This is the
+    -- field that matters for the CERTS withdrawal rule: a registered
+    -- account exists in the rewards map (with whatever balance) and
+    -- can be the target of a withdrawal; an unregistered credential
+    -- cannot.
+    , aiWithdrawableLovelace :: !Integer
+    -- ^ Current rewards balance in lovelace. The withdrawal in the tx
+    -- body must equal this exactly (typically 0 for withdraw-zero
+    -- triggers).
+    }
+    deriving (Show)
+
+instance FromJSON AccountInfo where
+    parseJSON = withObject "AccountInfo" $ \o -> do
+        active <- o .: "active"
+        registered <- o .:? "registered" .!= active
+        wd <- o .: "withdrawable_amount"
+        n <- case Text.unpack wd of
+            s -> case reads s of
+                [(n, "")] -> pure n
+                _ -> fail ("bad withdrawable_amount: " <> s)
+        pure
+            AccountInfo
+                { aiActive = active
+                , aiRegistered = registered
+                , aiWithdrawableLovelace = n
+                }
+
+{- | Fetch the account state for the given bech32 stake address. Use
+ 'stakeAddressBech32' to derive the address from a credential.
+-}
+fetchAccountInfo ::
+    Manager -> Network -> Text -> Text -> IO (Either String AccountInfo)
+fetchAccountInfo mgr net pid stake = do
+    let url = networkBaseUrl net <> "/accounts/" <> stake
+    eBody <- callBlockfrost mgr url pid
+    pure $ case eBody of
+        Left e -> Left e
+        Right body -> case eitherDecode body of
+            Left e -> Left ("JSON decode error: " <> e)
+            Right info -> Right info
+
+{- | Encode a stake credential as a bech32 stake address suitable for the
+  @GET /accounts/{stake_address}@ endpoint.
+
+  > header_byte = 0xe1 (mainnet, key)   | 0xf1 (mainnet, script)
+  >             | 0xe0 (testnet, key)   | 0xf0 (testnet, script)
+  > address     = header_byte || 28-byte credential hash
+  > hrp         = "stake" (mainnet)     | "stake_test" (testnet)
+-}
+stakeAddressBech32 ::
+    Network -> CredentialKind -> Text -> Either String Text
+stakeAddressBech32 net kind hashHex = do
+    bytes <- case B16.decode (TE.encodeUtf8 hashHex) of
+        Right bs -> Right bs
+        Left err -> Left ("hash hex decode failed: " <> err)
+    if BS.length bytes /= 28
+        then Left ("expected 28 bytes for credential hash, got " <> show (BS.length bytes))
+        else
+            let header :: Word8
+                header = case (net, kind) of
+                    (Mainnet, KeyCred) -> 0xe1
+                    (Mainnet, ScriptCred) -> 0xf1
+                    (_, KeyCred) -> 0xe0
+                    (_, ScriptCred) -> 0xf0
+                payload = BS.cons header bytes
+                hrpText = case net of
+                    Mainnet -> "stake"
+                    _ -> "stake_test"
+             in case Bech32.humanReadablePartFromText hrpText of
+                    Left err -> Left ("bad hrp: " <> show err)
+                    Right hrp ->
+                        Right (Bech32.encodeLenient hrp (Bech32.dataPartFromBytes payload))
 
 callBlockfrost :: Manager -> Text -> Text -> IO (Either String BSL.ByteString)
 callBlockfrost mgr url pid = do
