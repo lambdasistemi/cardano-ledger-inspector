@@ -4,6 +4,7 @@ module Main (main) where
 
 import Control.Applicative ((<|>))
 import qualified Data.Aeson as Aeson
+import Data.Maybe (fromMaybe)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -11,6 +12,7 @@ import qualified Data.Text.IO as TIO
 import Network.HTTP.Client (Manager)
 import Network.HTTP.Client.TLS (newTlsManager)
 import Options.Applicative
+import qualified Paths_tx_deep_diagnosis as Paths
 import System.Environment (lookupEnv)
 import System.Exit (die)
 import System.IO (hPutStrLn, stderr)
@@ -22,7 +24,7 @@ import TxDeepDiagnosisHost.Report (renderTopLevel)
 
 data Options = Options
     { optCborFile :: !FilePath
-    , optRegistryDir :: !FilePath
+    , optRegistryDir :: !(Maybe FilePath)
     , optNetwork :: !Network
     , optProjectId :: !(Maybe String)
     }
@@ -35,11 +37,15 @@ parseOpts =
                 <> metavar "FILE"
                 <> help "Path to a file containing the Conway tx CBOR hex"
             )
-        <*> strOption
-            ( long "registry"
-                <> metavar "DIR"
-                <> value "docs/inspector/protocols"
-                <> help "Path to the protocol registry directory"
+        <*> optional
+            ( strOption
+                ( long "registry"
+                    <> metavar "DIR"
+                    <> help
+                        ( "Path to the protocol registry directory "
+                            <> "(default: the registry vendored into this binary at build time)"
+                        )
+                )
             )
         <*> option
             parseNet
@@ -75,7 +81,9 @@ main = do
     pidFromEnv <- lookupEnv "BLOCKFROST_PROJECT_ID"
     let mpid = fmap Text.pack (optProjectId opts) <|> fmap Text.pack pidFromEnv
     hex <- Text.strip <$> TIO.readFile (optCborFile opts)
-    reg <- loadRegistry (optRegistryDir opts)
+    bundledRegistry <- Paths.getDataDir
+    let registryDir = fromMaybe bundledRegistry (optRegistryDir opts)
+    reg <- loadRegistry registryDir
     intent <- case runIntent hex of
         Left e -> die ("intent error: " <> e)
         Right v -> pure v

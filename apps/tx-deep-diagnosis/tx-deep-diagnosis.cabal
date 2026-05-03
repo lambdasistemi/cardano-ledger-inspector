@@ -6,6 +6,19 @@ author:        lambdasistemi
 license:       Apache-2.0
 build-type:    Simple
 
+-- The protocol registry travels with the binary so 'nix run' from
+-- anywhere finds the script-hash labels without needing a local
+-- checkout. Resolved at runtime via Paths_tx_deep_diagnosis.getDataDir.
+data-dir:      ../../docs/inspector/protocols
+data-files:
+    registry.json
+    amaru-treasury/journal-2026.json
+    amaru-treasury/pin.json
+    sundaeswap-v3/plutus.json
+    sundaeswap-v3/pin.json
+    sundaeswap-treasury-v3/plutus.json
+    sundaeswap-treasury-v3/pin.json
+
 library
   hs-source-dirs:   src
   exposed-modules:
@@ -36,6 +49,8 @@ library
 executable tx-deep-diagnosis
   main-is:          Main.hs
   hs-source-dirs:   app
+  other-modules:    Paths_tx_deep_diagnosis
+  autogen-modules:  Paths_tx_deep_diagnosis
   build-depends:
     , aeson
     , base                  >=4.18 && <5
