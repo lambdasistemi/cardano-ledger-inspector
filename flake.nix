@@ -636,7 +636,8 @@
           # apps/tx-deep-diagnosis/test/golden/<case>/ and asserts each
           # produced artifact equals expected/<file> byte-for-byte. The
           # binary calls only pure renderers — no ledger / no network.
-          tx-explain-render-smoke = pkgs.runCommand "tx-explain-render-smoke" { } ''
+          tx-explain-render-smoke = pkgs.runCommand "tx-explain-render-smoke"
+            { LANG = "C.UTF-8"; LC_ALL = "C.UTF-8"; } ''
             mkdir -p $out
             ${hostTargets.tx-deep-diagnosis-render-snapshot}/bin/tx-deep-diagnosis-render-snapshot \
               ${./apps/tx-deep-diagnosis/test/golden} \
