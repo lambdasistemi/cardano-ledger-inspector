@@ -688,6 +688,11 @@ data ValueBucketTotals = ValueBucketTotals
     , vbtCount :: Int
     , vbtLovelace :: Integer
     , vbtAssetCount :: Int
+    , vbtAddresses :: [T.Text]
+    -- ^ Sorted, de-duplicated hex addresses contributing to this
+    -- bucket. Lets consumers verify metadata-declared destinations
+    -- ('Network Compliance treasury' etc.) against the actual output
+    -- addresses without re-running the inspector.
     }
 
 txOutBucketTotals ::
@@ -701,12 +706,24 @@ txOutBucketTotals signerHashes txOuts =
     bucketTotals bucket =
         let matching =
                 filter ((== bucket) . txOutValueBucket signerHashes) txOuts
+            addrs =
+                Set.toAscList
+                    ( Set.fromList
+                        [ txOutAddressHex out
+                        | out <- matching
+                        ]
+                    )
          in ValueBucketTotals
                 { vbtBucket = bucket
                 , vbtCount = length matching
                 , vbtLovelace = sum (txOutLovelace <$> matching)
                 , vbtAssetCount = sum (txOutAssetCount <$> matching)
+                , vbtAddresses = addrs
                 }
+
+txOutAddressHex :: L.TxOut Conway.ConwayEra -> T.Text
+txOutAddressHex txOut =
+    T.decodeUtf8 (B16.encode (Addr.serialiseAddr (txOut ^. L.addrTxOutL)))
 
 allValueBuckets :: [ValueBucket]
 allValueBuckets =
@@ -841,6 +858,7 @@ valueBucketJson totals =
         , "tx_out_count" .= vbtCount totals
         , "lovelace" .= T.pack (show (vbtLovelace totals))
         , "asset_class_count" .= vbtAssetCount totals
+        , "addresses" .= vbtAddresses totals
         ]
 
 valueBucketName :: ValueBucket -> T.Text

@@ -36,6 +36,7 @@ import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
 import TxDeepDiagnosisHost.Render.Names (
     PartyName (..),
+    PartySource (..),
     resolveAddress,
  )
 
@@ -135,49 +136,35 @@ does not actually expose.
 observationsSection :: ProtocolRegistry -> DiagnosisDoc -> Text
 observationsSection reg doc =
     let inParties = inputParties reg doc
+        outParties = outputParties reg doc
         metaDestinations = metadataDestinations doc
-        outputCount = countOutputs doc
-        scriptOutputs = scriptOutputCount doc
+        crossover = inputOutputOverlap inParties outParties
         body =
             Text.concat
                 [ "Input parties (registry-resolved):\n\n"
                 , bulletList (map renderParty inParties)
                 , "\n"
+                , "Output parties (registry-resolved, from `intent.value.output_buckets[].addresses`):\n\n"
+                , bulletList (map renderOutputParty outParties)
+                , "\n"
                 , metaSection metaDestinations
-                , outputsObservation outputCount scriptOutputs
+                , crossoverSection crossover
                 ]
-     in if null inParties && null metaDestinations
+     in if null inParties && null outParties && null metaDestinations
             then ""
             else "## Observations\n\n" <> body
   where
     metaSection [] = ""
     metaSection ds =
-        "Metadata-declared destinations (self-declared, "
-            <> "_not verified against actual output addresses_):\n\n"
+        "Metadata-declared destination(s) (`self_declared`):\n\n"
             <> bulletList (map (\d -> "_" <> d <> "_") ds)
             <> "\n"
-    outputsObservation total scriptN =
-        let prelude =
-                "Output addresses are not exposed by the diagnosis "
-                    <> "envelope at this layer; "
-         in case (total, scriptN) of
-                (Nothing, _) -> ""
-                (Just t, _) ->
-                    prelude
-                        <> "of the "
-                        <> Text.pack (show t)
-                        <> " outputs"
-                        <> ( case scriptN of
-                                Just s
-                                    | s > 0 ->
-                                        " ("
-                                            <> Text.pack (show s)
-                                            <> " under script credentials)"
-                                _ -> ""
-                           )
-                        <> ", whether any returns to a party listed above "
-                        <> "cannot be confirmed without per-output address "
-                        <> "data.\n\n"
+    crossoverSection [] = ""
+    crossoverSection ms =
+        "Inputs that also receive outputs (same payment credential on "
+            <> "both sides):\n\n"
+            <> bulletList ms
+            <> "\n"
 
 bulletList :: [Text] -> Text
 bulletList = Text.concat . map (\x -> "- " <> x <> "\n")
@@ -194,9 +181,71 @@ renderParty (i, lov, pn) =
         <> lov
         <> " lovelace"
 
+renderOutputParty :: (Text, PartyName) -> Text
+renderOutputParty (bucket, pn) =
+    bucket
+        <> " bucket → **"
+        <> pnLabel pn
+        <> "** (`"
+        <> partySource pn
+        <> "`)"
+
 partySource :: PartyName -> Text
-partySource pn = case pnSource pn of
-    _ -> Text.pack (show (pnSource pn))
+partySource pn = Text.pack (show (pnSource pn))
+
+{- | Output parties extracted from
+@intent.value.output_buckets[].addresses[]@. One row per (bucket,
+address); duplicates collapsed by 'pnLabel' to keep the list short
+when many script outputs share a contract.
+-}
+outputParties :: ProtocolRegistry -> DiagnosisDoc -> [(Text, PartyName)]
+outputParties reg doc =
+    let path = ["result", "intent", "value", "output_buckets"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+        bucketEntries =
+            [ (label, addrs)
+            | Object o <- items
+            , Just (String label) <- [KeyMap.lookup "label" o]
+            , Just (Array as) <- [KeyMap.lookup "addresses" o]
+            , let addrs = [a | String a <- V.toList as]
+            ]
+     in dedupByLabel
+            [ (b, resolveAddress reg a)
+            | (b, addrs) <- bucketEntries
+            , a <- addrs
+            ]
+
+dedupByLabel :: [(Text, PartyName)] -> [(Text, PartyName)]
+dedupByLabel =
+    foldr keep []
+  where
+    keep x acc
+        | any (\y -> fst x == fst y && pnLabel (snd x) == pnLabel (snd y)) acc =
+            acc
+        | otherwise = x : acc
+
+{- | Pairs of (input-party label, "appears in output bucket B") where
+the input's resolved party label also shows up in an output bucket's
+addresses. The match is on registry-resolved label, so a treasury
+that owns both input and output is detected even if its addresses use
+different stake credentials.
+-}
+inputOutputOverlap :: [(Int, Text, PartyName)] -> [(Text, PartyName)] -> [Text]
+inputOutputOverlap inputs outputs =
+    [ "input #"
+        <> Text.pack (show i)
+        <> " — **"
+        <> pnLabel ipn
+        <> "** also appears as a destination in the **"
+        <> bucket
+        <> "** output bucket"
+    | (i, _, ipn) <- inputs
+    , pnSource ipn /= TruncatedHex
+    , (bucket, opn) <- outputs
+    , pnLabel ipn == pnLabel opn
+    ]
 
 inputParties :: ProtocolRegistry -> DiagnosisDoc -> [(Int, Text, PartyName)]
 inputParties reg doc =

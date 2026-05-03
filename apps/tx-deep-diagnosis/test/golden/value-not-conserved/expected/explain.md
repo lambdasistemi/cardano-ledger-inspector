@@ -16,11 +16,19 @@ Input parties (registry-resolved):
 - input #0 — **key d2626d** (`TruncatedHex`) — 50007239276 lovelace
 - input #1 — **Amaru Network Compliance treasury (0baa0d)** (`FromInstance`) — 1450000000000 lovelace
 
-Metadata-declared destinations (self-declared, _not verified against actual output addresses_):
+Output parties (registry-resolved, from `intent.value.output_buckets[].addresses`):
+
+- External key bucket → **key d2626d** (`TruncatedHex`)
+- Script bucket → **Amaru Network Compliance treasury (0baa0d)** (`FromInstance`)
+- Script bucket → **SundaeSwap V3 order** (`FromValidator`)
+
+Metadata-declared destination(s) (`self_declared`):
 
 - _Network Compliance's treasury_
 
-Output addresses are not exposed by the diagnosis envelope at this layer; of the 12 outputs (11 under script credentials), whether any returns to a party listed above cannot be confirmed without per-output address data.
+Inputs that also receive outputs (same payment credential on both sides):
+
+- input #1 — **Amaru Network Compliance treasury (0baa0d)** also appears as a destination in the **Script** output bucket
 
 ## Claims
 
