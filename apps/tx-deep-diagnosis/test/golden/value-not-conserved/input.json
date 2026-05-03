@@ -163,6 +163,30 @@
               "value": "No mint/burn"
             }
           ],
+          "scripts": [
+            {
+              "ex_units_committed": {
+                "memory": "609151",
+                "steps": "242364094"
+              },
+              "index": 1,
+              "input": {
+                "index": 0,
+                "tx_id": "64f27254f3c0311fb2e672cdb87de200089a596aa90dc09f8be4248540267cf0"
+              },
+              "purpose": "spending",
+              "redeemer_cbor_hex": "d87c9fa140a1401b0000005f086d2b1aff"
+            },
+            {
+              "ex_units_committed": {
+                "memory": "206629",
+                "steps": "66382393"
+              },
+              "index": 0,
+              "purpose": "rewarding",
+              "redeemer_cbor_hex": "80"
+            }
+          ],
           "sections": [
             {
               "empty": "No signer value perspective available.",
@@ -335,6 +359,148 @@
               }
             ],
             "output_lovelace": "1212430755481",
+            "outputs": [
+              {
+                "address_hex": "3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "1041836734694",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 0
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 1
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 2
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 3
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 4
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 5
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 6
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 7
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 8
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "12503280000",
+                "datum": {
+                  "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000001e6918b1aff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1a77359400ffffd87980ff",
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                },
+                "index": 9
+              },
+              {
+                "address_hex": "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "bucket": "script",
+                "coin_lovelace": "8166545306",
+                "datum": {
+                  "kind": "no_datum"
+                },
+                "index": 10
+              },
+              {
+                "address_hex": "01dea7197ac235d73e7f7b1a249bace6a833722415d88e91dec5d2626dbc1597ad71c55d2d009a9274b3831ded155118dd769f5376decc1369",
+                "assets": {},
+                "bucket": "external_key",
+                "coin_lovelace": "49897955481",
+                "datum": {
+                  "kind": "no_datum"
+                },
+                "index": 11
+              }
+            ],
             "resolved_input_buckets": [],
             "resolved_input_count": 0,
             "resolved_input_lovelace": "0",

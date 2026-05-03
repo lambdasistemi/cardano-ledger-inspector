@@ -70,6 +70,8 @@ renderSummaryMarkdown reg doc files =
         [ titleSection doc
         , verdictSection doc
         , observationsSection reg doc
+        , scriptsSection reg doc
+        , outputsSection reg doc
         , claimsSection doc
         , effectsSection doc
         , failuresSection doc
@@ -297,6 +299,145 @@ scriptOutputCount doc =
      in case scriptB of
             (n : _) -> Just n
             [] -> Nothing
+
+{- | Per-output table from @intent.value.outputs[]@. Lets the reader
+see exactly how a script bucket's lovelace splits across individual
+outputs and which datum (by hash or by inline cbor preview)
+parameterises each one. Critical for swap analysis: SundaeSwap V3
+order outputs encode min-receive amounts and beneficiaries in their
+inline datums.
+-}
+outputsSection :: ProtocolRegistry -> DiagnosisDoc -> Text
+outputsSection reg doc =
+    let path = ["result", "intent", "value", "outputs"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+     in if null items
+            then ""
+            else
+                "## Outputs\n\n"
+                    <> "| # | Bucket | Destination | ADA | Datum |\n"
+                    <> "|---|--------|-------------|----:|-------|\n"
+                    <> Text.concat (map (renderOutputRow reg) items)
+                    <> "\n"
+
+renderOutputRow :: ProtocolRegistry -> Value -> Text
+renderOutputRow reg v = case v of
+    Object o ->
+        let idx = case KeyMap.lookup "index" o of
+                Just (Number n) -> Text.pack (show (floor n :: Int))
+                _ -> "?"
+            bucket = case KeyMap.lookup "bucket" o of
+                Just (String s) -> s
+                _ -> ""
+            addr = case KeyMap.lookup "address_hex" o of
+                Just (String s) -> s
+                _ -> ""
+            party = pnLabel (resolveAddress reg addr)
+            lov = case KeyMap.lookup "coin_lovelace" o of
+                Just (String s) -> s
+                _ -> "0"
+            ada = formatAdaSimple (parseLov lov)
+            datumCell = case KeyMap.lookup "datum" o of
+                Just (Object d) -> renderDatumCell d
+                _ -> ""
+         in "| "
+                <> idx
+                <> " | "
+                <> escapeTable bucket
+                <> " | "
+                <> escapeTable party
+                <> " | "
+                <> ada
+                <> " | "
+                <> escapeTable datumCell
+                <> " |\n"
+    _ -> ""
+
+renderDatumCell :: KeyMap.KeyMap Value -> Text
+renderDatumCell d = case KeyMap.lookup "kind" d of
+    Just (String "no_datum") -> "—"
+    Just (String "datum_hash") -> case KeyMap.lookup "hash" d of
+        Just (String h) -> "hash `" <> Text.take 10 h <> "…`"
+        _ -> "hash"
+    Just (String "inline_datum") -> case KeyMap.lookup "cbor_hex" d of
+        Just (String h) -> "inline `" <> Text.take 14 h <> "…` (" <> Text.pack (show (Text.length h `div` 2)) <> "B)"
+        _ -> "inline"
+    _ -> ""
+
+parseLov :: Text -> Integer
+parseLov t = case reads (Text.unpack t) of
+    [(n, "")] -> n
+    _ -> 0
+
+{- | Per-redeemer table from @intent.scripts[]@. Each row identifies
+the redeemer's purpose, what it targets, the ex_units it commits, and
+a CBOR preview so the reader can spot-check the redeemer body without
+re-running the inspector.
+-}
+scriptsSection :: ProtocolRegistry -> DiagnosisDoc -> Text
+scriptsSection reg doc =
+    let path = ["result", "intent", "scripts"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+     in if null items
+            then ""
+            else
+                "## Smart-contract calls\n\n"
+                    <> "| # | Purpose | Target | ex_units (mem / steps) | Redeemer |\n"
+                    <> "|---|---------|--------|------------------------|----------|\n"
+                    <> Text.concat (zipWith (renderScriptRow reg) [0 ..] items)
+                    <> "\n"
+
+renderScriptRow :: ProtocolRegistry -> Int -> Value -> Text
+renderScriptRow _reg n v = case v of
+    Object o ->
+        let purpose = case KeyMap.lookup "purpose" o of
+                Just (String s) -> s
+                _ -> "?"
+            idx = case KeyMap.lookup "index" o of
+                Just (Number x) -> Text.pack (show (floor x :: Int))
+                _ -> "?"
+            target = case purpose of
+                "spending" -> case KeyMap.lookup "input" o of
+                    Just (Object inp) ->
+                        let txid = case KeyMap.lookup "tx_id" inp of
+                                Just (String s) -> Text.take 16 s <> "…"
+                                _ -> "?"
+                            i = case KeyMap.lookup "index" inp of
+                                Just (Number x) -> Text.pack (show (floor x :: Int))
+                                _ -> "?"
+                         in "input " <> txid <> "#" <> i
+                    _ -> "input #" <> idx
+                _ -> purpose <> " #" <> idx
+            exu = case KeyMap.lookup "ex_units_committed" o of
+                Just (Object e) ->
+                    let mem = case KeyMap.lookup "memory" e of
+                            Just (String s) -> s
+                            _ -> "?"
+                        st = case KeyMap.lookup "steps" e of
+                            Just (String s) -> s
+                            _ -> "?"
+                     in mem <> " / " <> st
+                _ -> "?"
+            cbor = case KeyMap.lookup "redeemer_cbor_hex" o of
+                Just (String s) ->
+                    "`" <> Text.take 14 s <> "…` (" <> Text.pack (show (Text.length s `div` 2)) <> "B)"
+                _ -> ""
+         in "| "
+                <> Text.pack (show n)
+                <> " | "
+                <> escapeTable purpose
+                <> " | "
+                <> escapeTable target
+                <> " | "
+                <> escapeTable exu
+                <> " | "
+                <> escapeTable cbor
+                <> " |\n"
+    _ -> ""
 
 claimsSection :: DiagnosisDoc -> Text
 claimsSection doc =
