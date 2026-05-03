@@ -34,6 +34,7 @@ import System.IO (hPutStrLn, stderr)
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry, loadRegistries)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc, parseDiagnosisDoc)
 import TxDeepDiagnosisHost.Render.Parties (renderPartiesMermaid)
+import TxDeepDiagnosisHost.Render.ValueFlow (renderValueFlowTsv)
 
 {- | Static registry of (relative file name, producer) pairs. Each
 renderer commit appends one line.
@@ -41,6 +42,7 @@ renderer commit appends one line.
 renderers :: [(FilePath, ProtocolRegistry -> DiagnosisDoc -> Text)]
 renderers =
     [ ("parties.mmd", renderPartiesMermaid)
+    , ("value-flow.tsv", renderValueFlowTsv)
     ]
 
 main :: IO ()
