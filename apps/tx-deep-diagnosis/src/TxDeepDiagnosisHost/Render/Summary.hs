@@ -34,6 +34,10 @@ import qualified Data.Vector as V
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
+import TxDeepDiagnosisHost.Render.Names (
+    PartyName (..),
+    resolveAddress,
+ )
 
 {- | Which artifacts the caller wrote alongside @summary.md@.
 Each Maybe holds the relative file name when written.
@@ -60,10 +64,11 @@ renderSummaryMarkdown ::
     DiagnosisDoc ->
     EmittedFiles ->
     Text
-renderSummaryMarkdown _reg doc files =
+renderSummaryMarkdown reg doc files =
     Text.concat
         [ titleSection doc
         , verdictSection doc
+        , observationsSection reg doc
         , claimsSection doc
         , effectsSection doc
         , failuresSection doc
@@ -115,6 +120,134 @@ verdictSection doc =
             <> "- ledger validation: **"
             <> verdict
             <> "**\n\n"
+
+{- | Lists the facts that drive flow understanding: who owns the
+inputs (per registry), what the metadata declares as the destination
+(self-declared, separately listed because the inspector library
+already warns it is unverified), and what the envelope structurally
+cannot tell us (per-output addresses).
+
+The reader is expected to compare the input parties against the
+metadata destination on their own. Stating "self-swap detected"
+would mean asserting an output flow direction that the envelope
+does not actually expose.
+-}
+observationsSection :: ProtocolRegistry -> DiagnosisDoc -> Text
+observationsSection reg doc =
+    let inParties = inputParties reg doc
+        metaDestinations = metadataDestinations doc
+        outputCount = countOutputs doc
+        scriptOutputs = scriptOutputCount doc
+        body =
+            Text.concat
+                [ "Input parties (registry-resolved):\n\n"
+                , bulletList (map renderParty inParties)
+                , "\n"
+                , metaSection metaDestinations
+                , outputsObservation outputCount scriptOutputs
+                ]
+     in if null inParties && null metaDestinations
+            then ""
+            else "## Observations\n\n" <> body
+  where
+    metaSection [] = ""
+    metaSection ds =
+        "Metadata-declared destinations (self-declared, "
+            <> "_not verified against actual output addresses_):\n\n"
+            <> bulletList (map (\d -> "_" <> d <> "_") ds)
+            <> "\n"
+    outputsObservation total scriptN =
+        let prelude =
+                "Output addresses are not exposed by the diagnosis "
+                    <> "envelope at this layer; "
+         in case (total, scriptN) of
+                (Nothing, _) -> ""
+                (Just t, _) ->
+                    prelude
+                        <> "of the "
+                        <> Text.pack (show t)
+                        <> " outputs"
+                        <> ( case scriptN of
+                                Just s
+                                    | s > 0 ->
+                                        " ("
+                                            <> Text.pack (show s)
+                                            <> " under script credentials)"
+                                _ -> ""
+                           )
+                        <> ", whether any returns to a party listed above "
+                        <> "cannot be confirmed without per-output address "
+                        <> "data.\n\n"
+
+bulletList :: [Text] -> Text
+bulletList = Text.concat . map (\x -> "- " <> x <> "\n")
+
+renderParty :: (Int, Text, PartyName) -> Text
+renderParty (i, lov, pn) =
+    "input #"
+        <> Text.pack (show i)
+        <> " — **"
+        <> pnLabel pn
+        <> "** (`"
+        <> partySource pn
+        <> "`) — "
+        <> lov
+        <> " lovelace"
+
+partySource :: PartyName -> Text
+partySource pn = case pnSource pn of
+    _ -> Text.pack (show (pnSource pn))
+
+inputParties :: ProtocolRegistry -> DiagnosisDoc -> [(Int, Text, PartyName)]
+inputParties reg doc =
+    let path = ["result", "validation", "resolved_inputs"]
+        items = case valuePath (ddValidate doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+     in zipWith (\i v -> mkParty i v) [0 ..] items
+            >>= maybe [] pure
+  where
+    mkParty i (Object o) = case KeyMap.lookup "tx_out" o of
+        Just (Object txOut) -> case KeyMap.lookup "address_hex" txOut of
+            Just (String addr) ->
+                let lov = case KeyMap.lookup "coin_lovelace" txOut of
+                        Just (String s) -> s
+                        _ -> "0"
+                 in Just (i, lov, resolveAddress reg addr)
+            _ -> Nothing
+        _ -> Nothing
+    mkParty _ _ = Nothing
+
+metadataDestinations :: DiagnosisDoc -> [Text]
+metadataDestinations doc =
+    let path = ["result", "intent", "metadata_claims"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+     in [d | Object o <- items, Just (String d) <- [KeyMap.lookup "destination" o], not (Text.null d)]
+
+countOutputs :: DiagnosisDoc -> Maybe Int
+countOutputs doc = case valuePath
+    (ddIntent doc)
+    ["result", "intent", "features", "output_count"] of
+    Just (Number n) -> Just (floor n)
+    _ -> Nothing
+
+scriptOutputCount :: DiagnosisDoc -> Maybe Int
+scriptOutputCount doc =
+    let path = ["result", "intent", "value", "output_buckets"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+        scriptB =
+            [ floor n
+            | Object o <- items
+            , Just (String "Script") <- [KeyMap.lookup "label" o]
+            , Just (Number n) <- [KeyMap.lookup "tx_out_count" o]
+            ]
+     in case scriptB of
+            (n : _) -> Just n
+            [] -> Nothing
 
 claimsSection :: DiagnosisDoc -> Text
 claimsSection doc =
