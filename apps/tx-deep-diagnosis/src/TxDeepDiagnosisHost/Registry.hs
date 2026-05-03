@@ -172,8 +172,9 @@ loadRegistries roots = do
             }
   where
     lastJust = foldr (\x acc -> case x of Just _ -> x; Nothing -> acc) Nothing
-    -- ^ folds RIGHT-to-left, so the LAST Just wins (= the rightmost
-    -- registry root with an Amaru journal overrides any earlier one).
+
+-- \^ folds RIGHT-to-left, so the LAST Just wins (= the rightmost
+-- registry root with an Amaru journal overrides any earlier one).
 
 data Identification
     = IdValidator !RegistryValidator
