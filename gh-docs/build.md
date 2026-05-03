@@ -45,8 +45,11 @@ result-cli/bin/tx-deep-diagnosis
 the browser loads as wasm. It produces a layered diagnosis of a Conway
 transaction by combining `tx.intent` and `tx.validate` (both running real
 `cardano-ledger-conway` code) with Blockfrost-resolved producer transactions
-and identity labels from the protocol registry under
-`docs/inspector/protocols/`.
+and identity labels from a protocol registry. The default registry —
+SundaeSwap V3 + treasury blueprints + the Amaru deployment journal — is
+**bundled into the binary at build time** via cabal `data-files` and
+loaded automatically (`Paths_tx_deep_diagnosis.getDataDir`), so
+`nix run` works from anywhere with no checkout required.
 
 ### Inputs
 
@@ -55,16 +58,18 @@ result-cli/bin/tx-deep-diagnosis --help
 ```
 
 ```text
-Usage: tx-deep-diagnosis --cbor FILE [--registry DIR] [--network NETWORK]
-                         [--blockfrost-id PROJECT_ID]
-
-  Layered Conway tx diagnosis using cardano-ledger-conway via the
-  cardano-ledger-inspector library
+Usage: tx-deep-diagnosis --cbor FILE [--registry DIR] [--no-bundled-registry]
+                         [--network NETWORK] [--blockfrost-id PROJECT_ID]
 
 Available options:
   --cbor FILE              Path to a file containing the Conway tx CBOR hex
-  --registry DIR           Path to the protocol registry directory
-                           (default: docs/inspector/protocols)
+  --registry DIR           Extra protocol registry directory to layer on top of
+                           the bundled one. Repeat to add several. Validator +
+                           instance entries from extra roots concat onto the
+                           bundled list; the Amaru journal is last-wins.
+  --no-bundled-registry    Skip the registry vendored into this binary at build
+                           time. Only the directories passed via --registry are
+                           consulted. Rare; meant for testing a clean replacement.
   --network NETWORK        mainnet | preprod | preview
   --blockfrost-id PID      Blockfrost project_id (or BLOCKFROST_PROJECT_ID env var)
 ```
@@ -92,6 +97,39 @@ When the `--blockfrost-id` is omitted, the CLI runs `tx.intent` and a
 context-less `tx.validate` (the validator says exactly which fields are
 missing — `source_output`, `protocol_parameters`, `slot`, `epoch`,
 `network` — instead of guessing).
+
+### Adding your own protocol identifications
+
+The bundled registry covers SundaeSwap V3 and Amaru's deployment scopes.
+For your own protocol, drop a directory shaped like
+`docs/inspector/protocols/` (a `registry.json` plus optional vendored
+blueprints) and pass it with `--registry`:
+
+```bash
+tx-deep-diagnosis \
+  --cbor my-tx.hex \
+  --registry ./my-protocol-registry \
+  --registry ./my-other-protocol-registry
+```
+
+The bundled registry is always loaded as the base layer; the
+`--registry` directories add to it. Validator and instance entries
+from extra roots concat onto the bundled list (later roots' entries
+shadow earlier ones at lookup time); the Amaru-style deployment
+journal is last-wins. To skip the bundle entirely (e.g. when testing
+a fully replaced registry), add `--no-bundled-registry`.
+
+### One-liner from GitHub (no checkout)
+
+```bash
+BLOCKFROST_PROJECT_ID=<key> \
+  nix run github:lambdasistemi/cardano-ledger-inspector#tx-deep-diagnosis -- \
+    --cbor my-tx.hex
+```
+
+The bundled registry travels inside the flake output, so script-hash
+labels (e.g. `Amaru network_compliance treasury`) are present even
+without a local checkout.
 
 ### What the CLI adds beyond the wasm
 

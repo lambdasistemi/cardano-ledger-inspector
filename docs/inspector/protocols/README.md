@@ -1,11 +1,19 @@
-# Protocol registry (scaffold)
+# Protocol registry
 
 Vendored CIP-57 Plutus blueprints and deployment registries that let the
 inspector identify on-chain script hashes and decode their datums against
 typed schemas.
 
-This directory is **data only** at this stage. The decoder primitive that
-consumes it is tracked in
+The registry is **bundled into `apps/tx-deep-diagnosis`** at build time
+via cabal `data-files`, so the CLI loads these labels by default with
+no `--registry` flag. Pass `--registry DIR` (repeatable) on the
+command line to layer additional protocol identifications on top
+without losing the bundled defaults; pass `--no-bundled-registry` to
+skip the bundle entirely (rare; meant for testing a clean
+replacement).
+
+The decoder primitive that consumes the typed schemas inside each
+`plutus.json` is tracked in
 [issue #35](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/35);
 the SundaeSwap V3 wiring in
 [issue #36](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/36).

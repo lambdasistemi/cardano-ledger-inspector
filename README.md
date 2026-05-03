@@ -18,6 +18,10 @@ library.
 - `apps/tx-deep-diagnosis/` — native CLI that links the inspector library
   directly, resolves producer transactions via Blockfrost, and labels script
   hashes against the protocol registry to produce a layered diagnosis report.
+  The default registry (under `docs/inspector/protocols/`) is bundled into
+  the binary at build time, so `nix run` works from anywhere with no
+  checkout. Pass `--registry DIR` (repeatable) to layer your own protocol
+  identifications on top.
 - `apps/wasm-extism-spike/` — wasm Extism plugin exposing the inspector's
   operations as named exports for cross-implementation conformance testing.
 - `apps/extism-spike-host/` — native Extism host that loads the wasm spike
