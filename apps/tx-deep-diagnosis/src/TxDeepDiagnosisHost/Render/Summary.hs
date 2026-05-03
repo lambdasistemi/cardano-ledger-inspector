@@ -4,18 +4,19 @@
 Module      : TxDeepDiagnosisHost.Render.Summary
 Description : Top-level summary.md tying the cuts together with prose.
 
-Sections, in fixed order so the file diffs cleanly:
+Sections, in fixed order so the file diffs cleanly and the first
+screen stays reader-first:
 
-* Title — from @intent.title@
-* Verdict paragraph — combines @summary@, @valid_for_supplied_context@,
-  and the failure count
-* Claims — @intent.metadata_claims@ as a table
-* Effects — @intent.sections[]@ rows (already pre-rendered for display
-  by the inspector library)
-* Signer perspective — @intent.signing@ + signer-perspective rows
-* Validation failures — one row per failure
-* Warnings — @intent.warnings@
-* Diagrams — relative links to whatever cuts were emitted
+* Title / tx id
+* Headline action summary
+* Verdict
+* Validation failures
+* Balance
+* Fees & resources
+* Observations / claims / effects
+* Smart-contract calls / outputs / datums
+* Warnings
+* Diagrams
 -}
 module TxDeepDiagnosisHost.Render.Summary (
     EmittedFiles (..),
@@ -68,14 +69,17 @@ renderSummaryMarkdown ::
 renderSummaryMarkdown reg doc files =
     Text.concat
         [ titleSection doc
+        , headlineSection doc
         , verdictSection doc
+        , failuresSection doc
+        , balanceSection reg doc
+        , feesResourcesSection doc
         , observationsSection reg doc
+        , claimsSection doc
+        , effectsSection doc
         , scriptsSection reg doc
         , outputsSection reg doc
         , datumsSection reg doc
-        , claimsSection doc
-        , effectsSection doc
-        , failuresSection doc
         , warningsSection doc
         , diagramsSection files
         ]
@@ -103,20 +107,27 @@ titleSection doc =
             <> textPath doc ["result", "intent", "tx_id"] ""
             <> "`\n\n"
 
+headlineSection :: DiagnosisDoc -> Text
+headlineSection doc =
+    let subject = headlineSubject doc
+        outcome = headlineOutcomePhrase (validationStatus doc)
+        dominantBucket = case dominantOutputBucketLabel doc of
+            Nothing -> ""
+            Just bucket ->
+                " and sends most value to the **"
+                    <> bucket
+                    <> "** bucket"
+     in "**Headline:** "
+            <> subject
+            <> " "
+            <> outcome
+            <> dominantBucket
+            <> ".\n\n"
+
 verdictSection :: DiagnosisDoc -> Text
 verdictSection doc =
     let topSummary = ddSummary doc
-        valid =
-            valuePath
-                (ddValidate doc)
-                [ "result"
-                , "validation"
-                , "valid_for_supplied_context"
-                ]
-        verdict = case valid of
-            Just (Bool True) -> "valid"
-            Just (Bool False) -> "invalid"
-            _ -> "unknown"
+        verdict = validationStatus doc
      in "## Verdict\n\n"
             <> "- "
             <> topSummary
@@ -124,6 +135,62 @@ verdictSection doc =
             <> "- ledger validation: **"
             <> verdict
             <> "**\n\n"
+
+validationStatus :: DiagnosisDoc -> Text
+validationStatus doc =
+    case valuePath
+        (ddValidate doc)
+        ["result", "validation", "status"] of
+        Just (String s) -> s
+        _ -> case valuePath
+            (ddValidate doc)
+            [ "result"
+            , "validation"
+            , "valid_for_supplied_context"
+            ] of
+            Just (Bool True) -> "valid"
+            Just (Bool False) -> "invalid"
+            _ -> "unknown"
+
+headlineSubject :: DiagnosisDoc -> Text
+headlineSubject doc =
+    case firstClaimLabel doc of
+        Just label | not (Text.null label) -> "Claimed **" <> label <> "**"
+        _ ->
+            let title = textPath doc ["result", "intent", "title"] "Transaction"
+             in case title of
+                    "Signing summary" -> "This transaction"
+                    "Transaction" -> "This transaction"
+                    _ -> "**" <> title <> "**"
+
+headlineOutcomePhrase :: Text -> Text
+headlineOutcomePhrase status = case status of
+    "valid" -> "is **valid**"
+    "invalid" -> "is **invalid**"
+    "incomplete" -> "is **incomplete** for the supplied context"
+    "rejected" -> "was **rejected** for the supplied context"
+    _ -> "has an **unknown** verdict"
+
+firstClaimLabel :: DiagnosisDoc -> Maybe Text
+firstClaimLabel doc =
+    case valuePath (ddIntent doc) ["result", "intent", "claims"] of
+        Just (Array xs) ->
+            case [textOf "label" o "" | Object o <- V.toList xs] of
+                (lab : _) | not (Text.null lab) -> Just lab
+                _ -> Nothing
+        _ -> Nothing
+
+dominantOutputBucketLabel :: DiagnosisDoc -> Maybe Text
+dominantOutputBucketLabel doc =
+    case outputBuckets doc of
+        [] -> Nothing
+        (x : xs) ->
+            let best = foldl' maxBucket (obLabel x, parseLov (obLovelace x)) xs
+             in Just (fst best)
+  where
+    maxBucket best bucket =
+        let current = (obLabel bucket, parseLov (obLovelace bucket))
+         in if snd current > snd best then current else best
 
 {- | Lists the facts that drive flow understanding: who owns the
 inputs (per registry), what the metadata declares as the destination
@@ -159,8 +226,12 @@ observationsSection reg doc =
   where
     metaSection [] = ""
     metaSection ds =
-        "Metadata-declared destination(s) (`self_declared`):\n\n"
-            <> bulletList (map (\d -> "_" <> d <> "_") ds)
+        "Metadata-declared destination(s):\n\n"
+            <> bulletList
+                ( map
+                    (\d -> "_" <> d <> "_ (self-declared, not verified)")
+                    ds
+                )
             <> "\n"
     crossoverSection [] = ""
     crossoverSection ms =
@@ -270,6 +341,29 @@ inputParties reg doc =
         _ -> Nothing
     mkParty _ _ = Nothing
 
+data OutputBucket = OutputBucket
+    { obLabel :: !Text
+    , obLovelace :: !Text
+    }
+
+outputBuckets :: DiagnosisDoc -> [OutputBucket]
+outputBuckets doc =
+    let path = ["result", "intent", "value", "output_buckets"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+     in mapMaybe parseBucket items
+  where
+    parseBucket (Object o) = do
+        label <- case KeyMap.lookup "label" o of
+            Just (String s) -> Just s
+            _ -> Nothing
+        let lov = case KeyMap.lookup "lovelace" o of
+                Just (String s) -> s
+                _ -> "0"
+        Just OutputBucket{obLabel = label, obLovelace = lov}
+    parseBucket _ = Nothing
+
 metadataDestinations :: DiagnosisDoc -> [Text]
 metadataDestinations doc =
     let path = ["result", "intent", "metadata_claims"]
@@ -284,6 +378,173 @@ countOutputs doc = case valuePath
     ["result", "intent", "features", "output_count"] of
     Just (Number n) -> Just (floor n)
     _ -> Nothing
+
+balanceSection :: ProtocolRegistry -> DiagnosisDoc -> Text
+balanceSection reg doc =
+    let inputs = inputParties reg doc
+        outBuckets = outputBuckets doc
+        feeLov = feeLovelace doc
+        inTotal = sum [parseLov lov | (_, lov, _) <- inputs]
+        outTotal = sum [parseLov lov | b <- outBuckets, let { lov = obLovelace b }] + parseLov feeLov
+        delta = inTotal - outTotal
+        inputsTable =
+            "### Inputs\n\n"
+                <> "| Source | ADA |\n"
+                <> "|--------|----:|\n"
+                <> Text.concat
+                    [ "| "
+                        <> escapeTable
+                            ( "input #"
+                                <> Text.pack (show i)
+                                <> " — "
+                                <> pnLabel pn
+                            )
+                        <> " | "
+                        <> formatAdaSimple (parseLov lov)
+                        <> " |\n"
+                    | (i, lov, pn) <- inputs
+                    ]
+                <> "| **Total inputs** | **"
+                <> formatAdaSimple inTotal
+                <> "** |\n\n"
+        outputsTable =
+            "### Outputs + fee\n\n"
+                <> "| Destination | ADA |\n"
+                <> "|-------------|----:|\n"
+                <> Text.concat
+                    [ "| "
+                        <> escapeTable (obLabel bucket <> " bucket")
+                        <> " | "
+                        <> formatAdaSimple (parseLov (obLovelace bucket))
+                        <> " |\n"
+                    | bucket <- outBuckets
+                    ]
+                <> "| fee | "
+                <> formatAdaSimple (parseLov feeLov)
+                <> " |\n"
+                <> "| **Total outputs + fee** | **"
+                <> formatAdaSimple outTotal
+                <> "** |\n\n"
+        balanceLine
+            | delta == 0 =
+                "_Balance: inputs = outputs + fee_\n\n"
+            | delta > 0 =
+                "**Unaccounted: "
+                    <> formatAdaSimple delta
+                    <> " missing — `ValueNotConservedUTxO`**\n\n"
+            | otherwise =
+                "**Over-spent: "
+                    <> formatAdaSimple (negate delta)
+                    <> " more in outputs + fee than inputs — `ValueNotConservedUTxO`**\n\n"
+     in if null inputs && null outBuckets && parseLov feeLov == 0
+            then ""
+            else
+                "## Balance\n\n"
+                    <> inputsTable
+                    <> outputsTable
+                    <> balanceLine
+
+feesResourcesSection :: DiagnosisDoc -> Text
+feesResourcesSection doc =
+    let feeRow =
+            Just
+                ( "Fee"
+                , formatAdaSimple (parseLov (feeLovelace doc)) <> " ADA"
+                , feeLovelace doc <> " lovelace"
+                )
+        txSizeRow = case txSizeBytes doc of
+            Just n ->
+                Just
+                    ( "Tx size"
+                    , formatCount n <> " bytes"
+                    , "from the intent envelope"
+                    )
+            Nothing -> Nothing
+        redeemerRow =
+            Just
+                ( "Redeemers"
+                , Text.pack (show (redeemerCount doc))
+                , "committed redeemers in the current intent view"
+                )
+        exUnitsRow = case committedExUnits doc of
+            Just (mem, steps) ->
+                Just
+                    ( "Committed ex-units"
+                    , formatCount mem <> " memory / " <> formatCount steps <> " steps"
+                    , "summed from per-redeemer committed budgets"
+                    )
+            Nothing -> Nothing
+        rows = mapMaybe id [feeRow, txSizeRow, redeemerRow, exUnitsRow]
+     in if null rows
+            then ""
+            else
+                "## Fees & resources\n\n"
+                    <> "| Label | Value | Detail |\n"
+                    <> "|-------|-------|--------|\n"
+                    <> Text.concat
+                        [ "| "
+                            <> escapeTable label
+                            <> " | "
+                            <> escapeTable value
+                            <> " | "
+                            <> escapeTable detail
+                            <> " |\n"
+                        | (label, value, detail) <- rows
+                        ]
+                    <> "\n"
+
+feeLovelace :: DiagnosisDoc -> Text
+feeLovelace doc = case valuePath (ddIntent doc) ["result", "intent", "fee_lovelace"] of
+    Just (String s) -> s
+    _ -> "0"
+
+txSizeBytes :: DiagnosisDoc -> Maybe Integer
+txSizeBytes doc = case valuePath (ddIntent doc) ["result", "intent", "tx_size_bytes"] of
+    Just (Number n) -> Just (floor n)
+    Just (String s) -> case reads (Text.unpack s) of
+        [(n, "")] -> Just n
+        _ -> Nothing
+    _ -> Nothing
+
+redeemerCount :: DiagnosisDoc -> Int
+redeemerCount doc =
+    case valuePath (ddIntent doc) ["result", "intent", "features", "redeemer_count"] of
+        Just (Number n) -> floor n
+        _ -> length (scriptRows doc)
+
+committedExUnits :: DiagnosisDoc -> Maybe (Integer, Integer)
+committedExUnits doc =
+    let units =
+            [ (mem, steps)
+            | Object o <- scriptRows doc
+            , Just (Object ex) <- [KeyMap.lookup "ex_units_committed" o]
+            , Just mem <- [stringNumber "memory" ex]
+            , Just steps <- [stringNumber "steps" ex]
+            ]
+     in case units of
+            [] -> Nothing
+            _ ->
+                Just
+                    ( sum [mem | (mem, _) <- units]
+                    , sum [steps | (_, steps) <- units]
+                    )
+
+scriptRows :: DiagnosisDoc -> [Value]
+scriptRows doc =
+    case valuePath (ddIntent doc) ["result", "intent", "scripts"] of
+        Just (Array xs) -> V.toList xs
+        _ -> []
+
+stringNumber :: Text -> KeyMap.KeyMap Value -> Maybe Integer
+stringNumber key o = case KeyMap.lookup (Key.fromText key) o of
+    Just (String s) -> case reads (Text.unpack s) of
+        [(n, "")] -> Just n
+        _ -> Nothing
+    Just (Number n) -> Just (floor n)
+    _ -> Nothing
+
+formatCount :: Integer -> Text
+formatCount = withThousandsSeparators . Text.pack . show
 
 scriptOutputCount :: DiagnosisDoc -> Maybe Int
 scriptOutputCount doc =
@@ -656,9 +917,16 @@ claimsSection doc =
                 <> " | "
                 <> escapeTable val
                 <> " | "
-                <> escapeTable det
+                <> escapeTable (selfDeclaredDetail det)
                 <> " |\n"
     renderClaim _ = ""
+
+selfDeclaredDetail :: Text -> Text
+selfDeclaredDetail det =
+    let stripped = Text.replace " / self-declared" "" det
+     in if Text.null stripped
+            then "self-declared, not verified"
+            else "self-declared, not verified / " <> stripped
 
 effectsSection :: DiagnosisDoc -> Text
 effectsSection doc =
@@ -719,13 +987,41 @@ failuresSection doc =
             predicate = textOf "predicate" o ""
             msg = textOf "message" o ""
          in "### "
+                <> failureLead predicate msg
+                <> "\n\n"
+                <> "_Raw rule:_ `"
                 <> rule
                 <> " — "
                 <> shortName predicate
-                <> "\n\n"
+                <> "`\n\n"
                 <> humanise predicate msg
                 <> "\n"
     renderFail _ = ""
+
+failureLead :: Text -> Text -> Text
+failureLead predicate _msg
+    | "ValueNotConservedUTxO" `Text.isInfixOf` predicate =
+        let supplied = extractCoin "supplied: MaryValue (Coin " predicate
+            expected = extractCoin "expected: MaryValue (Coin " predicate
+            delta = supplied - expected
+         in if delta > 0
+                then
+                    "Inputs and outputs do not conserve value: "
+                        <> formatAdaSimple delta
+                        <> " ADA missing"
+                else
+                    "Inputs and outputs do not conserve value: "
+                        <> formatAdaSimple (abs delta)
+                        <> " ADA over-spent"
+    | "MissingVKeyWitnessesUTXOW" `Text.isInfixOf` predicate =
+        let missing = length (extractKeyHashes predicate)
+            noun = if missing == 1 then "required signer witness is" else "required signer witnesses are"
+         in Text.pack (show missing) <> " " <> noun <> " missing"
+    | "BadInputsUTxO" `Text.isInfixOf` predicate =
+        "One or more declared inputs are missing from the supplied context"
+    | "OutsideValidityIntervalUTxO" `Text.isInfixOf` predicate =
+        "The transaction falls outside its validity interval"
+    | otherwise = shortName predicate
 
 {- | Convert a verbose ledger predicate into one human-readable name
 that the reader can grep for. Falls back to the first 60 chars of the
