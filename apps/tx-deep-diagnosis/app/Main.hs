@@ -4,8 +4,8 @@ module Main (main) where
 
 import Control.Applicative ((<|>))
 import qualified Data.Aeson as Aeson
-import Data.Maybe (fromMaybe)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TIO

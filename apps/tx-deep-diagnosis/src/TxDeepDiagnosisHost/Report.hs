@@ -13,8 +13,9 @@ import qualified Data.Text.Encoding as TE
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 
--- | Render the diagnosis as one valid JSON document so the output
--- pipes cleanly into jq, can be saved as a fixture, etc.
+{- | Render the diagnosis as one valid JSON document so the output
+pipes cleanly into jq, can be saved as a fixture, etc.
+-}
 renderReport ::
     -- | summary line for the top of the document (resolution status, etc.)
     Text ->
