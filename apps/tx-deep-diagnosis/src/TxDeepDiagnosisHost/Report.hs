@@ -1,34 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module TxDeepDiagnosisHost.Report (
-    renderTopLevel,
+    renderReport,
 ) where
 
-import Data.Aeson (Value)
+import Data.Aeson (Value, (.=))
+import qualified Data.Aeson as A
 import qualified Data.Aeson.Encode.Pretty as APretty
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
-import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 
-renderTopLevel :: Text -> Value -> Value -> ProtocolRegistry -> Text
-renderTopLevel title intent validate _reg =
-    Text.unlines
-        [ bar title
-        , bar "tx.intent (raw from cardano-ledger-conway via cardano-ledger-inspector lib)"
-        , prettyJson intent
-        , bar "tx.validate (real applyTx via cardano-ledger-conway)"
-        , prettyJson validate
-        ]
-  where
-    bar t =
-        Text.replicate 78 "="
-            <> "\n  "
-            <> t
-            <> "\n"
-            <> Text.replicate 78 "="
-
-prettyJson :: Value -> Text
-prettyJson = TE.decodeUtf8 . BSL.toStrict . APretty.encodePretty
+-- | Render the diagnosis as one valid JSON document so the output
+-- pipes cleanly into jq, can be saved as a fixture, etc.
+renderReport ::
+    -- | summary line for the top of the document (resolution status, etc.)
+    Text ->
+    -- | tx.intent response from the inspector library
+    Value ->
+    -- | tx.validate response from the inspector library
+    Value ->
+    -- | the loaded protocol registry — included so the rendered report
+    -- carries the labelling sources alongside the typed validation result
+    ProtocolRegistry ->
+    Text
+renderReport summary intent validate _reg =
+    let doc =
+            A.object
+                [ "tx-deep-diagnosis"
+                    .= A.object
+                        [ "summary" .= summary
+                        , "intent" .= intent
+                        , "validate" .= validate
+                        ]
+                ]
+     in TE.decodeUtf8 (BSL.toStrict (APretty.encodePretty doc)) <> "\n"
