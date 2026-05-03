@@ -187,6 +187,18 @@
               "redeemer_cbor_hex": "80"
             }
           ],
+          "withdrawals": [
+            {
+              "amount_lovelace": "0",
+              "credential": {
+                "hash": "a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094",
+                "kind": "script"
+              },
+              "index": 0,
+              "network": "mainnet",
+              "reward_account_hex": "f1a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094"
+            }
+          ],
           "sections": [
             {
               "empty": "No signer value perspective available.",

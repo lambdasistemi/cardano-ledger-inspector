@@ -314,6 +314,18 @@
                               rows = [ ];
                             }
                           ];
+                          withdrawals = [
+                            {
+                              index = 0;
+                              reward_account_hex = "f1a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094";
+                              network = "mainnet";
+                              credential = {
+                                kind = "script";
+                                hash = "a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094";
+                              };
+                              amount_lovelace = "0";
+                            }
+                          ];
                           value = {
                             net_spend_known = false;
                             net_spend_note = "Signer net is unknown until producer transaction CBOR resolves every regular input; output totals are still ledger facts.";

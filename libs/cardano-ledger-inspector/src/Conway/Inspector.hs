@@ -47,6 +47,7 @@ import Conway.Inspector.Common (
     txIdHex,
     txInJson,
     txOutJson,
+    withdrawalRowsJson,
     withdrawalsCount,
  )
 import Conway.Inspector.Context (
@@ -515,6 +516,8 @@ intentSummaryJson args tx =
             ]
         warnings =
             intentWarnings missingSignerHexes
+        structuredWithdrawals =
+            withdrawalRowsJson withdrawals
      in Aeson.object
             [ "title" .= ("Signing summary" :: T.Text)
             , "subtitle" .= intentSubtitle metadataClaims missingSignerHexes redeemers
@@ -608,6 +611,7 @@ intentSummaryJson args tx =
                     , "has_total_collateral" .= hasStrictMaybe (body ^. L.totalCollateralTxBodyL)
                     ]
             , "scripts" .= map (redeemerEntryJson inputs) redeemers
+            , "withdrawals" .= structuredWithdrawals
             , "effects" .= map intentEffect intentEffects
             , "context"
                 .= contextSummaryJson

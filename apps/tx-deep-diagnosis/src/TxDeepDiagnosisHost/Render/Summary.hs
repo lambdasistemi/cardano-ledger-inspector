@@ -14,7 +14,7 @@ screen stays reader-first:
 * Balance
 * Fees & resources
 * Observations / claims / effects
-* Smart-contract calls / outputs / datums
+* Smart-contract calls / withdrawals / outputs / datums
 * Warnings
 * Diagrams
 -}
@@ -78,6 +78,7 @@ renderSummaryMarkdown reg doc files =
         , claimsSection doc
         , effectsSection doc
         , scriptsSection reg doc
+        , withdrawalsSection doc
         , outputsSection reg doc
         , datumsSection reg doc
         , warningsSection doc
@@ -840,11 +841,11 @@ scriptsSection reg doc =
                 "## Smart-contract calls\n\n"
                     <> "| # | Purpose | Target | ex_units (mem / steps) | Redeemer |\n"
                     <> "|---|---------|--------|------------------------|----------|\n"
-                    <> Text.concat (zipWith (renderScriptRow reg) [0 ..] items)
+                    <> Text.concat (zipWith (renderScriptRow doc) [0 ..] items)
                     <> "\n"
 
-renderScriptRow :: ProtocolRegistry -> Int -> Value -> Text
-renderScriptRow _reg n v = case v of
+renderScriptRow :: DiagnosisDoc -> Int -> Value -> Text
+renderScriptRow doc n v = case v of
     Object o ->
         let purpose = case KeyMap.lookup "purpose" o of
                 Just (String s) -> s
@@ -863,6 +864,7 @@ renderScriptRow _reg n v = case v of
                                 _ -> "?"
                          in "input " <> txid <> "#" <> i
                     _ -> "input #" <> idx
+                "rewarding" -> withdrawalTarget doc idx
                 _ -> purpose <> " #" <> idx
             exu = case KeyMap.lookup "ex_units_committed" o of
                 Just (Object e) ->
@@ -890,6 +892,91 @@ renderScriptRow _reg n v = case v of
                 <> escapeTable cbor
                 <> " |\n"
     _ -> ""
+
+withdrawalsSection :: DiagnosisDoc -> Text
+withdrawalsSection doc =
+    let path = ["result", "intent", "withdrawals"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+     in if null items
+            then ""
+            else
+                "## Withdrawals\n\n"
+                    <> "| # | Reward account | Amount |\n"
+                    <> "|---|----------------|-------:|\n"
+                    <> Text.concat (map renderWithdrawalRow items)
+                    <> "\n"
+
+renderWithdrawalRow :: Value -> Text
+renderWithdrawalRow v = case v of
+    Object o ->
+        let idx = case KeyMap.lookup "index" o of
+                Just (Number n) -> Text.pack (show (floor n :: Int))
+                _ -> "?"
+            amount = case KeyMap.lookup "amount_lovelace" o of
+                Just (String s) -> formatAdaSimple (parseLov s)
+                _ -> formatAdaSimple 0
+            account = withdrawalAccountLabel o
+         in "| "
+                <> idx
+                <> " | "
+                <> escapeTable account
+                <> " | "
+                <> amount
+                <> " |\n"
+    _ -> ""
+
+withdrawalTarget :: DiagnosisDoc -> Text -> Text
+withdrawalTarget doc idxText =
+    case readIntText idxText >>= findWithdrawal doc of
+        Just o ->
+            let amount = case KeyMap.lookup "amount_lovelace" o of
+                    Just (String s) -> formatAdaSimple (parseLov s) <> " ADA"
+                    _ -> formatAdaSimple 0 <> " ADA"
+             in "withdrawal #" <> idxText <> " " <> withdrawalCredentialLabel o <> " (" <> amount <> ")"
+        Nothing -> "withdrawal #" <> idxText
+
+findWithdrawal :: DiagnosisDoc -> Int -> Maybe (KeyMap.KeyMap Value)
+findWithdrawal doc targetIndex =
+    case valuePath (ddIntent doc) ["result", "intent", "withdrawals"] of
+        Just (Array xs) -> go (V.toList xs)
+        _ -> Nothing
+  where
+    go [] = Nothing
+    go (Object o : rest) = case KeyMap.lookup "index" o of
+        Just (Number n)
+            | floor n == targetIndex -> Just o
+        _ -> go rest
+    go (_ : rest) = go rest
+
+withdrawalAccountLabel :: KeyMap.KeyMap Value -> Text
+withdrawalAccountLabel o =
+    let network = textOf "network" o ""
+        credential = withdrawalCredentialLabel o
+        rewardHex = case KeyMap.lookup "reward_account_hex" o of
+            Just (String s) -> "`" <> previewHex 20 s <> "`"
+            _ -> ""
+        parts = filter (not . Text.null) [network, credential, rewardHex]
+     in Text.intercalate " / " parts
+
+withdrawalCredentialLabel :: KeyMap.KeyMap Value -> Text
+withdrawalCredentialLabel o = case KeyMap.lookup "credential" o of
+    Just (Object cred) ->
+        let kind = textOf "kind" cred "credential"
+            hashText = textOf "hash" cred "?"
+         in kind <> " " <> hashText
+    _ -> "credential ?"
+
+previewHex :: Int -> Text -> Text
+previewHex n hexText
+    | Text.length hexText <= n = hexText
+    | otherwise = Text.take n hexText <> "…"
+
+readIntText :: Text -> Maybe Int
+readIntText t = case reads (Text.unpack t) of
+    [(n, "")] -> Just n
+    _ -> Nothing
 
 claimsSection :: DiagnosisDoc -> Text
 claimsSection doc =

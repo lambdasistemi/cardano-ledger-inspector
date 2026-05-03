@@ -21,6 +21,7 @@ module Conway.Inspector.Common (
     lookupObjectValue,
     lookupValue,
     multiAssetJson,
+    rewardAccountJson,
     safeHashHex,
     scriptHashHex,
     txIdHex,
@@ -29,6 +30,7 @@ module Conway.Inspector.Common (
     txInKey,
     txInTxIdHex,
     txOutJson,
+    withdrawalRowsJson,
     withdrawalsCount,
 ) where
 
@@ -40,6 +42,7 @@ import qualified Cardano.Ledger.Binary as Binary
 import qualified Cardano.Ledger.Coin as Coin
 import qualified Cardano.Ledger.Conway as Conway
 import Cardano.Ledger.Core (TxLevel (..))
+import qualified Cardano.Ledger.Credential as Credential
 import qualified Cardano.Ledger.Hashes as Hashes
 import qualified Cardano.Ledger.Mary.Value as Mary
 import qualified Cardano.Ledger.Plutus.Data as PData
@@ -120,6 +123,56 @@ lookupObjectValue =
 -}
 withdrawalsCount :: L.Withdrawals -> Int
 withdrawalsCount (L.Withdrawals m) = Map.size m
+
+withdrawalRowsJson :: L.Withdrawals -> [Aeson.Value]
+withdrawalRowsJson (L.Withdrawals m) =
+    zipWith withdrawalRowJson [0 :: Int ..] (Map.toList m)
+
+withdrawalRowJson :: Int -> (Addr.AccountAddress, Coin.Coin) -> Aeson.Value
+withdrawalRowJson index (rewardAccount, coin) =
+    case rewardAccountJson rewardAccount of
+        Aeson.Object fields ->
+            Aeson.Object
+                ( fields
+                    <> KeyMap.fromList
+                        [ ("index", Aeson.toJSON index)
+                        ,
+                            ( "amount_lovelace"
+                            , Aeson.String (T.pack (show (Coin.unCoin coin)))
+                            )
+                        ]
+                )
+        _ ->
+            Aeson.object
+                [ "index" .= index
+                , "amount_lovelace" .= T.pack (show (Coin.unCoin coin))
+                ]
+
+rewardAccountJson :: Addr.AccountAddress -> Aeson.Value
+rewardAccountJson rewardAccount@(Addr.AccountAddress network (Addr.AccountId credential)) =
+    Aeson.object
+        [ "reward_account_hex"
+            .= T.decodeUtf8 (B16.encode (Addr.serialiseRewardAccount rewardAccount))
+        , "network" .= networkText network
+        , "credential" .= credentialJson credential
+        ]
+
+credentialJson :: Credential.Credential r -> Aeson.Value
+credentialJson = \case
+    Credential.KeyHashObj keyHash ->
+        Aeson.object
+            [ "kind" .= ("key" :: T.Text)
+            , "hash" .= keyHashHex keyHash
+            ]
+    Credential.ScriptHashObj scriptHash ->
+        Aeson.object
+            [ "kind" .= ("script" :: T.Text)
+            , "hash" .= scriptHashHex scriptHash
+            ]
+
+networkText :: BaseTypes.Network -> T.Text
+networkText BaseTypes.Mainnet = "mainnet"
+networkText BaseTypes.Testnet = "testnet"
 
 -- | Render a Conway TxOut with address, value (coin + assets), and datum.
 txOutJson :: L.TxOut Conway.ConwayEra -> Aeson.Value

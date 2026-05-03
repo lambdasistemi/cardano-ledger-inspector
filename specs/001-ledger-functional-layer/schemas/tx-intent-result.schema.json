@@ -3,7 +3,7 @@
   "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-intent-result.schema.json",
   "title": "Cardano Ledger WASI Transaction Intent Result",
   "type": "object",
-  "required": ["title", "subtitle", "metrics", "claims", "sections", "warnings"],
+  "required": ["title", "subtitle", "metrics", "claims", "sections", "withdrawals", "warnings"],
   "properties": {
     "title": { "type": "string" },
     "subtitle": { "type": "string" },
@@ -65,6 +65,10 @@
     "effects": {
       "type": "array",
       "items": { "$ref": "#/$defs/effect" }
+    },
+    "withdrawals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/withdrawal" }
     },
     "sections": {
       "type": "array",
@@ -132,6 +136,27 @@
         "path": { "type": "string" },
         "copyValue": { "type": "string" },
         "detail": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "credential": {
+      "type": "object",
+      "required": ["kind", "hash"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["key", "script"] },
+        "hash": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "withdrawal": {
+      "type": "object",
+      "required": ["index", "reward_account_hex", "network", "credential", "amount_lovelace"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "reward_account_hex": { "type": "string" },
+        "network": { "type": "string", "enum": ["mainnet", "testnet"] },
+        "credential": { "$ref": "#/$defs/credential" },
+        "amount_lovelace": { "type": "string" }
       },
       "additionalProperties": true
     },
