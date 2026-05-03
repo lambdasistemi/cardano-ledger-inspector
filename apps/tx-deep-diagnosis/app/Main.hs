@@ -20,7 +20,7 @@ import System.IO (hPutStrLn, stderr)
 import TxDeepDiagnosisHost.Blockfrost
 import TxDeepDiagnosisHost.Diagnosis
 import TxDeepDiagnosisHost.Registry (loadRegistries)
-import TxDeepDiagnosisHost.Report (renderTopLevel)
+import TxDeepDiagnosisHost.Report (renderReport)
 
 data Options = Options
     { optCborFile :: !FilePath
@@ -145,14 +145,12 @@ main = do
         Left e -> die ("validate error: " <> e)
         Right v -> pure v
     TIO.putStr
-        ( renderTopLevel
-            ( "tx-deep-diagnosis  ("
-                <> Text.pack (show (Map.size producerCbors))
+        ( renderReport
+            ( Text.pack (show (Map.size producerCbors))
                 <> "/"
                 <> Text.pack (show (length producerHashes))
                 <> " producer txs resolved, network="
                 <> networkLedgerName (optNetwork opts)
-                <> ")"
             )
             intent
             validate
