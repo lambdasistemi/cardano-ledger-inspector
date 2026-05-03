@@ -81,23 +81,26 @@ flowchart LR
     S1 -. required .-> tx
 ```
 
-## Value flow
+## Balance
 
-```mermaid
----
-config:
-  sankey:
-    showValues: true
----
-sankey-beta
+### Inputs
 
-input#0 key d2626d,tx,50007239276
-input#1 Amaru Network Compliance treasury (0baa0d),tx,1450000000000
-tx,External key bucket,49897955481
-tx,Script bucket,1162532800000
-tx,fee,1043795
-tx,(unaccounted),287575440000
-```
+| Source | ADA |
+|--------|----:|
+| input #0 — key d2626d | 50,007.239276 |
+| input #1 — Amaru Network Compliance treasury (0baa0d) | 1,450,000.000000 |
+| **Total inputs** | **1,500,007.239276** |
+
+### Outputs + fee
+
+| Destination | ADA |
+|-------------|----:|
+| External key bucket | 49,897.955481 |
+| Script bucket | 1,162,532.800000 |
+| fee | 1.043795 |
+| **Total outputs + fee** | **1,212,431.799276** |
+
+**Unaccounted: 287,575.440000 missing — `ValueNotConservedUTxO`**
 
 ## Topology
 

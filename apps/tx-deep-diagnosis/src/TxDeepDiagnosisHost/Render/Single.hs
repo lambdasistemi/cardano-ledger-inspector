@@ -50,7 +50,7 @@ renderSingleMarkdown reg doc =
     Text.concat
         [ summaryWithoutFooter reg doc
         , partiesBlock reg doc
-        , valueFlowSankeyBlock reg doc
+        , balanceBlock reg doc
         , topologyBlock reg doc
         , failuresBlock reg doc
         ]
@@ -91,76 +91,113 @@ failuresBlock reg doc = case renderFailuresMermaid reg doc of
     Nothing -> ""
     Just t -> "## Failure overlay\n\n```mermaid\n" <> t <> "```\n\n"
 
-{- | Value-flow as a Mermaid @sankey-beta@ block. The renderer here
-inlines its own logic rather than re-deriving columns from the TSV
-renderer because @sankey-beta@'s row format (@source,target,value@)
-differs from the TSV's four-column shape. Both are byte-deterministic
-from the same envelope.
+{- | Balance section: two ADA-denominated tables (inputs / outputs+fee)
+plus a one-line conservation check.
 
-When @sum(inputs) != sum(outputs) + fee@ an explicit @(unaccounted)@
-edge captures the delta so the diagram remains balanced and the
-reader sees the @ValueNotConservedUTxO@ gap visually.
+Sankey was tried but is misleading at this resolution: we know
+aggregate input totals and aggregate bucket totals but not per-output
+addresses, so any "input → output" edge in a Sankey is an
+illustration, not a fact. Two side-by-side balance sheets read
+cleanly, denominate large numbers in ADA so disparities don't drown
+small rows, and end with the @ValueNotConservedUTxO@ delta as a
+single bottom-line.
 -}
-valueFlowSankeyBlock :: ProtocolRegistry -> DiagnosisDoc -> Text
-valueFlowSankeyBlock reg doc =
-    let header = "## Value flow\n\n```mermaid\n---\nconfig:\n  sankey:\n    showValues: true\n---\nsankey-beta\n\n"
-        body =
-            mconcat
-                [ inputRows reg doc
-                , bucketRows doc
-                , feeRow doc
-                , unaccountedRow doc
-                ]
-        footer = "```\n\n"
-     in header <> body <> footer
-
--- ---------------------------------------------------------------- --
--- Sankey row generation (mirrors Render.ValueFlow but emits CSV
--- triples instead of TSV quadruples)
--- ---------------------------------------------------------------- --
-
-inputRows :: ProtocolRegistry -> DiagnosisDoc -> Text
-inputRows reg doc =
+balanceBlock :: ProtocolRegistry -> DiagnosisDoc -> Text
+balanceBlock reg doc =
     let inputs = resolvedInputs doc
-     in Text.concat
-            [ csvRow
-                [ "input#"
-                    <> Text.pack (show i)
-                    <> " "
-                    <> pnLabel (resolveAddress reg (riAddress ri))
-                , "tx"
-                , riLovelace ri
-                ]
-            | (i, ri) <- zip [0 :: Int ..] inputs
-            ]
+        outBuckets = outputBuckets doc
+        feeLov = parseLov (feeLovelace doc)
+        inTotal = sum (map (parseLov . riLovelace) inputs)
+        outTotal = sum (map (parseLov . obLovelace) outBuckets) + feeLov
+        delta = inTotal - outTotal
+        inputsTable =
+            "### Inputs\n\n"
+                <> "| Source | ADA |\n"
+                <> "|--------|----:|\n"
+                <> Text.concat
+                    [ "| "
+                        <> escapeTable
+                            ( "input #"
+                                <> Text.pack (show i)
+                                <> " — "
+                                <> pnLabel (resolveAddress reg (riAddress ri))
+                            )
+                        <> " | "
+                        <> formatAda (parseLov (riLovelace ri))
+                        <> " |\n"
+                    | (i, ri) <- zip [0 :: Int ..] inputs
+                    ]
+                <> "| **Total inputs** | **"
+                <> formatAda inTotal
+                <> "** |\n\n"
+        outputsTable =
+            "### Outputs + fee\n\n"
+                <> "| Destination | ADA |\n"
+                <> "|-------------|----:|\n"
+                <> Text.concat
+                    [ "| "
+                        <> escapeTable
+                            ( obLabel b
+                                <> " bucket"
+                            )
+                        <> " | "
+                        <> formatAda (parseLov (obLovelace b))
+                        <> " |\n"
+                    | b <- outBuckets
+                    ]
+                <> "| fee | "
+                <> formatAda feeLov
+                <> " |\n"
+                <> "| **Total outputs + fee** | **"
+                <> formatAda outTotal
+                <> "** |\n\n"
+        balanceLine
+            | delta == 0 =
+                "_Balance: inputs = outputs + fee_\n\n"
+            | delta > 0 =
+                "**Unaccounted: "
+                    <> formatAda delta
+                    <> " missing — `ValueNotConservedUTxO`**\n\n"
+            | otherwise =
+                "**Over-spent: "
+                    <> formatAda (negate delta)
+                    <> " more in outputs+fee than inputs — "
+                    <> "`ValueNotConservedUTxO`**\n\n"
+     in "## Balance\n\n"
+            <> inputsTable
+            <> outputsTable
+            <> balanceLine
 
-bucketRows :: DiagnosisDoc -> Text
-bucketRows doc =
-    Text.concat
-        [ csvRow
-            [ "tx"
-            , obLabel b <> " bucket"
-            , obLovelace b
-            ]
-        | b <- outputBuckets doc
-        ]
+-- ---------------------------------------------------------------- --
+-- ADA formatting
+-- ---------------------------------------------------------------- --
 
-feeRow :: DiagnosisDoc -> Text
-feeRow doc = case lookupPath (ddIntent doc) ["result", "intent", "fee_lovelace"] of
-    Just (String s) -> csvRow ["tx", "fee", s]
-    _ -> ""
+{- | Format an integer lovelace amount as ADA with 6 decimals and
+thousands separators on the whole part.
+-}
+formatAda :: Integer -> Text
+formatAda n =
+    let sign = if n < 0 then "-" else ""
+        m = abs n
+        whole = m `div` 1000000
+        frac = m `mod` 1000000
+        wholeT = withThousandsSeparators (Text.pack (show whole))
+        fracT = Text.justifyRight 6 '0' (Text.pack (show frac))
+     in sign <> wholeT <> "." <> fracT
 
-unaccountedRow :: DiagnosisDoc -> Text
-unaccountedRow doc =
-    let inputTotal = sum (map (parseLov . riLovelace) (resolvedInputs doc))
-        outputTotal = sum (map (parseLov . obLovelace) (outputBuckets doc))
-        feeTotal = case lookupPath (ddIntent doc) ["result", "intent", "fee_lovelace"] of
-            Just (String s) -> parseLov s
-            _ -> 0
-        delta = inputTotal - (outputTotal + feeTotal)
-     in if delta == 0
-            then ""
-            else csvRow ["tx", "(unaccounted)", Text.pack (show delta)]
+withThousandsSeparators :: Text -> Text
+withThousandsSeparators t =
+    let chars = Text.unpack t
+        len = length chars
+        (head', tailGroups) = splitAt ((len - 1) `mod` 3 + 1) chars
+        groups
+            | null tailGroups = [head']
+            | otherwise = head' : chunksOf 3 tailGroups
+     in Text.pack (concatMap (\g -> if g == head' then g else "," <> g) groups)
+  where
+    chunksOf k xs = case splitAt k xs of
+        (h, []) -> [h]
+        (h, rest) -> h : chunksOf k rest
 
 -- ---------------------------------------------------------------- --
 -- Local copies of the parsing structs (kept here to avoid a
@@ -232,6 +269,16 @@ parseLov :: Text -> Integer
 parseLov t = case reads (Text.unpack t) of
     [(n, "")] -> n
     _ -> 0
+
+feeLovelace :: DiagnosisDoc -> Text
+feeLovelace doc = case lookupPath (ddIntent doc) ["result", "intent", "fee_lovelace"] of
+    Just (String s) -> s
+    _ -> "0"
+
+escapeTable :: Text -> Text
+escapeTable =
+    Text.replace "\n" " "
+        . Text.replace "|" "\\|"
 
 lookupPath :: Value -> [Text] -> Maybe Value
 lookupPath = foldl' step . Just
