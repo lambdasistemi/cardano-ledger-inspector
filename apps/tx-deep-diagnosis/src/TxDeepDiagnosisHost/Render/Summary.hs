@@ -380,20 +380,145 @@ failuresSection doc =
             then ""
             else
                 "## Validation failures\n\n"
-                    <> "| Rule | Message |\n"
-                    <> "|------|---------|\n"
                     <> Text.concat (map renderFail items)
-                    <> "\n"
   where
     renderFail (Object o) =
         let rule = textOf "rule" o ""
+            predicate = textOf "predicate" o ""
             msg = textOf "message" o ""
-         in "| "
-                <> escapeTable rule
-                <> " | "
-                <> escapeTable msg
-                <> " |\n"
+         in "### "
+                <> rule
+                <> " — "
+                <> shortName predicate
+                <> "\n\n"
+                <> humanise predicate msg
+                <> "\n"
     renderFail _ = ""
+
+{- | Convert a verbose ledger predicate into one human-readable name
+that the reader can grep for. Falls back to the first 60 chars of the
+predicate so unmapped failures still produce useful output.
+-}
+shortName :: Text -> Text
+shortName p
+    | "ValueNotConservedUTxO" `Text.isInfixOf` p = "ValueNotConservedUTxO"
+    | "MissingVKeyWitnessesUTXOW" `Text.isInfixOf` p =
+        "MissingVKeyWitnessesUTXOW"
+    | "BadInputsUTxO" `Text.isInfixOf` p = "BadInputsUTxO"
+    | "OutsideValidityIntervalUTxO" `Text.isInfixOf` p =
+        "OutsideValidityInterval"
+    | otherwise = Text.take 60 p
+
+{- | Translate the predicate into a few lines of ADA-denominated /
+hash-listed prose. Falls back to the raw message in a fenced block
+when the predicate shape is not recognised.
+-}
+humanise :: Text -> Text -> Text
+humanise predicate msg
+    | "ValueNotConservedUTxO" `Text.isInfixOf` predicate =
+        humaniseValueNotConserved predicate
+    | "MissingVKeyWitnessesUTXOW" `Text.isInfixOf` predicate =
+        humaniseMissingVKey predicate
+    | otherwise = "```\n" <> msg <> "\n```\n"
+
+humaniseValueNotConserved :: Text -> Text
+humaniseValueNotConserved predicate =
+    let supplied = extractCoin "supplied: MaryValue (Coin " predicate
+        expected = extractCoin "expected: MaryValue (Coin " predicate
+        delta = supplied - expected
+        direction
+            | delta > 0 =
+                "Inputs supply **"
+                    <> formatAdaSimple delta
+                    <> " ADA** more than outputs + fee — that ADA is "
+                    <> "unaccounted for."
+            | delta < 0 =
+                "Outputs + fee claim **"
+                    <> formatAdaSimple (negate delta)
+                    <> " ADA** more than inputs supply — over-spent."
+            | otherwise = "Both sides equal but the ledger still rejected — re-check predicate."
+     in "- supplied (inputs): **"
+            <> formatAdaSimple supplied
+            <> " ADA**\n"
+            <> "- expected (outputs + fee): **"
+            <> formatAdaSimple expected
+            <> " ADA**\n"
+            <> "- "
+            <> direction
+            <> "\n"
+
+humaniseMissingVKey :: Text -> Text
+humaniseMissingVKey predicate =
+    let hashes = extractKeyHashes predicate
+     in if null hashes
+            then "No vkey witness hashes recovered from the predicate.\n"
+            else
+                "The following payment-key hashes are listed as required \
+                \signers but are missing from the witness set:\n\n"
+                    <> Text.concat (map (\h -> "- `" <> h <> "`\n") hashes)
+                    <> "\n_Tip:_ each hash above is the `payment_key_hash` of one \
+                       \of the resolved inputs (or an explicitly declared required \
+                       \signer in the tx body). Compare with the `Observations` \
+                       \section above to see which party each hash belongs to.\n"
+
+{- | Pull a Coin integer out of @\"supplied: MaryValue (Coin 12345)\"@
+or @\"expected: ... (Coin 12345)\"@. Returns 0 on no match.
+-}
+extractCoin :: Text -> Text -> Integer
+extractCoin marker predicate =
+    case Text.breakOn marker predicate of
+        (_, rest)
+            | not (Text.null rest) ->
+                let after = Text.drop (Text.length marker) rest
+                    digits = Text.takeWhile (\c -> c >= '0' && c <= '9') after
+                 in case reads (Text.unpack digits) of
+                        [(n, "")] -> n
+                        _ -> 0
+        _ -> 0
+
+extractKeyHashes :: Text -> [Text]
+extractKeyHashes =
+    filter isHashLike
+        . map cleanup
+        . drop 1
+        . Text.splitOn "KeyHash"
+  where
+    cleanup t =
+        Text.takeWhile
+            (/= '"')
+            (Text.drop 1 (Text.dropWhile (/= '"') t))
+    isHashLike t =
+        Text.length t == 56 && Text.all isHex t
+    isHex c =
+        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+
+{- | Format an Integer lovelace amount as ADA with thousands
+separators and 6 decimals. Local copy to avoid a Render.Single ↔
+Render.Summary dependency cycle; both call sites are deterministic.
+-}
+formatAdaSimple :: Integer -> Text
+formatAdaSimple n =
+    let sign = if n < 0 then "-" else ""
+        m = abs n
+        whole = m `div` 1000000
+        frac = m `mod` 1000000
+        wholeT = withThousandsSeparators (Text.pack (show whole))
+        fracT = Text.justifyRight 6 '0' (Text.pack (show frac))
+     in sign <> wholeT <> "." <> fracT
+
+withThousandsSeparators :: Text -> Text
+withThousandsSeparators t =
+    let chars = Text.unpack t
+        len = length chars
+        (head', tailGroups) = splitAt ((len - 1) `mod` 3 + 1) chars
+        groups
+            | null tailGroups = [head']
+            | otherwise = head' : chunksOf 3 tailGroups
+     in Text.pack (concatMap (\g -> if g == head' then g else "," <> g) groups)
+  where
+    chunksOf k xs = case splitAt k xs of
+        (h, []) -> [h]
+        (h, rest) -> h : chunksOf k rest
 
 warningsSection :: DiagnosisDoc -> Text
 warningsSection doc =
