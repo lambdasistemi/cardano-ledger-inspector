@@ -54,6 +54,88 @@ Inputs that also receive outputs (same payment credential on both sides):
 | 10 | script | SundaeSwap V3 order | 8,166.545306 | — |
 | 11 | external_key | key d2626d | 49,897.955481 | — |
 
+## Datums
+
+<details><summary>Outputs #0, #1, #2, #3, #4, #5, #6, #7, #8 — SundaeSwap V3 order (9 identical)</summary>
+
+```
+Constr 0
+  Constr 0
+    Bytes 28B 64f35d26b237ad58…6e2540ef
+  Constr 1
+    List 4
+      Constr 0
+        Bytes 28B 7095faf3d48d582f…2bbdeffb
+      Constr 0
+        Bytes 28B f3ab64b0f97dcf0f…04d23e2e
+      Constr 0
+        Bytes 28B 8bd03209d227956a…b24fb1c1
+      Constr 0
+        Bytes 28B 97e0f6d6c86dbebf…edd49df2
+  Int 1280000
+  Constr 0
+    Constr 0
+      Constr 1
+        Bytes 28B 32201dc1e8270836…a10baa0d
+      Constr 0
+        Constr 0
+          Constr 1
+            Bytes 28B 32201dc1e8270836…a10baa0d
+    Constr 0
+  Constr 1
+    List 3
+      Bytes 0B 
+      Bytes 0B 
+      Int 12500000000
+    List 3
+      Bytes 28B c48cbb3d5e57ed56…02da47ad
+      Bytes 8B 0014df105553444d
+      Int 3062500000
+  Constr 0
+```
+
+</details>
+
+<details><summary>Output #9 — SundaeSwap V3 order</summary>
+
+```
+Constr 0
+  Constr 0
+    Bytes 28B 64f35d26b237ad58…6e2540ef
+  Constr 1
+    List 4
+      Constr 0
+        Bytes 28B 7095faf3d48d582f…2bbdeffb
+      Constr 0
+        Bytes 28B f3ab64b0f97dcf0f…04d23e2e
+      Constr 0
+        Bytes 28B 8bd03209d227956a…b24fb1c1
+      Constr 0
+        Bytes 28B 97e0f6d6c86dbebf…edd49df2
+  Int 1280000
+  Constr 0
+    Constr 0
+      Constr 1
+        Bytes 28B 32201dc1e8270836…a10baa0d
+      Constr 0
+        Constr 0
+          Constr 1
+            Bytes 28B 32201dc1e8270836…a10baa0d
+    Constr 0
+  Constr 1
+    List 3
+      Bytes 0B 
+      Bytes 0B 
+      Int 8163265306
+    List 3
+      Bytes 28B c48cbb3d5e57ed56…02da47ad
+      Bytes 8B 0014df105553444d
+      Int 2000000000
+  Constr 0
+```
+
+</details>
+
 ## Claims
 
 | Label | Value | Detail |
