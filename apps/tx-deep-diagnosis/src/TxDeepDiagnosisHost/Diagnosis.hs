@@ -2,6 +2,7 @@
 
 module TxDeepDiagnosisHost.Diagnosis (
     ValidationContext (..),
+    WithdrawalCredential (..),
     emptyContext,
     runIntent,
     runValidate,
@@ -9,6 +10,7 @@ module TxDeepDiagnosisHost.Diagnosis (
     buildValidateRequest,
     buildProducerTxsObject,
     extractProducerTxIds,
+    extractMissingWithdrawalCredentials,
     showInspectError,
 ) where
 
@@ -30,7 +32,23 @@ data ValidationContext = ValidationContext
     , vcSlot :: !(Maybe Integer)
     , vcEpoch :: !(Maybe Integer)
     , vcProtocolParameters :: !(Maybe Value)
+    , vcCertState :: !(Maybe Value)
+    -- ^ Optional cert_state JSON, schema:
+    --   @{ "rewards": [{"credential": {"kind","hash"}, "balance_lovelace": "<int>"}] }@
+    -- The inspector library reads this to seed the @Accounts@ map
+    -- before running Conway @applyTx@ (rewards-only is enough for
+    -- withdraw-zero patterns).
     }
+
+{- | A withdrawal credential the validator wants the host to look up
+  off-chain. Pulled out of the cert_state @missing_context@ entry's
+  @details.withdrawal_credentials@ array.
+-}
+data WithdrawalCredential = WithdrawalCredential
+    { wcKind :: !Text
+    , wcHash :: !Text
+    }
+    deriving (Eq, Ord, Show)
 
 emptyContext :: ValidationContext
 emptyContext =
@@ -40,6 +58,7 @@ emptyContext =
         , vcSlot = Nothing
         , vcEpoch = Nothing
         , vcProtocolParameters = Nothing
+        , vcCertState = Nothing
         }
 
 runIntent :: Text -> Either String Value
@@ -86,12 +105,13 @@ buildValidateRequest txHex ctx =
             <> maybe [] (\e -> [("epoch", A.String (Text.pack (show e)))]) (vcEpoch ctx)
             <> maybe [] (\p -> [("protocol_parameters", p)]) (vcProtocolParameters ctx)
             -- cert_state is required by the validator when the tx has
-            -- withdrawals or certificates, but the inspector library
-            -- only checks for its presence — not contents — to mark the
-            -- ledger.apply_tx scope as ready to run. Supplying an empty
-            -- object satisfies the gate.
-            <> [("cert_state", A.object [])]
-            <> [("source", A.String "tx-deep-diagnosis.blockfrost+latest+pparams")]
+            -- withdrawals or certificates. The inspector library reads
+            -- the @rewards@ entries to seed the Accounts map before
+            -- Conway applyTx runs; an empty object still satisfies the
+            -- gate but yields no seeded entries (CERTS will then reject
+            -- the withdrawal).
+            <> maybe [] (\c -> [("cert_state", c)]) (vcCertState ctx)
+            <> [("source", A.String "tx-deep-diagnosis.blockfrost+latest+pparams+cert_state")]
 
 buildProducerTxsObject :: Map Text Text -> Value
 buildProducerTxsObject m =
@@ -119,4 +139,26 @@ extractProducerTxIds resp =
         , A.Object entry <- foldr (:) [] missing
         , Just (A.String "source_output") <- [KeyMap.lookup "kind" entry]
         , Just (A.String txid) <- [KeyMap.lookup "tx_id" entry]
+        ]
+
+{- | Walk a tx.validate response and extract the de-duplicated stake
+  credentials the validator wants the host to look up off-chain. Each
+  entry comes from a missing_context @kind == "cert_state"@ row whose
+  @details.withdrawal_credentials@ array names the credentials.
+-}
+extractMissingWithdrawalCredentials :: Value -> [WithdrawalCredential]
+extractMissingWithdrawalCredentials resp =
+    nub
+        [ WithdrawalCredential{wcKind = kind, wcHash = hash}
+        | A.Object root <- [resp]
+        , Just (A.Object result) <- [KeyMap.lookup "result" root]
+        , Just (A.Object validation) <- [KeyMap.lookup "validation" result]
+        , Just (A.Array missing) <- [KeyMap.lookup "missing_context" validation]
+        , A.Object entry <- foldr (:) [] missing
+        , Just (A.String "cert_state") <- [KeyMap.lookup "kind" entry]
+        , Just (A.Object details) <- [KeyMap.lookup "details" entry]
+        , Just (A.Array creds) <- [KeyMap.lookup "withdrawal_credentials" details]
+        , A.Object cred <- foldr (:) [] creds
+        , Just (A.String kind) <- [KeyMap.lookup "kind" cred]
+        , Just (A.String hash) <- [KeyMap.lookup "hash" cred]
         ]

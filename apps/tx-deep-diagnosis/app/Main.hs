@@ -5,7 +5,7 @@ module Main (main) where
 import Control.Applicative ((<|>))
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TIO
@@ -132,6 +132,14 @@ main = do
                         Left e -> hPutStrLn stderr ("protocol-parameters fetch failed: " <> e)
                         _ -> pure ()
                     pure (prods, Nothing, Nothing)
+    -- Phase 2.5: build cert_state by fetching the rewards balance for
+    -- every withdrawal credential the probe surfaced.
+    let withdrawalCreds = extractMissingWithdrawalCredentials probe
+    mCertState <- case mpid of
+        Just pid
+            | not (null withdrawalCreds) ->
+                Just <$> buildCertState mgr (optNetwork opts) pid withdrawalCreds
+        _ -> pure Nothing
     -- Phase 3: validate again with everything we collected.
     let fullCtx =
             ValidationContext
@@ -140,6 +148,7 @@ main = do
                 , vcSlot = fmap lbSlot mLatest
                 , vcEpoch = fmap lbEpoch mLatest
                 , vcProtocolParameters = mPParams
+                , vcCertState = mCertState
                 }
     validate <- case runValidate hex fullCtx of
         Left e -> die ("validate error: " <> e)
@@ -168,3 +177,90 @@ fetchProducer mgr net pid h = do
                 stderr
                 ("producer fetch failed for " <> Text.unpack h <> ": " <> e)
             pure (h, Left e)
+
+{- | For each withdrawal credential surfaced by the probe, look up the
+ current rewards balance via Blockfrost and assemble the cert_state
+ JSON the inspector library expects. Failures (bad bech32 derivation,
+ HTTP errors, unregistered accounts) are logged but do not abort —
+ the unresolved credentials simply do not appear in the output, and
+ the ledger will then surface its own CERTS error for them, which is
+ more useful diagnostic output than a host-side abort.
+-}
+buildCertState ::
+    Manager -> Network -> Text -> [WithdrawalCredential] -> IO Aeson.Value
+buildCertState mgr net pid creds = do
+    rewardEntries <- mapM (fetchRewardsEntry mgr net pid) creds
+    pure $
+        Aeson.object
+            [ ("rewards", Aeson.toJSON (catMaybes rewardEntries))
+            ]
+
+fetchRewardsEntry ::
+    Manager -> Network -> Text -> WithdrawalCredential -> IO (Maybe Aeson.Value)
+fetchRewardsEntry mgr net pid cred = do
+    let kind = case wcKind cred of
+            "script" -> Just ScriptCred
+            "key" -> Just KeyCred
+            _ -> Nothing
+    case kind of
+        Nothing -> do
+            hPutStrLn
+                stderr
+                ("unknown credential.kind: " <> Text.unpack (wcKind cred))
+            pure Nothing
+        Just k -> case stakeAddressBech32 net k (wcHash cred) of
+            Left e -> do
+                hPutStrLn
+                    stderr
+                    ( "stake-address derivation failed for "
+                        <> Text.unpack (wcHash cred)
+                        <> ": "
+                        <> e
+                    )
+                pure Nothing
+            Right stake -> do
+                eAcc <- fetchAccountInfo mgr net pid stake
+                case eAcc of
+                    Left e -> do
+                        hPutStrLn
+                            stderr
+                            ( "account fetch failed for "
+                                <> Text.unpack stake
+                                <> ": "
+                                <> e
+                            )
+                        pure Nothing
+                    Right info
+                        | not (aiRegistered info) -> do
+                            -- Truly unknown to the chain. Skip; CERTS
+                            -- will then reject with a clear message
+                            -- naming the credential, which is the right
+                            -- diagnostic signal for the user.
+                            hPutStrLn
+                                stderr
+                                ( "stake credential never registered on chain: "
+                                    <> Text.unpack stake
+                                    <> " (CERTS will reject this withdrawal)"
+                                )
+                            pure Nothing
+                        | otherwise -> do
+                            -- registered=true with active=false is the
+                            -- normal state for a withdraw-zero trigger
+                            -- script that never delegates ADA — seed
+                            -- and let the ledger evaluate.
+                            pure $
+                                Just $
+                                    Aeson.object
+                                        [ ("credential", credentialJson cred)
+                                        ,
+                                            ( "balance_lovelace"
+                                            , Aeson.String (Text.pack (show (aiWithdrawableLovelace info)))
+                                            )
+                                        ]
+
+credentialJson :: WithdrawalCredential -> Aeson.Value
+credentialJson cred =
+    Aeson.object
+        [ ("kind", Aeson.String (wcKind cred))
+        , ("hash", Aeson.String (wcHash cred))
+        ]
