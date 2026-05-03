@@ -68,10 +68,21 @@ Inputs that also receive outputs (same payment credential on both sides):
 
 ## Validation failures
 
-| Rule | Message |
-|------|---------|
-| UTXOW | Transaction witness or UTxO validation failed: UtxoFailure (ValueNotConservedUTxO Mismatch (RelEQ) {supplied: MaryValue (Coin 1500007239276) (MultiAsset (fromList [])), expected: MaryValue (Coin 1212431799276) (MultiAsset (fromList []))}) |
-| UTXOW | Transaction witness or UTxO validation failed: MissingVKeyWitnessesUTXOW (NonEmptySet (fromList [KeyHash {unKeyHash = "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1"},KeyHash {unKeyHash = "dea7197ac235d73e7f7b1a249bace6a833722415d88e91dec5d2626d"},KeyHash {unKeyHash = "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e"}])) |
+### UTXOW — ValueNotConservedUTxO
+
+- supplied (inputs): **1,500,007.239276 ADA**
+- expected (outputs + fee): **1,212,431.799276 ADA**
+- Inputs supply **287,575.440000 ADA** more than outputs + fee — that ADA is unaccounted for.
+
+### UTXOW — MissingVKeyWitnessesUTXOW
+
+The following payment-key hashes are listed as required signers but are missing from the witness set:
+
+- `8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1`
+- `dea7197ac235d73e7f7b1a249bace6a833722415d88e91dec5d2626d`
+- `f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e`
+
+_Tip:_ each hash above is the `payment_key_hash` of one of the resolved inputs (or an explicitly declared required signer in the tx body). Compare with the `Observations` section above to see which party each hash belongs to.
 
 ## Warnings
 
