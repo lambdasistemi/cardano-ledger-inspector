@@ -33,18 +33,33 @@ import System.IO (hPutStrLn, stderr)
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry, loadRegistries)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc, parseDiagnosisDoc)
+import TxDeepDiagnosisHost.Render.Failures (renderFailuresMermaid)
 import TxDeepDiagnosisHost.Render.Parties (renderPartiesMermaid)
+import TxDeepDiagnosisHost.Render.Summary (
+    EmittedFiles (..),
+    renderSummaryMarkdown,
+ )
 import TxDeepDiagnosisHost.Render.Topology (renderTopologyMermaid)
 import TxDeepDiagnosisHost.Render.ValueFlow (renderValueFlowTsv)
 
-{- | Static registry of (relative file name, producer) pairs. Each
-renderer commit appends one line.
+{- | All artifacts the harness can produce, in emit order. Failures
+and summary are conditional on doc state and produce 'Maybe'
+output.
 -}
-renderers :: [(FilePath, ProtocolRegistry -> DiagnosisDoc -> Text)]
+data Artifact
+    = Always !FilePath !(ProtocolRegistry -> DiagnosisDoc -> Text)
+    | Conditional !FilePath !(ProtocolRegistry -> DiagnosisDoc -> Maybe Text)
+    | -- | Summary depends on which other files were emitted, so it
+      -- runs last and receives the cumulative 'EmittedFiles'.
+      SummaryArtifact !FilePath
+
+renderers :: [Artifact]
 renderers =
-    [ ("parties.mmd", renderPartiesMermaid)
-    , ("value-flow.tsv", renderValueFlowTsv)
-    , ("topology.mmd", renderTopologyMermaid)
+    [ Always "parties.mmd" renderPartiesMermaid
+    , Always "value-flow.tsv" renderValueFlowTsv
+    , Always "topology.mmd" renderTopologyMermaid
+    , Conditional "failures.mmd" renderFailuresMermaid
+    , SummaryArtifact "summary.md"
     ]
 
 main :: IO ()
@@ -113,11 +128,37 @@ runCase mode reg root name = do
                 hPutStrLn stderr ("parse " <> inputPath <> ": " <> e)
                 pure (name, False)
             Right doc -> do
-                outcomes <-
-                    mapM
-                        (handleArtifact mode reg root name doc)
-                        renderers
+                let initial = noEmittedFilesLocal
+                (outcomes, _emitted) <-
+                    foldArtifacts mode reg root name doc initial renderers
                 pure (name, and outcomes)
+
+noEmittedFilesLocal :: EmittedFiles
+noEmittedFilesLocal =
+    EmittedFiles
+        { efParties = Nothing
+        , efValueFlow = Nothing
+        , efTopology = Nothing
+        , efFailures = Nothing
+        }
+
+{- | Apply each artifact in order, threading 'EmittedFiles' so the
+summary can link only to files that were actually written.
+-}
+foldArtifacts ::
+    Mode ->
+    ProtocolRegistry ->
+    FilePath ->
+    FilePath ->
+    DiagnosisDoc ->
+    EmittedFiles ->
+    [Artifact] ->
+    IO ([Bool], EmittedFiles)
+foldArtifacts _ _ _ _ _ acc [] = pure ([], acc)
+foldArtifacts mode reg root name doc acc (a : as) = do
+    (ok, acc') <- handleArtifact mode reg root name doc acc a
+    (rest, accFinal) <- foldArtifacts mode reg root name doc acc' as
+    pure (ok : rest, accFinal)
 
 handleArtifact ::
     Mode ->
@@ -125,29 +166,51 @@ handleArtifact ::
     FilePath ->
     FilePath ->
     DiagnosisDoc ->
-    (FilePath, ProtocolRegistry -> DiagnosisDoc -> Text) ->
-    IO Bool
-handleArtifact WriteMode reg root name doc (artifact, render) = do
-    let expectedDir = root </> name </> "expected"
-        expectedPath = expectedDir </> artifact
-    exists <- doesDirectoryExist expectedDir
-    unless exists $ die ("missing expected dir: " <> expectedDir)
-    TIO.writeFile expectedPath (render reg doc)
-    putStrLn ("wrote " <> expectedPath)
-    pure True
-handleArtifact CompareMode reg root name doc args =
-    compareArtifact reg root name doc args
+    EmittedFiles ->
+    Artifact ->
+    IO (Bool, EmittedFiles)
+handleArtifact mode reg root name doc files art = case art of
+    Always file render -> do
+        let actual = render reg doc
+        ok <- handle mode reg root name file actual
+        pure (ok, recordFile file files)
+    Conditional file render -> case render reg doc of
+        Nothing ->
+            -- Skipped on purpose; tolerate any leftover expected file.
+            pure (True, files)
+        Just actual -> do
+            ok <- handle mode reg root name file actual
+            pure (ok, recordFile file files)
+    SummaryArtifact file -> do
+        let actual = renderSummaryMarkdown reg doc files
+        ok <- handle mode reg root name file actual
+        pure (ok, recordFile file files)
 
-compareArtifact ::
+recordFile :: FilePath -> EmittedFiles -> EmittedFiles
+recordFile "parties.mmd" f = f{efParties = Just "parties.mmd"}
+recordFile "value-flow.tsv" f = f{efValueFlow = Just "value-flow.tsv"}
+recordFile "topology.mmd" f = f{efTopology = Just "topology.mmd"}
+recordFile "failures.mmd" f = f{efFailures = Just "failures.mmd"}
+recordFile _ f = f
+
+handle ::
+    Mode ->
     ProtocolRegistry ->
     FilePath ->
     FilePath ->
-    DiagnosisDoc ->
-    (FilePath, ProtocolRegistry -> DiagnosisDoc -> Text) ->
+    FilePath ->
+    Text ->
     IO Bool
-compareArtifact reg root name doc (artifact, render) = do
-    let expectedPath = root </> name </> "expected" </> artifact
-        actual = render reg doc
+handle WriteMode _reg root name file actual = do
+    let expectedDir = root </> name </> "expected"
+        expectedPath = expectedDir </> file
+    exists <- doesDirectoryExist expectedDir
+    unless exists $ die ("missing expected dir: " <> expectedDir)
+    TIO.writeFile expectedPath actual
+    putStrLn ("wrote " <> expectedPath)
+    pure True
+handle CompareMode _reg root name file actual = do
+    let expectedPath = root </> name </> "expected" </> file
     expectedExists <- doesFileExist expectedPath
     if not expectedExists
         then do
@@ -170,7 +233,7 @@ compareArtifact reg root name doc (artifact, render) = do
                         ( "DIFF in "
                             <> name
                             <> "/"
-                            <> artifact
+                            <> file
                             <> ":\n--- expected ---\n"
                             <> Text.unpack expected
                             <> "--- actual ---\n"
