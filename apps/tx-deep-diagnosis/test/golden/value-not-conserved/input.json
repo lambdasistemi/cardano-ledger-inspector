@@ -367,8 +367,183 @@
                 "coin_lovelace": "1041836734694",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 0
               },
@@ -379,8 +554,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 1
               },
@@ -391,8 +741,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 2
               },
@@ -403,8 +928,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 3
               },
@@ -415,8 +1115,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 4
               },
@@ -427,8 +1302,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 5
               },
@@ -439,8 +1489,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 6
               },
@@ -451,8 +1676,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 7
               },
@@ -463,8 +1863,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000002e90edd00ff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1ab68a0aa0ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "12500000000"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "3062500000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 8
               },
@@ -475,8 +2050,183 @@
                 "coin_lovelace": "12503280000",
                 "datum": {
                   "cbor_hex": "d8799fd8799f581c64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540efffd87a9f9fd8799f581c7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffbffd8799f581cf3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2effd8799f581c8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1ffd8799f581c97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2ffffff1a00138800d8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffd8799fd8799fd87a9f581c32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0dffffffffd87980ffd87a9f9f40401b00000001e6918b1aff9f581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad480014df105553444d1a77359400ffffd87980ff",
-                  "kind": "inline_datum",
-                  "note": "Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes"
+                  "decoded": {
+                    "fields": [
+                      {
+                        "fields": [
+                          {
+                            "hex": "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef",
+                            "kind": "bytes",
+                            "len": 28
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "kind": "int",
+                        "value": "1280000"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "fields": [
+                              {
+                                "fields": [
+                                  {
+                                    "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                    "kind": "bytes",
+                                    "len": 28
+                                  }
+                                ],
+                                "index": 1,
+                                "kind": "constr"
+                              },
+                              {
+                                "fields": [
+                                  {
+                                    "fields": [
+                                      {
+                                        "fields": [
+                                          {
+                                            "hex": "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                                            "kind": "bytes",
+                                            "len": 28
+                                          }
+                                        ],
+                                        "index": 1,
+                                        "kind": "constr"
+                                      }
+                                    ],
+                                    "index": 0,
+                                    "kind": "constr"
+                                  }
+                                ],
+                                "index": 0,
+                                "kind": "constr"
+                              }
+                            ],
+                            "index": 0,
+                            "kind": "constr"
+                          },
+                          {
+                            "fields": [],
+                            "index": 0,
+                            "kind": "constr"
+                          }
+                        ],
+                        "index": 0,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [
+                          {
+                            "items": [
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "hex": "",
+                                "kind": "bytes",
+                                "len": 0
+                              },
+                              {
+                                "kind": "int",
+                                "value": "8163265306"
+                              }
+                            ],
+                            "kind": "list"
+                          },
+                          {
+                            "items": [
+                              {
+                                "hex": "c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad",
+                                "kind": "bytes",
+                                "len": 28
+                              },
+                              {
+                                "hex": "0014df105553444d",
+                                "kind": "bytes",
+                                "len": 8
+                              },
+                              {
+                                "kind": "int",
+                                "value": "2000000000"
+                              }
+                            ],
+                            "kind": "list"
+                          }
+                        ],
+                        "index": 1,
+                        "kind": "constr"
+                      },
+                      {
+                        "fields": [],
+                        "index": 0,
+                        "kind": "constr"
+                      }
+                    ],
+                    "index": 0,
+                    "kind": "constr"
+                  },
+                  "kind": "inline_datum"
                 },
                 "index": 9
               },

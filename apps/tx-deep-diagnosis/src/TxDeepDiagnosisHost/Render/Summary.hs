@@ -27,7 +27,7 @@ import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.List (foldl')
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Vector as V
@@ -72,6 +72,7 @@ renderSummaryMarkdown reg doc files =
         , observationsSection reg doc
         , scriptsSection reg doc
         , outputsSection reg doc
+        , datumsSection reg doc
         , claimsSection doc
         , effectsSection doc
         , failuresSection doc
@@ -370,6 +371,196 @@ parseLov :: Text -> Integer
 parseLov t = case reads (Text.unpack t) of
     [(n, "")] -> n
     _ -> 0
+
+{- | Pretty-prints the per-output decoded datum AST. Each output that
+carries an @inline_datum@ with a @decoded@ field gets its own
+collapsible @<details>@ so the full document remains scrollable.
+The pretty-printer renders the AST as an indented pseudo-Lisp form
+which compresses better than JSON in the markdown view.
+
+Outputs whose datum is a hash-only reference, or a @no_datum@, are
+omitted. Identical datums (same hex string) are deduplicated — a
+SundaeSwap order with N identical outputs only shows the datum
+once with a count.
+-}
+datumsSection :: ProtocolRegistry -> DiagnosisDoc -> Text
+datumsSection reg doc =
+    let path = ["result", "intent", "value", "outputs"]
+        items = case valuePath (ddIntent doc) path of
+            Just (Array xs) -> V.toList xs
+            _ -> []
+        decoded = mapMaybeDecoded reg items
+        groups = groupByCbor decoded
+     in if null groups
+            then ""
+            else
+                "## Datums\n\n"
+                    <> Text.concat (map renderDatumGroup groups)
+
+mapMaybeDecoded ::
+    ProtocolRegistry ->
+    [Value] ->
+    [DecodedDatum]
+mapMaybeDecoded reg = mapMaybe step
+  where
+    step (Object o) = do
+        idx <- case KeyMap.lookup "index" o of
+            Just (Number n) -> Just (floor n :: Int)
+            _ -> Nothing
+        addr <- case KeyMap.lookup "address_hex" o of
+            Just (String s) -> Just s
+            _ -> Nothing
+        d <- case KeyMap.lookup "datum" o of
+            Just (Object dm) -> Just dm
+            _ -> Nothing
+        case KeyMap.lookup "kind" d of
+            Just (String "inline_datum") -> do
+                cbor <- case KeyMap.lookup "cbor_hex" d of
+                    Just (String s) -> Just s
+                    _ -> Nothing
+                ast <- KeyMap.lookup "decoded" d
+                Just
+                    DecodedDatum
+                        { ddIndex = idx
+                        , ddDestination = pnLabel (resolveAddress reg addr)
+                        , ddCbor = cbor
+                        , ddAst = ast
+                        }
+            _ -> Nothing
+    step _ = Nothing
+
+data DecodedDatum = DecodedDatum
+    { ddIndex :: !Int
+    , ddDestination :: !Text
+    , ddCbor :: !Text
+    , ddAst :: !Value
+    }
+
+groupByCbor :: [DecodedDatum] -> [(DecodedDatum, [Int])]
+groupByCbor = foldr add []
+  where
+    add d acc = case partitionBy (\(rep, _) -> ddCbor rep == ddCbor d) acc of
+        (Just (rep, idxs), rest) -> (rep, ddIndex d : idxs) : rest
+        (Nothing, _) -> (d, [ddIndex d]) : acc
+
+partitionBy :: (a -> Bool) -> [a] -> (Maybe a, [a])
+partitionBy _ [] = (Nothing, [])
+partitionBy p (x : xs)
+    | p x = (Just x, xs)
+    | otherwise = case partitionBy p xs of
+        (m, rest) -> (m, x : rest)
+
+renderDatumGroup :: (DecodedDatum, [Int]) -> Text
+renderDatumGroup (rep, indices) =
+    let title = case sortedIndices indices of
+            [i] -> "Output #" <> Text.pack (show i) <> " — " <> ddDestination rep
+            xs ->
+                "Outputs "
+                    <> Text.intercalate ", " ["#" <> Text.pack (show i) | i <- xs]
+                    <> " — "
+                    <> ddDestination rep
+                    <> " ("
+                    <> Text.pack (show (length xs))
+                    <> " identical)"
+     in "<details><summary>"
+            <> escapeTable title
+            <> "</summary>\n\n"
+            <> "```\n"
+            <> prettyPlutusData 0 (ddAst rep)
+            <> "```\n\n"
+            <> "</details>\n\n"
+
+sortedIndices :: [Int] -> [Int]
+sortedIndices = foldr insertSorted []
+  where
+    insertSorted x [] = [x]
+    insertSorted x (y : ys)
+        | x <= y = x : y : ys
+        | otherwise = y : insertSorted x ys
+
+{- | Pseudo-Lisp pretty-print of a Plutus Data AST node. Indented two
+spaces per nesting level. Constr is rendered with its constructor
+index; bytes show their hex (truncated for display) plus a UTF-8
+preview when present; ints render as decimal.
+-}
+prettyPlutusData :: Int -> Value -> Text
+prettyPlutusData lvl v =
+    let pad = Text.replicate (lvl * 2) " "
+     in case v of
+            Object o -> case KeyMap.lookup "kind" o of
+                Just (String "constr") ->
+                    let idx = case KeyMap.lookup "index" o of
+                            Just (Number n) -> Text.pack (show (floor n :: Integer))
+                            _ -> "?"
+                        fields = case KeyMap.lookup "fields" o of
+                            Just (Array xs) -> V.toList xs
+                            _ -> []
+                     in pad
+                            <> "Constr "
+                            <> idx
+                            <> "\n"
+                            <> Text.concat
+                                (map (prettyPlutusData (lvl + 1)) fields)
+                Just (String "list") ->
+                    let items = case KeyMap.lookup "items" o of
+                            Just (Array xs) -> V.toList xs
+                            _ -> []
+                     in pad
+                            <> "List "
+                            <> Text.pack (show (length items))
+                            <> "\n"
+                            <> Text.concat
+                                (map (prettyPlutusData (lvl + 1)) items)
+                Just (String "map") ->
+                    let entries = case KeyMap.lookup "entries" o of
+                            Just (Array xs) -> V.toList xs
+                            _ -> []
+                     in pad
+                            <> "Map\n"
+                            <> Text.concat
+                                (map (prettyMapEntry (lvl + 1)) entries)
+                Just (String "int") -> case KeyMap.lookup "value" o of
+                    Just (String s) -> pad <> "Int " <> s <> "\n"
+                    _ -> pad <> "Int ?\n"
+                Just (String "bytes") ->
+                    let hex = case KeyMap.lookup "hex" o of
+                            Just (String s) -> s
+                            _ -> ""
+                        len = case KeyMap.lookup "len" o of
+                            Just (Number n) -> floor n :: Int
+                            _ -> 0
+                        utf = case KeyMap.lookup "utf8" o of
+                            Just (String s) -> Just s
+                            _ -> Nothing
+                        hexShort
+                            | Text.length hex <= 32 = hex
+                            | otherwise = Text.take 16 hex <> "…" <> Text.takeEnd 8 hex
+                        utfTail = case utf of
+                            Just s -> "  // \"" <> s <> "\""
+                            Nothing -> ""
+                     in pad
+                            <> "Bytes "
+                            <> Text.pack (show len)
+                            <> "B "
+                            <> hexShort
+                            <> utfTail
+                            <> "\n"
+                _ -> pad <> "?\n"
+            _ -> pad <> "?\n"
+
+prettyMapEntry :: Int -> Value -> Text
+prettyMapEntry lvl v = case v of
+    Object o ->
+        let pad = Text.replicate (lvl * 2) " "
+            k = fromMaybe Null (KeyMap.lookup "k" o)
+            mv = fromMaybe Null (KeyMap.lookup "v" o)
+         in pad
+                <> "k:\n"
+                <> prettyPlutusData (lvl + 1) k
+                <> pad
+                <> "v:\n"
+                <> prettyPlutusData (lvl + 1) mv
+    _ -> ""
 
 {- | Per-redeemer table from @intent.scripts[]@. Each row identifies
 the redeemer's purpose, what it targets, the ex_units it commits, and
