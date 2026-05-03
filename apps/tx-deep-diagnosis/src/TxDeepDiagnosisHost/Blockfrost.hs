@@ -3,16 +3,23 @@
 module TxDeepDiagnosisHost.Blockfrost (
     Network (..),
     networkBaseUrl,
+    networkLedgerName,
     ResolvedOutput (..),
     ResolvedAsset (..),
+    LatestBlock (..),
     fetchTxUtxos,
     fetchTxCbor,
     fetchOutputAtIndex,
+    fetchLatestBlock,
+    fetchProtocolParametersJson,
+    remapPParamsToLedger,
 ) where
 
 import Control.Exception (SomeException, try)
 import Data.Aeson (FromJSON (..), eitherDecode, withObject, (.!=), (.:), (.:?))
 import qualified Data.Aeson as A
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -28,6 +35,11 @@ networkBaseUrl :: Network -> Text
 networkBaseUrl Mainnet = "https://cardano-mainnet.blockfrost.io/api/v0"
 networkBaseUrl Preprod = "https://cardano-preprod.blockfrost.io/api/v0"
 networkBaseUrl Preview = "https://cardano-preview.blockfrost.io/api/v0"
+
+-- The string the ledger expects in the validation context's "network" field.
+networkLedgerName :: Network -> Text
+networkLedgerName Mainnet = "mainnet"
+networkLedgerName _ = "testnet"
 
 data ResolvedAsset = ResolvedAsset
     { rAssetUnit :: !Text
@@ -112,6 +124,145 @@ fetchOutputAtIndex mgr net pid txHash ix = do
                 [] -> Nothing
             )
             eOuts
+
+data LatestBlock = LatestBlock
+    { lbSlot :: !Integer
+    , lbEpoch :: !Integer
+    }
+    deriving (Show)
+
+instance FromJSON LatestBlock where
+    parseJSON = withObject "LatestBlock" $ \o ->
+        LatestBlock <$> o .: "slot" <*> o .: "epoch"
+
+fetchLatestBlock :: Manager -> Network -> Text -> IO (Either String LatestBlock)
+fetchLatestBlock mgr net pid = do
+    let url = networkBaseUrl net <> "/blocks/latest"
+    eBody <- callBlockfrost mgr url pid
+    pure $ case eBody of
+        Left e -> Left e
+        Right body -> case eitherDecode body of
+            Left e -> Left ("JSON decode error: " <> e)
+            Right blk -> Right blk
+
+-- Returns the raw Blockfrost protocol-parameters JSON. Use
+-- 'remapPParamsToLedger' to convert into the camelCase shape the
+-- ledger functional layer expects.
+fetchProtocolParametersJson ::
+    Manager -> Network -> Text -> IO (Either String A.Value)
+fetchProtocolParametersJson mgr net pid = do
+    let url = networkBaseUrl net <> "/epochs/latest/parameters"
+    eBody <- callBlockfrost mgr url pid
+    pure $ case eBody of
+        Left e -> Left e
+        Right body -> case eitherDecode body of
+            Left e -> Left ("JSON decode error: " <> e)
+            Right v -> Right v
+
+-- Port of docs/inspector/src/FFI/Blockfrost.js lines 31-98
+-- (blockfrostParamsToLedgerPParams). Maps Blockfrost's snake_case
+-- protocol-parameter shape to the camelCase shape the ledger
+-- functional layer accepts.
+remapPParamsToLedger :: A.Value -> A.Value
+remapPParamsToLedger raw = case raw of
+    A.Object o
+        | KeyMap.member (Key.fromString "txFeePerByte") o
+            && KeyMap.member (Key.fromString "protocolVersion") o ->
+            A.Object o
+    A.Object o -> A.object (remapEntries o)
+    _ -> raw
+  where
+    remapEntries o =
+        let lookFirst ks = case [v | k <- ks, Just v <- [lookupVal k o]] of
+                (v : _) -> Just v
+                [] -> Nothing
+            num k = numberOrNull (lookupVal k o)
+            numFirst ks = numberOrNull (lookFirst ks)
+            asProtocolVersion =
+                A.object
+                    [ ("major", num "protocol_major_ver")
+                    , ("minor", num "protocol_minor_ver")
+                    ]
+            asExUnitPrices =
+                A.object
+                    [ ("priceMemory", num "price_mem")
+                    , ("priceSteps", num "price_step")
+                    ]
+            asMaxTxEx =
+                A.object
+                    [ ("memory", num "max_tx_ex_mem")
+                    , ("steps", num "max_tx_ex_steps")
+                    ]
+            asMaxBlockEx =
+                A.object
+                    [ ("memory", num "max_block_ex_mem")
+                    , ("steps", num "max_block_ex_steps")
+                    ]
+            asPoolVoting =
+                A.object
+                    [ ("motionNoConfidence", num "pvt_motion_no_confidence")
+                    , ("committeeNormal", num "pvt_committee_normal")
+                    , ("committeeNoConfidence", num "pvt_committee_no_confidence")
+                    , ("hardForkInitiation", num "pvt_hard_fork_initiation")
+                    , ("ppSecurityGroup", numFirst ["pvt_p_p_security_group", "pvtpp_security_group"])
+                    ]
+            asDRepVoting =
+                A.object
+                    [ ("motionNoConfidence", num "dvt_motion_no_confidence")
+                    , ("committeeNormal", num "dvt_committee_normal")
+                    , ("committeeNoConfidence", num "dvt_committee_no_confidence")
+                    , ("updateToConstitution", num "dvt_update_to_constitution")
+                    , ("hardForkInitiation", num "dvt_hard_fork_initiation")
+                    , ("ppNetworkGroup", num "dvt_p_p_network_group")
+                    , ("ppEconomicGroup", num "dvt_p_p_economic_group")
+                    , ("ppTechnicalGroup", num "dvt_p_p_technical_group")
+                    , ("ppGovGroup", num "dvt_p_p_gov_group")
+                    , ("treasuryWithdrawal", num "dvt_treasury_withdrawal")
+                    ]
+            costModels = case lookFirst ["cost_models_raw", "cost_models"] of
+                Just v -> v
+                Nothing -> A.Null
+        in [ ("txFeePerByte", num "min_fee_a")
+           , ("txFeeFixed", num "min_fee_b")
+           , ("maxBlockBodySize", num "max_block_size")
+           , ("maxTxSize", num "max_tx_size")
+           , ("maxBlockHeaderSize", num "max_block_header_size")
+           , ("stakeAddressDeposit", num "key_deposit")
+           , ("stakePoolDeposit", num "pool_deposit")
+           , ("poolRetireMaxEpoch", num "e_max")
+           , ("stakePoolTargetNum", num "n_opt")
+           , ("poolPledgeInfluence", num "a0")
+           , ("monetaryExpansion", num "rho")
+           , ("treasuryCut", num "tau")
+           , ("protocolVersion", asProtocolVersion)
+           , ("minPoolCost", num "min_pool_cost")
+           , ("utxoCostPerByte", numFirst ["coins_per_utxo_size", "coins_per_utxo_word"])
+           , ("costModels", costModels)
+           , ("executionUnitPrices", asExUnitPrices)
+           , ("maxTxExecutionUnits", asMaxTxEx)
+           , ("maxBlockExecutionUnits", asMaxBlockEx)
+           , ("maxValueSize", num "max_val_size")
+           , ("collateralPercentage", num "collateral_percent")
+           , ("maxCollateralInputs", num "max_collateral_inputs")
+           , ("poolVotingThresholds", asPoolVoting)
+           , ("dRepVotingThresholds", asDRepVoting)
+           , ("committeeMinSize", num "committee_min_size")
+           , ("committeeMaxTermLength", num "committee_max_term_length")
+           , ("govActionLifetime", num "gov_action_lifetime")
+           , ("govActionDeposit", num "gov_action_deposit")
+           , ("dRepDeposit", num "drep_deposit")
+           , ("dRepActivity", num "drep_activity")
+           , ("minFeeRefScriptCostPerByte", num "min_fee_ref_script_cost_per_byte")
+           ]
+    lookupVal k o = KeyMap.lookup (Key.fromString k) o
+    numberOrNull Nothing = A.Null
+    numberOrNull (Just (A.String t)) = case Text.unpack t of
+        s -> case reads s :: [(Double, String)] of
+            [(n, "")] -> A.toJSON n
+            _ -> A.Null
+    numberOrNull (Just v@(A.Number _)) = v
+    numberOrNull (Just A.Null) = A.Null
+    numberOrNull (Just other) = other
 
 callBlockfrost :: Manager -> Text -> Text -> IO (Either String BSL.ByteString)
 callBlockfrost mgr url pid = do
