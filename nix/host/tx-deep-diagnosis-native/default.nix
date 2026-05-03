@@ -20,4 +20,6 @@ in
   inherit project;
   tx-deep-diagnosis =
     project.hsPkgs.tx-deep-diagnosis.components.exes.tx-deep-diagnosis;
+  tx-deep-diagnosis-render-snapshot =
+    project.hsPkgs.tx-deep-diagnosis.components.exes.tx-deep-diagnosis-render-snapshot;
 }

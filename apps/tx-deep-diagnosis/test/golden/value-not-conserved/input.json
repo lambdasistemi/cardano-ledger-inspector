@@ -1,0 +1,583 @@
+{
+  "tx-deep-diagnosis": {
+    "intent": {
+      "ledger_functional_layer": "cardano-ledger-functional/v1",
+      "op": "tx.intent",
+      "result": {
+        "intent": {
+          "body_hash": "30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f",
+          "claims": [
+            {
+              "detail": "Required to pay Antithesis as vendor / destination Network Compliance's treasury / metadata label 1694 / self-declared",
+              "label": "Swap ADA<->USDM",
+              "value": "Swapping ADA for $100k at a rate of $0.245 per ADA"
+            }
+          ],
+          "context": {
+            "complete": false,
+            "decoded_producer_tx_count": 0,
+            "input_count": 2,
+            "input_policy": "preserve",
+            "missing_input_count": 2,
+            "missing_reference_input_count": 4,
+            "producer_tx_count": 0,
+            "producer_tx_errors": [],
+            "reference_input_count": 4,
+            "resolution": null,
+            "resolved_input_count": 0,
+            "resolved_reference_input_count": 0,
+            "supplied": false
+          },
+          "effects": [
+            {
+              "detail": "source outputs not supplied",
+              "label": "Consumes inputs",
+              "value": "2 inputs"
+            },
+            {
+              "detail": "1212430755481 lovelace total across all outputs",
+              "label": "Creates outputs",
+              "value": "12 outputs"
+            },
+            {
+              "detail": "",
+              "label": "Pays fee",
+              "value": "1043795 lovelace"
+            },
+            {
+              "detail": "2 declared signers missing from witnesses",
+              "label": "Required signatures",
+              "value": "2 signers"
+            },
+            {
+              "detail": "0 script witnesses",
+              "label": "Scripts",
+              "value": "2 redeemers"
+            },
+            {
+              "detail": "reference inputs are available to scripts but are not spent",
+              "label": "Reference inputs",
+              "value": "4 read-only inputs"
+            },
+            {
+              "detail": "",
+              "label": "Withdrawals",
+              "value": "1 withdrawal"
+            },
+            {
+              "detail": "",
+              "label": "Mint/burn",
+              "value": "No mint/burn"
+            },
+            {
+              "detail": "total 1565693 lovelace / return 50005673583 lovelace",
+              "label": "Collateral",
+              "value": "1 collateral input"
+            }
+          ],
+          "features": {
+            "burned_asset_count": 0,
+            "cert_count": 0,
+            "collateral_input_count": 1,
+            "datum_count": 0,
+            "has_collateral_return": true,
+            "has_total_collateral": true,
+            "input_count": 2,
+            "minted_asset_count": 0,
+            "output_count": 12,
+            "redeemer_count": 2,
+            "reference_input_count": 4,
+            "script_count": 0,
+            "withdrawal_count": 1
+          },
+          "fee_lovelace": "1043795",
+          "input_policy": "preserve",
+          "metadata_claims": [
+            {
+              "context": "",
+              "description": "Swapping ADA for $100k at a rate of $0.245 per ADA",
+              "destination": "Network Compliance's treasury",
+              "event": "disburse",
+              "hash": "",
+              "hash_algorithm": "blake2b-256",
+              "justification": "Required to pay Antithesis as vendor",
+              "label": "1694",
+              "self_declared": true,
+              "title": "Swap ADA<->USDM",
+              "value": {
+                "@context": [
+                  "https://github.com/SundaeSwap-finance/treasury-contracts/blob/",
+                  "ad4316d0d36cdef780f85fc2ec8b307e645ddc2a",
+                  "/offchain/src/metadata/spec.md"
+                ],
+                "body": {
+                  "description": [
+                    "Swapping ADA for $100k at a rate of $0.245 per ADA"
+                  ],
+                  "destination": {
+                    "label": "Network Compliance's treasury"
+                  },
+                  "event": "disburse",
+                  "justification": [
+                    "Required to pay Antithesis as vendor"
+                  ],
+                  "label": "Swap ADA<->USDM",
+                  "references": []
+                },
+                "hashAlgorithm": "blake2b-256",
+                "instance": "38c627d45835744a2d6c727124f2b5852e5564aeab3f608e0e84ea6d"
+              }
+            }
+          ],
+          "metrics": [
+            {
+              "label": "Fee",
+              "value": "1.043795 ADA"
+            },
+            {
+              "label": "Signer net ADA",
+              "value": "unknown"
+            },
+            {
+              "label": "Output total",
+              "value": "1212430.755481 ADA"
+            },
+            {
+              "label": "Required signers",
+              "value": "2"
+            },
+            {
+              "label": "Missing signers",
+              "value": "2 missing required signers"
+            },
+            {
+              "label": "Redeemers",
+              "value": "2 redeemers"
+            },
+            {
+              "label": "Withdrawals",
+              "value": "1 withdrawal"
+            },
+            {
+              "label": "Mint/burn",
+              "value": "No mint/burn"
+            }
+          ],
+          "sections": [
+            {
+              "empty": "No signer value perspective available.",
+              "rows": [
+                {
+                  "copyValue": "unknown",
+                  "detail": "producer transaction CBOR must resolve every regular input before signer net can be known",
+                  "label": "Net signer ADA",
+                  "path": "[\"intent\",\"value\",\"signer_perspective\",\"#0\"]",
+                  "value": "unknown"
+                },
+                {
+                  "copyValue": "unknown",
+                  "detail": "0 resolved source outputs matched signer payment key hashes out of 0 resolved inputs",
+                  "label": "Signer-controlled inputs",
+                  "path": "[\"intent\",\"value\",\"signer_perspective\",\"#1\"]",
+                  "value": "unknown"
+                },
+                {
+                  "copyValue": "0 ADA",
+                  "detail": "0 outputs matched signer payment key hashes out of 12 outputs",
+                  "label": "Signer-controlled outputs",
+                  "path": "[\"intent\",\"value\",\"signer_perspective\",\"#2\"]",
+                  "value": "0 ADA"
+                },
+                {
+                  "copyValue": "1212430.755481 ADA",
+                  "detail": "outputs not controlled by declared or witnessed signer payment key hashes",
+                  "label": "External/script outputs",
+                  "path": "[\"intent\",\"value\",\"signer_perspective\",\"#3\"]",
+                  "value": "1212430.755481 ADA"
+                }
+              ],
+              "title": "Signer value perspective"
+            },
+            {
+              "empty": "No transaction effects reported.",
+              "rows": [
+                {
+                  "copyValue": "2 inputs",
+                  "detail": "source outputs not supplied",
+                  "label": "Consumes inputs",
+                  "path": "[\"intent\",\"effects\",\"#0\"]",
+                  "value": "2 inputs"
+                },
+                {
+                  "copyValue": "12 outputs",
+                  "detail": "1212430755481 lovelace total across all outputs",
+                  "label": "Creates outputs",
+                  "path": "[\"intent\",\"effects\",\"#1\"]",
+                  "value": "12 outputs"
+                },
+                {
+                  "copyValue": "1043795 lovelace",
+                  "detail": "",
+                  "label": "Pays fee",
+                  "path": "[\"intent\",\"effects\",\"#2\"]",
+                  "value": "1043795 lovelace"
+                },
+                {
+                  "copyValue": "2 signers",
+                  "detail": "2 declared signers missing from witnesses",
+                  "label": "Required signatures",
+                  "path": "[\"intent\",\"effects\",\"#3\"]",
+                  "value": "2 signers"
+                },
+                {
+                  "copyValue": "2 redeemers",
+                  "detail": "0 script witnesses",
+                  "label": "Scripts",
+                  "path": "[\"intent\",\"effects\",\"#4\"]",
+                  "value": "2 redeemers"
+                },
+                {
+                  "copyValue": "4 read-only inputs",
+                  "detail": "reference inputs are available to scripts but are not spent",
+                  "label": "Reference inputs",
+                  "path": "[\"intent\",\"effects\",\"#5\"]",
+                  "value": "4 read-only inputs"
+                },
+                {
+                  "copyValue": "1 withdrawal",
+                  "detail": "",
+                  "label": "Withdrawals",
+                  "path": "[\"intent\",\"effects\",\"#6\"]",
+                  "value": "1 withdrawal"
+                },
+                {
+                  "copyValue": "No mint/burn",
+                  "detail": "",
+                  "label": "Mint/burn",
+                  "path": "[\"intent\",\"effects\",\"#7\"]",
+                  "value": "No mint/burn"
+                },
+                {
+                  "copyValue": "1 collateral input",
+                  "detail": "total 1565693 lovelace / return 50005673583 lovelace",
+                  "label": "Collateral",
+                  "path": "[\"intent\",\"effects\",\"#8\"]",
+                  "value": "1 collateral input"
+                }
+              ],
+              "title": "Critical effects"
+            },
+            {
+              "empty": "None missing.",
+              "rows": [
+                {
+                  "copyValue": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                  "detail": "declared required signer not present in vkey or bootstrap witnesses",
+                  "label": "declared required signer not present in vkey or bootstrap witnesses",
+                  "path": "[\"intent\",\"signing\",\"missing_vkey_witnesses\",\"#0\",\"hash\"]",
+                  "value": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1"
+                },
+                {
+                  "copyValue": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                  "detail": "declared required signer not present in vkey or bootstrap witnesses",
+                  "label": "declared required signer not present in vkey or bootstrap witnesses",
+                  "path": "[\"intent\",\"signing\",\"missing_vkey_witnesses\",\"#1\",\"hash\"]",
+                  "value": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e"
+                }
+              ],
+              "title": "Missing required signers"
+            }
+          ],
+          "signing": {
+            "missing_vkey_witness_count": 2,
+            "missing_vkey_witnesses": [
+              {
+                "hash": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                "reason": "declared required signer not present in vkey or bootstrap witnesses"
+              },
+              {
+                "hash": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                "reason": "declared required signer not present in vkey or bootstrap witnesses"
+              }
+            ],
+            "present_bootstrap_witness_count": 0,
+            "present_vkey_witness_count": 0,
+            "required_signer_count": 2
+          },
+          "subtitle": "1 metadata claim / 2 missing required signers / 2 redeemers",
+          "title": "Signing summary",
+          "tx_id": "30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f",
+          "value": {
+            "input_lovelace_complete": false,
+            "net_spend_known": false,
+            "net_spend_note": "Signer net is unknown until producer transaction CBOR resolves every regular input; output totals are still ledger facts.",
+            "output_buckets": [
+              {
+                "asset_class_count": 0,
+                "bucket": "external_key",
+                "label": "External key",
+                "lovelace": "49897955481",
+                "tx_out_count": 1
+              },
+              {
+                "asset_class_count": 0,
+                "bucket": "script",
+                "label": "Script",
+                "lovelace": "1162532800000",
+                "tx_out_count": 11
+              }
+            ],
+            "output_lovelace": "1212430755481",
+            "resolved_input_buckets": [],
+            "resolved_input_count": 0,
+            "resolved_input_lovelace": "0",
+            "signer_lovelace": {
+              "basis": "payment key credentials matching declared required signers or present key witnesses",
+              "external_or_script_output_lovelace": "1212430755481",
+              "known": false,
+              "net_lovelace": null,
+              "output_lovelace": "0",
+              "resolved_input_lovelace": "0"
+            }
+          },
+          "warnings": [
+            "Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy.",
+            "Declared required signer hashes are absent from the witness set."
+          ]
+        }
+      }
+    },
+    "summary": "6/6 producer txs resolved, network=mainnet",
+    "validate": {
+      "ledger_functional_layer": "cardano-ledger-functional/v1",
+      "op": "tx.validate",
+      "result": {
+        "validation": {
+          "body_hash": "30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f",
+          "checks": [
+            {
+              "id": "context.explicit",
+              "message": "Supplied context is syntactically usable.",
+              "path": [
+                "args",
+                "context"
+              ],
+              "required_context": [],
+              "scope": "context",
+              "status": "passed",
+              "title": "Explicit validation context"
+            },
+            {
+              "id": "ledger.apply_tx",
+              "message": "Conway applyTx rejected the transaction for the supplied context.",
+              "path": [
+                "args",
+                "context"
+              ],
+              "required_context": [
+                "source_output",
+                "protocol_parameters",
+                "slot",
+                "epoch",
+                "network"
+              ],
+              "scope": "ledger",
+              "status": "failed",
+              "title": "Conway ledger validation"
+            }
+          ],
+          "complete": true,
+          "context": {
+            "complete": true,
+            "decoded_producer_tx_count": 6,
+            "epoch": "628",
+            "input_count": 2,
+            "input_policy": "preserve",
+            "missing_input_count": 0,
+            "missing_reference_input_count": 0,
+            "network": "mainnet",
+            "producer_tx_count": 6,
+            "producer_tx_errors": [],
+            "reference_input_count": 4,
+            "resolution": null,
+            "resolved_input_count": 2,
+            "resolved_reference_input_count": 4,
+            "slot": "186251734",
+            "supplied": true,
+            "unspent_status": "not_checked"
+          },
+          "errors": [],
+          "failures": [
+            {
+              "index": 0,
+              "kind": "ledger_failure",
+              "message": "Transaction witness or UTxO validation failed: UtxoFailure (ValueNotConservedUTxO Mismatch (RelEQ) {supplied: MaryValue (Coin 1500007239276) (MultiAsset (fromList [])), expected: MaryValue (Coin 1212431799276) (MultiAsset (fromList []))})",
+              "path": [
+                "body"
+              ],
+              "predicate": "ConwayUtxowFailure (UtxoFailure (ValueNotConservedUTxO Mismatch (RelEQ) {supplied: MaryValue (Coin 1500007239276) (MultiAsset (fromList [])), expected: MaryValue (Coin 1212431799276) (MultiAsset (fromList []))}))",
+              "rule": "UTXOW"
+            },
+            {
+              "index": 1,
+              "kind": "ledger_failure",
+              "message": "Transaction witness or UTxO validation failed: MissingVKeyWitnessesUTXOW (NonEmptySet (fromList [KeyHash {unKeyHash = \"8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1\"},KeyHash {unKeyHash = \"dea7197ac235d73e7f7b1a249bace6a833722415d88e91dec5d2626d\"},KeyHash {unKeyHash = \"f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e\"}]))",
+              "path": [
+                "body"
+              ],
+              "predicate": "ConwayUtxowFailure (MissingVKeyWitnessesUTXOW (NonEmptySet (fromList [KeyHash {unKeyHash = \"8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1\"},KeyHash {unKeyHash = \"dea7197ac235d73e7f7b1a249bace6a833722415d88e91dec5d2626d\"},KeyHash {unKeyHash = \"f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e\"}])))",
+              "rule": "UTXOW"
+            }
+          ],
+          "missing_context": [],
+          "resolved_inputs": [
+            {
+              "index": 0,
+              "key": "42e4c279036e3ab6070bc969392b823917d8b998204d5dcbdfe69fec4b442da0#0",
+              "kind": "input",
+              "path": [
+                "body",
+                "inputs",
+                "#0"
+              ],
+              "resolved": true,
+              "source": "blockfrost.txs.cbor",
+              "tx_id": "42e4c279036e3ab6070bc969392b823917d8b998204d5dcbdfe69fec4b442da0",
+              "tx_out": {
+                "address_hex": "01dea7197ac235d73e7f7b1a249bace6a833722415d88e91dec5d2626dbc1597ad71c55d2d009a9274b3831ded155118dd769f5376decc1369",
+                "assets": {},
+                "coin_lovelace": "50007239276",
+                "datum": {
+                  "kind": "no_datum"
+                }
+              }
+            },
+            {
+              "index": 0,
+              "key": "64f27254f3c0311fb2e672cdb87de200089a596aa90dc09f8be4248540267cf0#0",
+              "kind": "input",
+              "path": [
+                "body",
+                "inputs",
+                "#1"
+              ],
+              "resolved": true,
+              "source": "blockfrost.txs.cbor",
+              "tx_id": "64f27254f3c0311fb2e672cdb87de200089a596aa90dc09f8be4248540267cf0",
+              "tx_out": {
+                "address_hex": "3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                "assets": {},
+                "coin_lovelace": "1450000000000",
+                "datum": {
+                  "kind": "no_datum"
+                }
+              }
+            }
+          ],
+          "resolved_reference_inputs": [
+            {
+              "index": 0,
+              "key": "11ace24a7b0caad4a68a38ef2fff18185dc9ea604e84425dab487cae94e4cf54#0",
+              "kind": "reference_input",
+              "path": [
+                "body",
+                "reference_inputs",
+                "#0"
+              ],
+              "resolved": true,
+              "source": "blockfrost.txs.cbor",
+              "tx_id": "11ace24a7b0caad4a68a38ef2fff18185dc9ea604e84425dab487cae94e4cf54",
+              "tx_out": {
+                "address_hex": "715a7350fef97581498697d679aa1cbc4fb72f51991bde8ad535614365",
+                "assets": {
+                  "5a7350fef97581498697d679aa1cbc4fb72f51991bde8ad535614365": {
+                    "616d61727520323032362073636f706573": "1"
+                  }
+                },
+                "coin_lovelace": "2000000",
+                "datum": {
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST rendering deferred"
+                }
+              }
+            },
+            {
+              "index": 2,
+              "key": "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095#2",
+              "kind": "reference_input",
+              "path": [
+                "body",
+                "reference_inputs",
+                "#1"
+              ],
+              "resolved": true,
+              "source": "blockfrost.txs.cbor",
+              "tx_id": "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095",
+              "tx_out": {
+                "address_hex": "012613b73d0961f4a63e2ea0551a9689f8e42121b5f1705f1b72e1595423a476e5a8dbfffd3fb5e9026fba36c195ae5ab0fd9df92b2866ea06",
+                "assets": {},
+                "coin_lovelace": "25000000",
+                "datum": {
+                  "kind": "no_datum"
+                }
+              }
+            },
+            {
+              "index": 0,
+              "key": "810bfcbde85ae72f27d7e8cd154c03c802de15d3fa0dd83a32a4b0fdba330b3c#0",
+              "kind": "reference_input",
+              "path": [
+                "body",
+                "reference_inputs",
+                "#2"
+              ],
+              "resolved": true,
+              "source": "blockfrost.txs.cbor",
+              "tx_id": "810bfcbde85ae72f27d7e8cd154c03c802de15d3fa0dd83a32a4b0fdba330b3c",
+              "tx_out": {
+                "address_hex": "012613b73d0961f4a63e2ea0551a9689f8e42121b5f1705f1b72e1595423a476e5a8dbfffd3fb5e9026fba36c195ae5ab0fd9df92b2866ea06",
+                "assets": {},
+                "coin_lovelace": "25000000",
+                "datum": {
+                  "kind": "no_datum"
+                }
+              }
+            },
+            {
+              "index": 2,
+              "key": "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c#2",
+              "kind": "reference_input",
+              "path": [
+                "body",
+                "reference_inputs",
+                "#3"
+              ],
+              "resolved": true,
+              "source": "blockfrost.txs.cbor",
+              "tx_id": "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c",
+              "tx_out": {
+                "address_hex": "7138c627d45835744a2d6c727124f2b5852e5564aeab3f608e0e84ea6d",
+                "assets": {
+                  "38c627d45835744a2d6c727124f2b5852e5564aeab3f608e0e84ea6d": {
+                    "5245474953545259": "1"
+                  }
+                },
+                "coin_lovelace": "2000000",
+                "datum": {
+                  "kind": "inline_datum",
+                  "note": "Plutus Data AST rendering deferred"
+                }
+              }
+            }
+          ],
+          "status": "invalid",
+          "tx_id": "30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f",
+          "valid_for_supplied_context": false,
+          "warnings": [
+            "tx.validate did not mutate or return transaction CBOR."
+          ]
+        }
+      }
+    }
+  }
+}

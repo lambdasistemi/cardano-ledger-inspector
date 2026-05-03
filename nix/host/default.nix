@@ -46,7 +46,13 @@ let
     if txDeepDiagnosisNative == null
       then null
       else txDeepDiagnosisNative.tx-deep-diagnosis;
+
+  tx-deep-diagnosis-render-snapshot =
+    if txDeepDiagnosisNative == null
+      then null
+      else txDeepDiagnosisNative.tx-deep-diagnosis-render-snapshot;
 in
 {
-  inherit libextism extism-spike-host tx-deep-diagnosis;
+  inherit libextism extism-spike-host
+    tx-deep-diagnosis tx-deep-diagnosis-render-snapshot;
 }
