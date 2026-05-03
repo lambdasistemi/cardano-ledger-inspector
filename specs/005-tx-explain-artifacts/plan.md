@@ -11,70 +11,92 @@ the `ProtocolRegistry`. Putting them in the host CLI keeps the ledger
 functional API surface untouched and avoids re-running the ledger to
 produce display-only artifacts. No new `tx.explain` op.
 
+## Decision: cuts at different heights, not one mega-graph
+
+A single Mermaid diagram of every input/output/reference/collateral
+plus signers is unreadable beyond ~20 nodes and Mermaid's auto-layout
+breaks. The renderer emits a directory of cuts:
+
+- **L1 parties (`parties.mmd`)** — Mermaid `flowchart LR`, ~4–8 nodes
+- **L2 value flow (`value-flow.tsv`)** — Sankey TSV
+- **L3 topology (`topology.mmd`)** — Mermaid `flowchart TD`, full graph
+- **L4 failures (`failures.mmd`)** — Mermaid, only when invalid
+- **`summary.md`** — prose, links to the cuts above
+
 ## Module layout
 
 Add to `apps/tx-deep-diagnosis/src/`:
+
+- `TxDeepDiagnosisHost.Render.Doc`
+  - `data DiagnosisDoc = DiagnosisDoc { ddSummary :: !Text, ddIntent :: !Value, ddValidate :: !Value }`
+  - `parseDiagnosisDoc :: Value -> Either String DiagnosisDoc`
 
 - `TxDeepDiagnosisHost.Render.Names`
   - `data PartyName = PartyName { pnLabel :: !Text, pnSource :: !PartySource }`
   - `data PartySource = FromValidator | FromInstance | FromAmaruScope | TruncatedHex`
   - `resolveScript :: ProtocolRegistry -> Text -> PartyName`
-    Looks up a script hash in `prValidators`, then `prInstances`, then
-    `prAmaru` scope owners. Falls back to `first8…last8` truncation.
   - `resolveAddress :: ProtocolRegistry -> Text -> PartyName`
-    Same, given an address-hex; extracts the payment-script-hash byte
-    range and delegates to `resolveScript`. Key-only addresses get
-    truncated hex with `pnSource = TruncatedHex`.
 
-- `TxDeepDiagnosisHost.Render.Diagram`
-  - `data DiagramOptions = DiagramOptions { dShowReferenceInputs :: !Bool, dShowCollateral :: !Bool }`
-  - `defaultDiagramOptions :: DiagramOptions`
-  - `renderMermaid :: DiagramOptions -> ProtocolRegistry -> DiagnosisDoc -> Text`
-  - One `flowchart TD` document. Nodes are addressed by stable string
-    IDs derived from JSON paths (e.g. `inN`, `outN`, `refN`, `body`,
-    `signerN`). Validation failures are encoded as a `classDef failure`
-    applied to the affected node IDs.
+- `TxDeepDiagnosisHost.Render.Parties`
+  - `renderPartiesMermaid :: ProtocolRegistry -> DiagnosisDoc -> Text`
 
-- `TxDeepDiagnosisHost.Render.Report`
-  - `renderMarkdown :: ProtocolRegistry -> DiagnosisDoc -> Text`
-  - Sections in fixed order so output is diffable.
+- `TxDeepDiagnosisHost.Render.ValueFlow`
+  - `renderValueFlowTsv :: ProtocolRegistry -> DiagnosisDoc -> Text`
+    Header row `source\ttarget\tlovelace\tlabel`. Rows derived from
+    `intent.value.resolved_input_buckets[]` and
+    `intent.value.output_buckets[]`. When inputs are unresolved, only
+    the header is emitted (deterministic empty Sankey).
 
-- `TxDeepDiagnosisHost.Render.Doc`
-  - `data DiagnosisDoc = DiagnosisDoc { ddSummary :: !Text, ddIntent :: !Value, ddValidate :: !Value }`
-  - `parseDiagnosisDoc :: Value -> Either String DiagnosisDoc`
-    Pulls the `tx-deep-diagnosis` object from the wrapped envelope.
+- `TxDeepDiagnosisHost.Render.Topology`
+  - `renderTopologyMermaid :: ProtocolRegistry -> DiagnosisDoc -> Text`
+    Full per-node graph; failures applied as `classDef` overlays.
 
-The four modules form a small subgraph under
-`TxDeepDiagnosisHost.Render.*`. Each exposes pure functions; nothing in
-this subgraph uses `IO`.
+- `TxDeepDiagnosisHost.Render.Failures`
+  - `renderFailuresMermaid :: ProtocolRegistry -> DiagnosisDoc -> Maybe Text`
+    Returns `Nothing` when `validation.failures[]` is empty so the
+    caller knows not to write the file.
 
-Rename the existing `TxDeepDiagnosisHost.Report` to keep its meaning
-clear (it renders the JSON envelope, not the markdown). Two options:
+- `TxDeepDiagnosisHost.Render.Summary`
+  - `data EmittedFiles = EmittedFiles { efParties :: !FilePath, efValueFlow :: !FilePath, efTopology :: !FilePath, efFailures :: !(Maybe FilePath) }`
+  - `renderSummaryMarkdown :: ProtocolRegistry -> DiagnosisDoc -> EmittedFiles -> Text`
+    Sections: title, verdict paragraph, claims table, effects table,
+    signer perspective table, failures table, warnings, diagrams
+    footer. Links use the relative file names in `EmittedFiles`.
 
-- (A) Leave `Report` alone (it renders the JSON envelope) and put the
-  markdown emitter in `Render.Report`. Slightly confusing but minimal
-  diff.
-- (B) Rename `Report` → `Envelope`. Cleaner names but a churn commit.
+- `TxDeepDiagnosisHost.Render.Emit` (Main.hs glue, IO)
+  - `emitExplain :: FilePath -> ProtocolRegistry -> DiagnosisDoc -> IO ()`
+    Creates the directory, writes the four/five files, picks
+    `summary.md` last so its link list reflects what was actually
+    written.
 
-Choose (A) for now; if the names get confusing during implementation,
-revisit in a follow-up rename commit.
+The renderer subgraph under `TxDeepDiagnosisHost.Render.*` is pure —
+nothing in it imports `System.IO`. Only `Render.Emit` does IO.
 
 ## CLI surface
 
 Add to `Options`:
 
 ```haskell
-, optEmitMermaid :: !(Maybe FilePath)
-, optEmitReport  :: !(Maybe FilePath)
+, optEmitExplain :: !(Maybe FilePath)
 ```
 
-After the existing JSON envelope is written to stdout, if either option
-is set, parse the in-memory `Value` we already have, render, and write
-to the target path. No re-encoding round-trip.
+After the existing JSON envelope is written to stdout, if the option is
+set, parse the in-memory `Value` we already have, call `emitExplain`.
+
+Help text:
+
+```
+--emit-explain DIR
+    Write a directory of human-readable artifacts: summary.md,
+    parties.mmd, value-flow.tsv, topology.mmd, and failures.mmd
+    (when the tx is invalid). Existing files are overwritten.
+```
 
 ## Failure overlay mapping
 
-Match on `validate.result.validation.failures[].rule` + `kind`:
+Match on `validate.result.validation.failures[].rule` + the failure
+substring. Applies in `Render.Topology` (for L3 overlay) and in
+`Render.Failures` (for the standalone L4 cut):
 
 | Source                                    | Diagram target            | Class       |
 |-------------------------------------------|---------------------------|-------------|
@@ -85,8 +107,6 @@ Match on `validate.result.validation.failures[].rule` + `kind`:
 | anything else under `UTXOW`               | body                      | `bodyFail`  |
 | any other rule                            | body                      | `bodyFail`  |
 
-Unmapped failures still reach the user via the report's failure table.
-
 ## Snapshot tests
 
 Test suite under `apps/tx-deep-diagnosis/test/`:
@@ -96,38 +116,26 @@ apps/tx-deep-diagnosis/
 ├── test/
 │   ├── Main.hs                  -- tasty entrypoint
 │   └── golden/
-│       ├── passing/             -- input.json, diagram.mmd, report.md
-│       ├── value-not-conserved/
+│       ├── passing/             -- input.json + expected/{summary.md, parties.mmd, value-flow.tsv, topology.mmd}
+│       ├── value-not-conserved/ -- ... + expected/failures.mmd
 │       ├── missing-witness/
 │       └── multi-redeemer/
 └── tx-deep-diagnosis.cabal      -- adds test-suite stanza
 ```
 
-Use `tasty` + a hand-rolled byte-equality assertion (no `tasty-golden`
-dependency to keep CHaP-pinned dep set tight). Each test loads
-`input.json`, runs the renderer, and compares to `diagram.mmd` /
-`report.md`. Mismatch prints the unified diff.
+Use `tasty` + a hand-rolled byte-equality assertion. Each test loads
+`input.json`, runs the renderers, and compares each file to its
+counterpart under `expected/`. Mismatch prints a unified diff.
 
 For the parties registry, the tests load the bundled
-`docs/inspector/protocols` registry just like the binary does.
+`docs/inspector/protocols` registry just like the binary does, via
+`Paths_tx_deep_diagnosis.getDataDir`.
 
 ## Nix check
 
-Add `tx-explain-render-smoke` to `flake.nix`:
-
-```nix
-tx-explain-render-smoke = pkgs.runCommand "tx-explain-render-smoke" { } ''
-  ${hostTargets.tx-deep-diagnosis-test}/bin/tx-deep-diagnosis-test
-  touch $out
-'';
-```
-
-Wired into `nix/host/tx-deep-diagnosis-native/default.nix` to expose the
-test executable, and into `apps/x86_64-linux` so `nix run
-.#tx-explain-render-smoke` works (CI pattern).
-
-CI workflow gets a new `tx-explain-render-smoke` job mirroring the
-existing `tx-intent-smoke` job.
+Add `tx-explain-render-smoke` to `flake.nix`, run the test executable,
+expose an app wrapper, wire to CI Build Gate + a per-job step mirroring
+`tx-intent-smoke`.
 
 ## Determinism
 
@@ -136,27 +144,29 @@ existing `tx-intent-smoke` job.
 - Lovelace and decimal numbers are reproduced from the JSON strings as-is
   — never reparsed and reformatted.
 - No timestamps or random IDs in the output.
+- File write order: parties → value-flow → topology → failures →
+  summary. Summary is last so its link list reflects which files
+  exist.
 
 ## Out of scope (this PR)
 
 - Surge preview render integration (the artifacts can be added later to
   the static site).
-- A graphviz / DOT alternative.
+- D2 / Graphviz alternative backends.
 - Cross-checking metadata claims against destinations.
 
 ## Risks
 
-- Mermaid diagrams beyond ~30 nodes get hard to read in default
-  renderers. Mitigation: collapse output buckets into one node per
-  bucket label rather than per-output. The four fixtures cover the
-  expected sizes.
-- The `RegistryInstance` label is sometimes generic (`"SundaeSwap V3
-  Treasury"` for many distinct treasuries). Mitigation: append the last
-  6 hex of the hash to instance-derived labels so distinct instances
-  remain distinguishable.
+- Mermaid diagrams beyond ~30 nodes get hard to read. Mitigated by the
+  cut design — only `topology.mmd` approaches that size.
+- Generic instance labels (`"SundaeSwap V3 Treasury"` for many distinct
+  treasuries). Mitigation: append the last 6 hex of the hash to
+  instance-derived labels so distinct instances remain
+  distinguishable.
 
 ## Open follow-ups (separate tickets)
 
+- D2 backend swap if any cut looks bad on a real fixture.
 - Wire the rendered artifacts into the docs build so the site shows the
-  diagram for the bundled fixture.
-- Add a small fixtures-bumping helper to make snapshot regeneration safe.
+  diagrams for the bundled fixture.
+- A small fixtures-bumping helper to make snapshot regeneration safe.
