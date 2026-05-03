@@ -304,6 +304,26 @@
               "title": "Critical effects"
             },
             {
+              "empty": "No declared required signers.",
+              "rows": [
+                {
+                  "copyValue": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                  "detail": "declared required signer not present in vkey or bootstrap witnesses",
+                  "label": "declared required signer",
+                  "path": "[\"intent\",\"signing\",\"required_signers\",\"#0\",\"hash\"]",
+                  "value": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1"
+                },
+                {
+                  "copyValue": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                  "detail": "declared required signer not present in vkey or bootstrap witnesses",
+                  "label": "declared required signer",
+                  "path": "[\"intent\",\"signing\",\"required_signers\",\"#1\",\"hash\"]",
+                  "value": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e"
+                }
+              ],
+              "title": "Declared required signers"
+            },
+            {
               "empty": "None missing.",
               "rows": [
                 {
@@ -337,8 +357,22 @@
               }
             ],
             "present_bootstrap_witness_count": 0,
+            "present_bootstrap_witnesses": [],
             "present_vkey_witness_count": 0,
-            "required_signer_count": 2
+            "present_vkey_witnesses": [],
+            "required_signer_count": 2,
+            "required_signers": [
+              {
+                "hash": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+                "source": "tx_body.required_signers",
+                "witness_status": "missing"
+              },
+              {
+                "hash": "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+                "source": "tx_body.required_signers",
+                "witness_status": "missing"
+              }
+            ]
           },
           "subtitle": "1 metadata claim / 2 missing required signers / 2 redeemers",
           "title": "Signing summary",

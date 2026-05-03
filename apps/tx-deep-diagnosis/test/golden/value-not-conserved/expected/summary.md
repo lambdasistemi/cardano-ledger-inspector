@@ -112,6 +112,13 @@ Inputs that also receive outputs (same payment credential on both sides):
 | Mint/burn | No mint/burn |  |
 | Collateral | 1 collateral input | total 1565693 lovelace / return 50005673583 lovelace |
 
+## Declared required signers
+
+| Label | Value | Detail |
+|-------|-------|--------|
+| declared required signer | 8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1 | declared required signer not present in vkey or bootstrap witnesses |
+| declared required signer | f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e | declared required signer not present in vkey or bootstrap witnesses |
+
 ## Missing required signers
 
 | Label | Value | Detail |

@@ -11,13 +11,16 @@ JSON envelope. The reader-first contract for the top of the report is:
 6. Fees & resources
 7. Observations
 8. Claims
-9. Effects
-10. Smart-contract calls
-11. Withdrawals
-12. Outputs
-13. Datums
-14. Warnings
-15. Diagrams
+9. Signer value perspective
+10. Critical effects
+11. Declared required signers
+12. Missing required signers
+13. Smart-contract calls
+14. Withdrawals
+15. Outputs
+16. Datums
+17. Warnings
+18. Diagrams
 
 `summary.md` uses that order directly. `explain.md` uses the same summary and
 then embeds the Mermaid diagrams at the end inside collapsed `<details>` blocks.

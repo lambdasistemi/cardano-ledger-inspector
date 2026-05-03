@@ -3,7 +3,7 @@
   "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-intent-result.schema.json",
   "title": "Cardano Ledger WASI Transaction Intent Result",
   "type": "object",
-  "required": ["title", "subtitle", "metrics", "claims", "sections", "withdrawals", "warnings"],
+  "required": ["title", "subtitle", "metrics", "claims", "signing", "sections", "withdrawals", "warnings"],
   "properties": {
     "title": { "type": "string" },
     "subtitle": { "type": "string" },
@@ -24,10 +24,7 @@
       "type": "array",
       "items": { "type": "object", "additionalProperties": true }
     },
-    "signing": {
-      "type": "object",
-      "additionalProperties": true
-    },
+    "signing": { "$ref": "#/$defs/signing" },
     "value": {
       "type": "object",
       "properties": {
@@ -94,6 +91,10 @@
       },
       "additionalProperties": true
     },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
     "claim": {
       "type": "object",
       "required": ["label", "value", "detail"],
@@ -101,6 +102,73 @@
         "label": { "type": "string" },
         "value": { "type": "string" },
         "detail": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "signerReference": {
+      "type": "object",
+      "required": ["hash", "source"],
+      "properties": {
+        "hash": { "type": "string" },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "missingSigner": {
+      "type": "object",
+      "required": ["hash", "reason"],
+      "properties": {
+        "hash": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "requiredSignerCoverage": {
+      "type": "object",
+      "required": ["hash", "source", "witness_status"],
+      "properties": {
+        "hash": { "type": "string" },
+        "source": { "type": "string" },
+        "witness_status": {
+          "type": "string",
+          "enum": ["present_vkey", "present_bootstrap", "missing"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "signing": {
+      "type": "object",
+      "required": [
+        "missing_vkey_witness_count",
+        "missing_vkey_witnesses",
+        "present_bootstrap_witness_count",
+        "present_bootstrap_witnesses",
+        "present_vkey_witness_count",
+        "present_vkey_witnesses",
+        "required_signer_count",
+        "required_signers"
+      ],
+      "properties": {
+        "missing_vkey_witness_count": { "$ref": "#/$defs/count" },
+        "missing_vkey_witnesses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/missingSigner" }
+        },
+        "present_bootstrap_witness_count": { "$ref": "#/$defs/count" },
+        "present_bootstrap_witnesses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/signerReference" }
+        },
+        "present_vkey_witness_count": { "$ref": "#/$defs/count" },
+        "present_vkey_witnesses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/signerReference" }
+        },
+        "required_signer_count": { "$ref": "#/$defs/count" },
+        "required_signers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/requiredSignerCoverage" }
+        }
       },
       "additionalProperties": true
     },
