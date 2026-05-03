@@ -13,45 +13,50 @@ human-facing artifacts: it carries pre-rendered `effects`, `metrics`, and
 `sections` rows, an explicit `failures[]` list on the validate block, and
 labelled output buckets (`external_key` vs `script`).
 
-A CLI consumer today still has to read raw JSON to reason about a transaction.
-The shape is stable enough to render two deterministic artifacts directly:
+A single mega-graph of every input, output, reference input, collateral,
+signer, and failure does not survive a typical Conway transaction (≥20
+nodes; Mermaid's auto-layout is unstable past ~20 nodes). Pedagogically a
+signer also wants different views at different moments: who is moving
+what, where the money goes, the full topology, what is wrong.
 
-- a **Mermaid diagram** of inputs → body → outputs with reference and
-  collateral side rails and a failure overlay
-- a **Markdown report** built from the same JSON: title, claims, effects
-  table, signer table, validation verdict, failures, warnings
+The output of the renderer is therefore **a directory of cuts at
+different heights**, plus a top-level `summary.md` that tells the story
+in prose with links to the cuts.
 
-Naming parties (script / address hashes → human labels) is a registry lookup,
-not a reasoning task. The protocol registry (`docs/inspector/protocols/...`)
-already maps validator and instance hashes to labels and is loaded today by
+Naming parties (script / address hashes → human labels) is a registry
+lookup, not a reasoning task. The protocol registry
+(`docs/inspector/protocols/...`) already maps validator and instance
+hashes to labels and is loaded today by
 `TxDeepDiagnosisHost.Registry.loadRegistries`.
 
 ## User Scenarios & Testing
 
 ### User Story 1 — Read a transaction at a glance (Priority: P1)
 
-A signer or auditor runs `tx-deep-diagnosis --cbor tx.cbor --emit-mermaid
-diagram.mmd --emit-report report.md` and gets two artifacts that, together,
-explain the transaction without opening the JSON.
+A signer or auditor runs `tx-deep-diagnosis --cbor tx.cbor --emit-explain
+out/` and gets a directory of artifacts that, together, explain the
+transaction without opening the JSON.
 
 **Why this priority**: this is the user-visible value of the ticket.
 
-**Independent Test**: run on the committed SundaeSwap/USDM mainnet fixture;
-the report shows the swap claim, the value-not-conserved failure, the missing
-required signers; the Mermaid diagram renders inputs, twelve outputs split
-into key vs script buckets, four reference inputs, one collateral, and a
-red-tagged body for the value-not-conservation failure.
+**Independent Test**: run on the committed SundaeSwap/USDM mainnet
+fixture; `out/summary.md` opens with the swap claim, the
+value-not-conserved failure, and the missing required signers; the
+embedded links resolve to `parties.mmd`, `value-flow.tsv`,
+`topology.mmd`, and `failures.mmd`.
 
 **Acceptance Scenarios**:
 
-1. **Given** a passing tx, **When** the artifacts are rendered, **Then** the
-   diagram has no red overlays and the report's verdict line is `valid`.
+1. **Given** a passing tx, **When** the artifacts are rendered, **Then**
+   `failures.mmd` is omitted and `summary.md` ends with `verdict: valid`.
 2. **Given** a tx with a `ValueNotConservedUTxO` failure, **When** the
-   artifacts are rendered, **Then** the body node carries a red badge
-   labelled with the conserved-value mismatch summary.
+   artifacts are rendered, **Then** `failures.mmd` shows the body node
+   in the `bodyFail` class and `summary.md` quotes the conserved-value
+   mismatch from the validator message.
 3. **Given** a tx missing vkey witnesses, **When** the artifacts are
-   rendered, **Then** each missing-signer hash appears as a red badge
-   (resolved to a human label if known in the registry).
+   rendered, **Then** each missing-signer hash appears as a red
+   synthetic-signer node in `failures.mmd`, resolved to a human label
+   if known in the registry.
 
 ### User Story 2 — Determinism and offline use (Priority: P1)
 
@@ -65,88 +70,133 @@ artifacts safe to diff and review.
 
 **Acceptance Scenarios**:
 
-1. **Given** a fixture JSON, **When** the renderers are invoked, **Then** the
-   output bytes match the committed snapshot.
+1. **Given** a fixture JSON, **When** the renderers are invoked, **Then**
+   each emitted file matches the committed snapshot byte-for-byte.
 2. **Given** the same fixture, **When** the renderers are invoked from a
    different working directory, **Then** the output is unchanged.
 
 ### User Story 3 — Names from the registry, not from a guess (Priority: P2)
 
-When a script hash matches a `RegistryValidator` or `RegistryInstance`, its
-label is used in both the diagram and the report. Unknown hashes are
-displayed in truncated hex with no fabricated label.
+When a script hash matches a `RegistryValidator` or `RegistryInstance`,
+its label is used in every cut and in the prose summary. Unknown hashes
+are displayed in truncated hex (`first8…last8`) with no fabricated label.
 
-**Why this priority**: a wrong attribution on a `disburse` claim is worse than
-`unknown`. This rule keeps the renderers honest.
+**Why this priority**: a wrong attribution on a `disburse` claim is worse
+than `unknown`. This rule keeps the renderers honest.
 
-**Independent Test**: render the SundaeSwap fixture; the script-bucket node
-in the diagram is labelled `SundaeSwap V3 Treasury` (or whatever the
-registry says), not `38c627d4…`. Render a tx whose script hashes are not in
-the registry; the node label is `script (38c627d4…)`.
+**Independent Test**: render the SundaeSwap fixture; the script-bucket
+node is labelled from the registry, not from raw hex. Render a tx whose
+script hashes are not in the registry; the node label is `script
+(38c627d4…)`.
 
 ## Functional Requirements
 
-- **FR-001**: `tx-deep-diagnosis` accepts two new CLI options:
-  `--emit-mermaid <PATH>` and `--emit-report <PATH>`. Either or both may be
-  given. When neither is given, behaviour is unchanged.
-- **FR-002**: With `--emit-mermaid`, a Mermaid `flowchart TD` document is
-  written to `<PATH>` after the JSON envelope is emitted on stdout.
-- **FR-003**: With `--emit-report`, a Markdown document is written to
-  `<PATH>` after the JSON envelope is emitted on stdout.
-- **FR-004**: Both renderers consume only the `tx-deep-diagnosis` JSON
+- **FR-001**: `tx-deep-diagnosis` accepts a new CLI option
+  `--emit-explain <DIR>`. When absent, behaviour is unchanged. When
+  present, the directory is created (mkdir -p) and the artifacts below
+  are written to it after the JSON envelope is emitted on stdout.
+
+- **FR-002**: The emitted directory contains the following files:
+  - `summary.md` — top-level prose summary, always present
+  - `parties.mmd` — Mermaid `flowchart LR`, parties cut (L1)
+  - `value-flow.tsv` — Sankey-shaped TSV of lovelace flows (L2)
+  - `topology.mmd` — Mermaid `flowchart TD`, full topology cut (L3)
+  - `failures.mmd` — Mermaid `flowchart TD` of failures only, written
+    only when `validation.failures[]` is non-empty (L4)
+
+- **FR-003**: `summary.md` is the human-readable deep summary. Sections
+  in this order: title (intent.title), one-paragraph verdict
+  (parses `summary` line + `valid_for_supplied_context`), claims table,
+  effects table from `intent.sections[]`, signer perspective table,
+  validation failures table, warnings, and a "diagrams" footer with
+  relative links to `parties.mmd`, `value-flow.tsv`, `topology.mmd`, and
+  `failures.mmd` (links are emitted only for files that were written).
+
+- **FR-004**: All renderers consume only the `tx-deep-diagnosis` JSON
   envelope (`intent`, `validate`, `summary`) and the loaded
-  `ProtocolRegistry`. They do not call the inspector library or the network.
-- **FR-005**: The Mermaid diagram includes nodes for: every resolved input,
-  every output bucket from `intent.value.output_buckets[]`, every reference
-  input, the collateral input/return when present, and the tx body.
-- **FR-006**: Annotations on the body node: fee, redeemer count, withdrawal
-  count, mint/burn status, metadata label (when a single label is dominant),
-  collateral.
-- **FR-007**: Validation failures are overlaid on the diagram by attaching a
-  red-styled badge (Mermaid `classDef`) to the affected node. Mapping:
-  `ValueNotConservedUTxO` → body; `MissingVKeyWitnessesUTXOW` → a synthetic
-  signer node per missing hash; other ledger failures → body with their
-  rule name.
-- **FR-008**: The Markdown report contains, in order: title (intent.title
-  / subtitle), one-paragraph summary derived from `summary` + verdict,
-  metadata claims table, effects table (from `intent.sections[]` rows),
-  signer perspective table, validation verdict + failures table, warnings
-  list.
-- **FR-009**: Hash → label resolution uses the existing
-  `TxDeepDiagnosisHost.Registry.identifyByHash` and treasury scope helpers.
-  Unknown hashes are displayed in truncated form (`first8…last8`) with no
+  `ProtocolRegistry`. They do not call the inspector library or the
+  network.
+
+- **FR-005**: Cut definitions:
+
+  - **Parties (L1)** — one Mermaid node per distinct party, where a
+    party is a signer hash, an address payment-credential, or a script
+    hash from `intent.value.output_buckets[].bucket`. Edges represent
+    the consume / produce / withdraw / collateral relations. Node
+    budget: ~4–8 in expected fixtures.
+
+  - **Value flow (L2)** — TSV with columns `source<TAB>target<TAB>lovelace<TAB>label`. Sources are
+    resolved-input nodes; targets are output-bucket nodes. The TSV is a
+    standard Sankey input that any d3-sankey or pivot tool consumes;
+    it is not rendered as Mermaid (Mermaid `sankey-beta` is unstable
+    and we want byte-stable snapshots).
+
+  - **Topology (L3)** — every resolved input, every output (one node
+    per output, not per bucket), every reference input, the collateral
+    input/return when present, the body, and one synthetic signer node
+    per declared required signer. Node budget: ~20–30 in expected
+    fixtures.
+
+  - **Failures (L4)** — only emitted when `validation.failures[]` is
+    non-empty. Each failure becomes one or more red nodes mapped per
+    plan.md.
+
+- **FR-006**: Annotations on the body node in topology: fee, redeemer
+  count, withdrawal count, mint/burn status, metadata label (when a
+  single label is dominant), collateral indicator.
+
+- **FR-007**: Validation failures are styled with Mermaid `classDef`
+  classes named `bodyFail`, `signerFail`, `inputFail`. The mapping is
+  defined in `plan.md`.
+
+- **FR-008**: Hash → label resolution uses the existing
+  `TxDeepDiagnosisHost.Registry.identifyByHash` and treasury scope
+  helpers. Unknown hashes are truncated `first8…last8` with no
   fabricated label.
-- **FR-010**: The renderer modules are pure (`Text`-in, `Text`-out). No `IO`.
+
+- **FR-009**: The renderer modules are pure (`Text`-in, `Text`-out). No
+  `IO` inside the renderers; the `Main` writes the resulting strings to
+  disk.
 
 ## Edge Cases
 
-- No producer-tx context resolved (probe-only mode): the diagram still
-  renders inputs as unresolved placeholders; the report's signer perspective
-  shows `unknown net spend` with the existing `net_spend_note` reproduced.
-- Multiple ledger failures: each failure is overlaid; the report lists them
-  in the order returned by the validator.
-- A tx with no script outputs: the script bucket is omitted from the diagram.
-- A tx with no reference inputs / no collateral: the corresponding side
-  rails are omitted.
-- Metadata with no `1694` (or any) label: the metadata-label annotation is
-  omitted but the claim block in the report still renders raw values.
-- Output bucket lovelace totals expressed as decimal strings: rendered as ADA
-  with the existing `intent` formatting (no recomputation).
+- No producer-tx context resolved (probe-only mode): `summary.md`
+  reproduces `value.net_spend_note`; `topology.mmd` shows inputs as
+  unresolved placeholders; `value-flow.tsv` is emitted with empty rows
+  plus a header so downstream tools do not crash.
+- Multiple ledger failures: each failure overlays a node in
+  `failures.mmd`; `summary.md` lists them in the validator's order.
+- A tx with no script outputs: the parties cut omits the script node;
+  the topology cut still renders the body and signers.
+- A tx with no reference inputs / no collateral: the corresponding
+  side rails are omitted from topology.
+- Metadata with no `1694` (or any) label: the metadata-label
+  annotation is omitted but the claim block in `summary.md` still
+  renders raw values.
+- Lovelace and decimal numbers are reproduced from the JSON strings
+  as-is — never reparsed and reformatted.
 
 ## Out of Scope
 
 - Cross-checking metadata claims against actual destinations.
-- Free-form prose narrative generation.
+- Free-form prose narrative beyond the structured `summary.md` template.
 - Resolving stake-pool tickers, ADA Handles, or CIP-26 metadata oracle
-  entries (deferrable; the registry covers the immediate need).
-- A new `tx.explain` ledger op. The renderers live in the host CLI, not the
-  inspector library, so the ledger functional API surface is unchanged.
+  entries.
+- A new `tx.explain` ledger op. The renderers live in the host CLI, not
+  the inspector library, so the ledger functional API surface is
+  unchanged.
+- D2 / Graphviz alternative backends. If Mermaid layout proves
+  insufficient for the topology cut on a fixture, a D2 swap is a
+  follow-up PR, not part of this scope.
 
 ## Acceptance
 
-- `tx-deep-diagnosis --cbor <hex> --emit-mermaid d.mmd --emit-report r.md`
-  exits 0 and produces both files for the four snapshot fixtures.
+- `tx-deep-diagnosis --cbor <hex> --emit-explain out/` exits 0 and
+  produces `summary.md`, `parties.mmd`, `value-flow.tsv`, `topology.mmd`
+  for the four snapshot fixtures, plus `failures.mmd` for the three
+  invalid ones.
 - Snapshot tests cover: passing tx; `ValueNotConservedUTxO` failure;
   missing-witness failure; multi-redeemer script tx.
-- Running the renderers twice produces byte-identical output.
+- Running the renderers twice produces byte-identical output for every
+  emitted file.
 - `just ci` is green.
