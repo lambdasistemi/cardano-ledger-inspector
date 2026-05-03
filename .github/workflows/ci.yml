@@ -31,6 +31,18 @@ jobs:
       - name: Build OpenAPI artifact
         run: nix build --quiet .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
 
+      - name: Build wasm Extism plugin
+        run: nix build --quiet .#packages.x86_64-linux.wasm-extism-spike -o result-extism-wasm
+
+      - name: Build native Extism host
+        run: nix build --quiet .#packages.x86_64-linux.extism-spike-host -o result-extism-host
+
+      - name: Build native deep-diagnosis CLI
+        run: nix build --quiet .#packages.x86_64-linux.tx-deep-diagnosis -o result-cli
+
+      - name: Regenerate + diff OpenAPI source
+        run: nix build --quiet .#checks.x86_64-linux.ledger-functional-openapi-check
+
       - name: Check committed Swagger is generated
         run: nix build --quiet .#checks.x86_64-linux.ledger-functional-swagger-check
 
@@ -40,8 +52,23 @@ jobs:
       - name: Smoke tx.witness.plan operation
         run: nix build --quiet .#checks.x86_64-linux.tx-witness-plan-smoke
 
+      - name: Smoke tx.intent operation
+        run: nix build --quiet .#checks.x86_64-linux.tx-intent-smoke
+
+      - name: Smoke tx.validate operation
+        run: nix build --quiet .#checks.x86_64-linux.tx-validate-smoke
+
+      - name: Smoke tx.evaluate.scripts operation
+        run: nix build --quiet .#checks.x86_64-linux.tx-evaluate-scripts-smoke
+
       - name: Smoke explicit UTxO input context
         run: nix build --quiet .#checks.x86_64-linux.tx-input-context-smoke
+
+      - name: Smoke Extism conformance vs WASI
+        run: nix build --quiet .#checks.x86_64-linux.tx-extism-spike-smoke
+
+      - name: Format check (fourmolu)
+        run: nix develop --quiet -c just format-check
 
       - name: Run inspector Playwright tests
         run: nix develop --quiet -c just test-playwright
