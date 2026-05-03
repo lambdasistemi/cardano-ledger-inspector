@@ -313,6 +313,9 @@
             "net_spend_note": "Signer net is unknown until producer transaction CBOR resolves every regular input; output totals are still ledger facts.",
             "output_buckets": [
               {
+                "addresses": [
+                  "01dea7197ac235d73e7f7b1a249bace6a833722415d88e91dec5d2626dbc1597ad71c55d2d009a9274b3831ded155118dd769f5376decc1369"
+                ],
                 "asset_class_count": 0,
                 "bucket": "external_key",
                 "label": "External key",
@@ -320,6 +323,10 @@
                 "tx_out_count": 1
               },
               {
+                "addresses": [
+                  "3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+                  "31fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307732201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"
+                ],
                 "asset_class_count": 0,
                 "bucket": "script",
                 "label": "Script",
