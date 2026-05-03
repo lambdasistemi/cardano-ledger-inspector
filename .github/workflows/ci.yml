@@ -22,59 +22,32 @@ jobs:
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Build inspector WASI package
-        run: nix build --quiet .#packages.x86_64-linux.wasm-tx-inspector -o result-wasm
 
-      - name: Build inspector UI
-        run: nix build --quiet .#packages.x86_64-linux.tx-inspector-ui -o result-site
-
-      - name: Build OpenAPI artifact
-        run: nix build --quiet .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
-
-      - name: Build wasm Extism plugin
-        run: nix build --quiet .#packages.x86_64-linux.wasm-extism-spike -o result-extism-wasm
-
-      - name: Build native Extism host
-        run: nix build --quiet .#packages.x86_64-linux.extism-spike-host -o result-extism-host
-
-      - name: Build native deep-diagnosis CLI
-        run: nix build --quiet .#packages.x86_64-linux.tx-deep-diagnosis -o result-cli
-
-      - name: Regenerate + diff OpenAPI source
-        run: nix build --quiet .#checks.x86_64-linux.ledger-functional-openapi-check
-
-      - name: Check committed Swagger is generated
-        run: nix build --quiet .#checks.x86_64-linux.ledger-functional-swagger-check
-
-      - name: Smoke tx.identify operation
-        run: nix build --quiet .#checks.x86_64-linux.tx-identify-smoke
-
-      - name: Smoke tx.witness.plan operation
-        run: nix build --quiet .#checks.x86_64-linux.tx-witness-plan-smoke
-
-      - name: Smoke tx.intent operation
-        run: nix build --quiet .#checks.x86_64-linux.tx-intent-smoke
-
-      - name: Smoke tx.validate operation
-        run: nix build --quiet .#checks.x86_64-linux.tx-validate-smoke
-
-      - name: Smoke tx.evaluate.scripts operation
-        run: nix build --quiet .#checks.x86_64-linux.tx-evaluate-scripts-smoke
-
-      - name: Smoke explicit UTxO input context
-        run: nix build --quiet .#checks.x86_64-linux.tx-input-context-smoke
-
-      - name: Smoke Extism conformance vs WASI
-        run: nix build --quiet .#checks.x86_64-linux.tx-extism-spike-smoke
-
-      - name: Format check (fourmolu)
-        run: nix develop --quiet -c just format-check
-
-      - name: Run inspector Playwright tests
-        run: nix develop --quiet -c just test-playwright
+      - name: Build everything (packages + checks)
+        run: |
+          nix build --quiet \
+            .#packages.x86_64-linux.wasm-tx-inspector \
+            .#packages.x86_64-linux.tx-inspector-ui \
+            .#packages.x86_64-linux.ledger-functional-openapi \
+            .#packages.x86_64-linux.wasm-extism-spike \
+            .#packages.x86_64-linux.extism-spike-host \
+            .#packages.x86_64-linux.tx-deep-diagnosis \
+            .#checks.x86_64-linux.ledger-functional-openapi-check \
+            .#checks.x86_64-linux.ledger-functional-swagger-check \
+            .#checks.x86_64-linux.tx-identify-smoke \
+            .#checks.x86_64-linux.tx-witness-plan-smoke \
+            .#checks.x86_64-linux.tx-intent-smoke \
+            .#checks.x86_64-linux.tx-validate-smoke \
+            .#checks.x86_64-linux.tx-evaluate-scripts-smoke \
+            .#checks.x86_64-linux.tx-input-context-smoke \
+            .#checks.x86_64-linux.tx-extism-spike-smoke \
+            -o result-gate
 
       - name: Prepare downloadable artifacts
         run: |
+          nix build --quiet .#packages.x86_64-linux.wasm-tx-inspector -o result-wasm
+          nix build --quiet .#packages.x86_64-linux.tx-inspector-ui -o result-site
+          nix build --quiet .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
           mkdir -p artifacts/wasm-tx-inspector artifacts/tx-inspector-ui artifacts/ledger-functional-openapi
           cp -L result-wasm/wasm-tx-inspector.wasm artifacts/wasm-tx-inspector/
           cp -L result-site/* artifacts/tx-inspector-ui/
@@ -104,3 +77,135 @@ jobs:
           path: artifacts/ledger-functional-openapi
           if-no-files-found: error
           retention-days: 30
+
+  openapi-regen-check:
+    name: OpenAPI regen + diff
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.ledger-functional-openapi-check
+
+  swagger-check:
+    name: Swagger alias check
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.ledger-functional-swagger-check
+
+  tx-identify-smoke:
+    name: Smoke tx.identify
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.tx-identify-smoke
+
+  tx-witness-plan-smoke:
+    name: Smoke tx.witness.plan
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.tx-witness-plan-smoke
+
+  tx-intent-smoke:
+    name: Smoke tx.intent
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.tx-intent-smoke
+
+  tx-validate-smoke:
+    name: Smoke tx.validate
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.tx-validate-smoke
+
+  tx-evaluate-scripts-smoke:
+    name: Smoke tx.evaluate.scripts
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.tx-evaluate-scripts-smoke
+
+  tx-input-context-smoke:
+    name: Smoke explicit UTxO input context
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.tx-input-context-smoke
+
+  tx-extism-spike-smoke:
+    name: Smoke Extism conformance vs WASI
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix build --quiet .#checks.x86_64-linux.tx-extism-spike-smoke
+
+  format-check:
+    name: Format (fourmolu)
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix develop --quiet -c just format-check
+
+  playwright:
+    name: Playwright
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix develop --quiet -c just test-playwright
