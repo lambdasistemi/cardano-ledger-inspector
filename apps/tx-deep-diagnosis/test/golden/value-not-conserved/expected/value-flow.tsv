@@ -1,0 +1,7 @@
+source	target	lovelace	label
+input#0 key d2626d	tx	50007239276	input
+input#1 Amaru Network Compliance treasury (0baa0d)	tx	1450000000000	input
+tx	External key bucket	49897955481	External key (1 outputs)
+tx	Script bucket	1162532800000	Script (11 outputs)
+tx	fee	1043795	fee paid
+tx	(unaccounted)	287575440000	input total - (output total + fee); non-zero implies ValueNotConservedUTxO

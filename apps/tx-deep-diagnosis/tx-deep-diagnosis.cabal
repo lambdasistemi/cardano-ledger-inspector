@@ -28,6 +28,7 @@ library
     TxDeepDiagnosisHost.Render.Doc
     TxDeepDiagnosisHost.Render.Names
     TxDeepDiagnosisHost.Render.Parties
+    TxDeepDiagnosisHost.Render.ValueFlow
     TxDeepDiagnosisHost.Report
 
   build-depends:
