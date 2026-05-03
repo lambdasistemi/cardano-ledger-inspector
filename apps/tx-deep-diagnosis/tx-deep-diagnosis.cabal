@@ -29,6 +29,7 @@ library
     TxDeepDiagnosisHost.Render.Failures
     TxDeepDiagnosisHost.Render.Names
     TxDeepDiagnosisHost.Render.Parties
+    TxDeepDiagnosisHost.Render.Single
     TxDeepDiagnosisHost.Render.Summary
     TxDeepDiagnosisHost.Render.Topology
     TxDeepDiagnosisHost.Render.ValueFlow

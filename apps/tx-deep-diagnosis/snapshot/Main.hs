@@ -35,6 +35,7 @@ import TxDeepDiagnosisHost.Registry (ProtocolRegistry, loadRegistries)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc, parseDiagnosisDoc)
 import TxDeepDiagnosisHost.Render.Failures (renderFailuresMermaid)
 import TxDeepDiagnosisHost.Render.Parties (renderPartiesMermaid)
+import TxDeepDiagnosisHost.Render.Single (renderSingleMarkdown)
 import TxDeepDiagnosisHost.Render.Summary (
     EmittedFiles (..),
     renderSummaryMarkdown,
@@ -60,6 +61,7 @@ renderers =
     , Always "topology.mmd" renderTopologyMermaid
     , Conditional "failures.mmd" renderFailuresMermaid
     , SummaryArtifact "summary.md"
+    , Always "explain.md" renderSingleMarkdown
     ]
 
 main :: IO ()
