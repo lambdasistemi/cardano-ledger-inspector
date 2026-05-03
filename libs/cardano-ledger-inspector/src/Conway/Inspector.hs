@@ -585,6 +585,10 @@ intentSummaryJson args tx =
                             ]
                     , "resolved_input_buckets" .= map valueBucketJson inputValueBuckets
                     , "output_buckets" .= map valueBucketJson outputValueBuckets
+                    , "outputs"
+                        .= map
+                            (intentOutputJson signerHexSet)
+                            (zip [0 ..] outputs)
                     ]
             , "features"
                 .= Aeson.object
@@ -724,6 +728,32 @@ txOutBucketTotals signerHashes txOuts =
 txOutAddressHex :: L.TxOut Conway.ConwayEra -> T.Text
 txOutAddressHex txOut =
     T.decodeUtf8 (B16.encode (Addr.serialiseAddr (txOut ^. L.addrTxOutL)))
+
+{- | Per-output detail emitted under @intent.value.outputs[]@. Adds
+@index@ + @bucket@ to the existing 'txOutJson' shape so consumers can
+read individual output values and datums without re-running the
+inspector. Required to verify swap order parameters from the
+@intent@ envelope alone.
+-}
+intentOutputJson ::
+    Set.Set T.Text ->
+    (Int, L.TxOut Conway.ConwayEra) ->
+    Aeson.Value
+intentOutputJson signerHashes (i, txOut) =
+    case txOutJson txOut of
+        Aeson.Object fields ->
+            Aeson.Object
+                ( fields
+                    <> KeyMap.fromList
+                        [ ("index", Aeson.toJSON i)
+                        ,
+                            ( "bucket"
+                            , Aeson.String
+                                (valueBucketName (txOutValueBucket signerHashes txOut))
+                            )
+                        ]
+                )
+        other -> other
 
 allValueBuckets :: [ValueBucket]
 allValueBuckets =

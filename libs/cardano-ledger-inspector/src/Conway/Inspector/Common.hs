@@ -162,10 +162,11 @@ datumJson (PData.DatumHash h) =
         [ "kind" .= ("datum_hash" :: T.Text)
         , "hash" .= T.decodeUtf8 (B16.encode (Crypto.hashToBytes (Hashes.extractHash h)))
         ]
-datumJson (PData.Datum _) =
+datumJson (PData.Datum bd) =
     Aeson.object
         [ "kind" .= ("inline_datum" :: T.Text)
-        , "note" .= ("Plutus Data AST rendering deferred" :: T.Text)
+        , "cbor_hex" .= T.decodeUtf8 (B16.encode (Hashes.originalBytes bd))
+        , "note" .= ("Plutus Data AST decoding deferred; cbor_hex is the inline datum bytes" :: T.Text)
         ]
 
 txInJson :: TxIn.TxIn -> Aeson.Value
