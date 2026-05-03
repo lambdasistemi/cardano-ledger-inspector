@@ -27,6 +27,7 @@ library
     TxDeepDiagnosisHost.Registry
     TxDeepDiagnosisHost.Render.Doc
     TxDeepDiagnosisHost.Render.Names
+    TxDeepDiagnosisHost.Render.Parties
     TxDeepDiagnosisHost.Report
 
   build-depends:
@@ -44,6 +45,7 @@ library
     , http-types
     , scientific
     , text
+    , vector
     , cardano-ledger-inspector
 
   default-language: Haskell2010

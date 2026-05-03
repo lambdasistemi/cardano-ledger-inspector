@@ -21,6 +21,7 @@ import Control.Monad (forM, unless, when)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as BSL
 import Data.List (sort)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TIO
 import qualified Paths_tx_deep_diagnosis as Paths
@@ -30,35 +31,42 @@ import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr)
 
-import TxDeepDiagnosisHost.Registry (loadRegistries)
-import TxDeepDiagnosisHost.Render.Doc (parseDiagnosisDoc)
+import TxDeepDiagnosisHost.Registry (ProtocolRegistry, loadRegistries)
+import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc, parseDiagnosisDoc)
+import TxDeepDiagnosisHost.Render.Parties (renderPartiesMermaid)
+
+{- | Static registry of (relative file name, producer) pairs. Each
+renderer commit appends one line.
+-}
+renderers :: [(FilePath, ProtocolRegistry -> DiagnosisDoc -> Text)]
+renderers =
+    [ ("parties.mmd", renderPartiesMermaid)
+    ]
 
 main :: IO ()
 main = do
     args <- getArgs
-    goldenRoot <- case args of
-        [p] -> pure p
+    (mode, goldenRoot) <- case args of
+        [p] -> pure (CompareMode, p)
+        ["--write", p] -> pure (WriteMode, p)
         _ ->
             die
-                "usage: tx-deep-diagnosis-render-snapshot <golden-root>\n"
+                ( "usage: tx-deep-diagnosis-render-snapshot [--write] "
+                    <> "<golden-root>\n"
+                )
     bundled <- Paths.getDataDir
-    _reg <- loadRegistries [bundled]
+    reg <- loadRegistries [bundled]
     cases <- listGoldenCases goldenRoot
     when (null cases) $
         die ("no golden cases found under " <> goldenRoot)
-    results <- forM cases (runCase _reg goldenRoot)
+    results <- forM cases (runCase mode reg goldenRoot)
     let failed = [name | (name, False) <- results]
-    if null failed
-        then do
-            mapM_ (\(name, _) -> putStrLn ("ok   " <> name)) results
-            exitSuccess
-        else do
-            mapM_
-                ( \(name, ok) ->
-                    putStrLn ((if ok then "ok   " else "FAIL ") <> name)
-                )
-                results
-            exitFailure
+    mapM_
+        ( \(name, ok) ->
+            putStrLn ((if ok then "ok   " else "FAIL ") <> name)
+        )
+        results
+    if null failed then exitSuccess else exitFailure
 
 listGoldenCases :: FilePath -> IO [FilePath]
 listGoldenCases root = do
@@ -80,19 +88,13 @@ filterM p (x : xs) = do
     pure (if keep then x : rest else rest)
 
 {- | Run all renderers for a single golden case. Returns @True@ on
-match, @False@ otherwise. The renderer set is currently empty; each
-renderer commit will extend 'renderers' to add a new (artifact name,
-producer) entry.
+match, @False@ otherwise.
 -}
-runCase ::
-    -- | bundled protocol registry; passed for forward use as renderers land
-    a ->
-    -- | golden root
-    FilePath ->
-    -- | case name (subdir of root)
-    FilePath ->
-    IO (FilePath, Bool)
-runCase _reg root name = do
+data Mode = CompareMode | WriteMode
+    deriving (Eq)
+
+runCase :: Mode -> ProtocolRegistry -> FilePath -> FilePath -> IO (FilePath, Bool)
+runCase mode reg root name = do
     let inputPath = root </> name </> "input.json"
     inputExists <- doesFileExist inputPath
     unless inputExists $
@@ -106,18 +108,74 @@ runCase _reg root name = do
             Left e -> do
                 hPutStrLn stderr ("parse " <> inputPath <> ": " <> e)
                 pure (name, False)
-            Right _doc -> do
-                -- Renderer set is empty for now; the case passes if the
-                -- envelope decodes. Subsequent commits extend this with
-                -- per-artifact byte equality checks against
-                -- expected/<file>.
-                pure (name, True)
+            Right doc -> do
+                outcomes <-
+                    mapM
+                        (handleArtifact mode reg root name doc)
+                        renderers
+                pure (name, and outcomes)
+
+handleArtifact ::
+    Mode ->
+    ProtocolRegistry ->
+    FilePath ->
+    FilePath ->
+    DiagnosisDoc ->
+    (FilePath, ProtocolRegistry -> DiagnosisDoc -> Text) ->
+    IO Bool
+handleArtifact WriteMode reg root name doc (artifact, render) = do
+    let expectedDir = root </> name </> "expected"
+        expectedPath = expectedDir </> artifact
+    exists <- doesDirectoryExist expectedDir
+    unless exists $ die ("missing expected dir: " <> expectedDir)
+    TIO.writeFile expectedPath (render reg doc)
+    putStrLn ("wrote " <> expectedPath)
+    pure True
+handleArtifact CompareMode reg root name doc args =
+    compareArtifact reg root name doc args
+
+compareArtifact ::
+    ProtocolRegistry ->
+    FilePath ->
+    FilePath ->
+    DiagnosisDoc ->
+    (FilePath, ProtocolRegistry -> DiagnosisDoc -> Text) ->
+    IO Bool
+compareArtifact reg root name doc (artifact, render) = do
+    let expectedPath = root </> name </> "expected" </> artifact
+        actual = render reg doc
+    expectedExists <- doesFileExist expectedPath
+    if not expectedExists
+        then do
+            hPutStrLn
+                stderr
+                ( "MISSING expected file: "
+                    <> expectedPath
+                    <> "\n--- actual output ---\n"
+                    <> Text.unpack actual
+                    <> "--- end ---"
+                )
+            pure False
+        else do
+            expected <- TIO.readFile expectedPath
+            if expected == actual
+                then pure True
+                else do
+                    hPutStrLn
+                        stderr
+                        ( "DIFF in "
+                            <> name
+                            <> "/"
+                            <> artifact
+                            <> ":\n--- expected ---\n"
+                            <> Text.unpack expected
+                            <> "--- actual ---\n"
+                            <> Text.unpack actual
+                            <> "--- end ---"
+                        )
+                    pure False
 
 die :: String -> IO a
 die msg = do
     hPutStrLn stderr msg
     exitFailure
-
--- Silence "defined but not used" until the renderer wiring lands.
-_unused :: ()
-_unused = const () (Text.pack "", TIO.hPutStrLn)

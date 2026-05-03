@@ -1,0 +1,19 @@
+%% L1 — parties involved in tx 30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f
+flowchart LR
+    classDef signer fill:#fff8dc,stroke:#cc9900,stroke-width:2px
+    classDef inputAddr fill:#f0f0f0,stroke:#666
+    classDef bucket fill:#e6f0ff,stroke:#3366cc
+    classDef txBody fill:#fffefa,stroke:#000,stroke-width:2px
+    tx["tx"]:::txBody
+    I0["key d2626d"]:::inputAddr
+    I0 -- consumed --> tx
+    I1["Amaru Network Compliance treasury (0baa0d)"]:::inputAddr
+    I1 -- consumed --> tx
+    O0["External key (1 out, 49897955481 lovelace)"]:::bucket
+    tx -- produces --> O0
+    O1["Script (11 out, 1162532800000 lovelace)"]:::bucket
+    tx -- produces --> O1
+    S0["signer 8bd03209…b24fb1c1"]:::signer
+    S0 -. required .-> tx
+    S1["signer f3ab64b0…04d23e2e"]:::signer
+    S1 -. required .-> tx
