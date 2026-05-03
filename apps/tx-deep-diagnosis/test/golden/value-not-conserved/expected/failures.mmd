@@ -1,0 +1,17 @@
+%% L4 — failures for tx 30723408902f540c29e2e0ec7cb0dc89a0024d00506b564e326b8fe10fd2a00f
+flowchart TD
+    classDef body fill:#fff,stroke:#000
+    classDef bodyFail fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
+    classDef signerFail fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
+    classDef ruleFail fill:#fff0f0,stroke:#aa3333,stroke-dasharray:3 3
+    body["tx body"]:::body
+    f0["UTXOW / ValueNotConservedUTxO"]:::ruleFail
+    f0 --> body
+    body:::bodyFail
+    f1["UTXOW / MissingVKeyWitnesses"]:::ruleFail
+    f1_s0["missing signer 8bd03209…b24fb1c1"]:::signerFail
+    f1 --> f1_s0
+    f1_s1["missing signer dea7197a…c5d2626d"]:::signerFail
+    f1 --> f1_s1
+    f1_s2["missing signer f3ab64b0…04d23e2e"]:::signerFail
+    f1 --> f1_s2
