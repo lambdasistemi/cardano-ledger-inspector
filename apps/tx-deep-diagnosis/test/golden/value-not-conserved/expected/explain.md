@@ -124,7 +124,13 @@ Inputs that also receive outputs (same payment credential on both sides):
 | # | Purpose | Target | ex_units (mem / steps) | Redeemer |
 |---|---------|--------|------------------------|----------|
 | 0 | spending | input 64f27254f3c0311f…#0 | 609151 / 242364094 | `d87c9fa140a140…` (17B) |
-| 1 | rewarding | rewarding #0 | 206629 / 66382393 | `80…` (1B) |
+| 1 | rewarding | withdrawal #0 script a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094 (0.000000 ADA) | 206629 / 66382393 | `80…` (1B) |
+
+## Withdrawals
+
+| # | Reward account | Amount |
+|---|----------------|-------:|
+| 0 | mainnet / script a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094 / `f1a64d1b9e1aeffe5405…` | 0.000000 |
 
 ## Outputs
 

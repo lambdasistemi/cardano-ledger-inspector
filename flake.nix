@@ -224,6 +224,8 @@
               and .op == "tx.intent"
               and any(.result.intent.metrics[]; .label == "Signer net ADA" and .value == "-5.900913 ADA")
               and .result.intent.sections[0].title == "Signer value perspective"
+              and (.result.intent.withdrawals | type) == "array"
+              and (.result.intent.withdrawals | length) == 0
               and .result.intent.value.net_spend_known == true
               and .result.intent.value.signer_lovelace.known == true
               and .result.intent.value.signer_lovelace.net_lovelace == "-5900913"
