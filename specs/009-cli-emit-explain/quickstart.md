@@ -1,4 +1,4 @@
-# Quickstart: tx-deep-diagnosis Runtime --emit-explain
+# Quickstart: tx-deep-diagnosis Stdout Explain Format
 
 ## Build the CLI
 
@@ -6,18 +6,33 @@
 nix build .#packages.x86_64-linux.tx-deep-diagnosis -o result-cli
 ```
 
-## Write the explanation bundle
+## Print the explanation to stdout
 
 ```bash
 ./result-cli/bin/tx-deep-diagnosis \
   --cbor specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex \
   --network mainnet \
+  --format explain
+```
+
+Expected result:
+
+- stdout is a markdown explanation
+- no extra files are written
+
+## Also write the explanation bundle
+
+```bash
+./result-cli/bin/tx-deep-diagnosis \
+  --cbor specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex \
+  --network mainnet \
+  --format explain \
   --emit-explain out
 ```
 
 Expected result:
 
-- stdout is still a JSON diagnosis envelope
+- stdout is still the markdown explanation
 - `out/summary.md` exists
 - `out/explain.md` exists
 - `out/parties.mmd` exists

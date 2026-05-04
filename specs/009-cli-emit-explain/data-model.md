@@ -1,4 +1,9 @@
-# Data Model: tx-deep-diagnosis Runtime --emit-explain
+# Data Model: tx-deep-diagnosis Stdout Explain Format
+
+## Output Format
+
+- `json`: the existing machine-readable diagnosis envelope on stdout
+- `explain`: the single-file markdown explanation on stdout
 
 ## Explain Artifact
 

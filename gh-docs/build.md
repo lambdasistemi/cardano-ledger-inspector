@@ -59,7 +59,7 @@ result-cli/bin/tx-deep-diagnosis --help
 
 ```text
 Usage: tx-deep-diagnosis --cbor FILE [--registry DIR] [--no-bundled-registry]
-                         [--emit-explain DIR] [--network NETWORK]
+                         [--format FORMAT] [--emit-explain DIR] [--network NETWORK]
                          [--blockfrost-id PROJECT_ID]
 
 Available options:
@@ -71,23 +71,41 @@ Available options:
   --no-bundled-registry    Skip the registry vendored into this binary at build
                            time. Only the directories passed via --registry are
                            consulted. Rare; meant for testing a clean replacement.
-  --emit-explain DIR       Write summary.md, explain.md, and diagram artifacts
-                           to DIR after printing the diagnosis JSON.
+  --format FORMAT          stdout format: json | explain
+  --emit-explain DIR       Also write summary.md, explain.md, and diagram artifacts
+                           to DIR.
   --network NETWORK        mainnet | preprod | preview
   --blockfrost-id PID      Blockfrost project_id (or BLOCKFROST_PROJECT_ID env var)
 ```
 
-### One-shot example on the SundaeSwap fixture
+### One-shot explain markdown on stdout
 
 ```bash
 export BLOCKFROST_PROJECT_ID=mainnet…
 result-cli/bin/tx-deep-diagnosis \
     --cbor specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex \
+    --network mainnet \
+    --format explain
+```
+
+The standard route is now explicit:
+
+- `--format json` or no `--format`: typed JSON diagnosis envelope on stdout
+- `--format explain`: single-file markdown explanation on stdout
+
+If you also want the directory-shaped artifact bundle on disk, add
+`--emit-explain out/`:
+
+```bash
+export BLOCKFROST_PROJECT_ID=mainnet…
+result-cli/bin/tx-deep-diagnosis \
+    --cbor specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex \
+    --network mainnet \
+    --format explain \
     --emit-explain out
 ```
 
-The CLI prints one typed JSON diagnosis envelope on stdout and, when
-`--emit-explain` is present, also writes the human-facing artifacts to `out/`:
+That optional side output writes:
 
 - `summary.md`
 - `explain.md`
@@ -112,7 +130,8 @@ context-less `tx.validate` (the validator says exactly which fields are
 missing — `source_output`, `protocol_parameters`, `slot`, `epoch`,
 `network` — instead of guessing).
 
-If `--emit-explain` is omitted, the CLI remains JSON-only.
+If `--emit-explain` is omitted, stdout is unaffected; only the extra files are
+skipped.
 
 ### Adding your own protocol identifications
 
@@ -141,6 +160,7 @@ a fully replaced registry), add `--no-bundled-registry`.
 BLOCKFROST_PROJECT_ID=<key> \
   nix run github:lambdasistemi/cardano-ledger-inspector#tx-deep-diagnosis -- \
     --cbor my-tx.hex \
+    --format explain \
     --emit-explain out
 ```
 
