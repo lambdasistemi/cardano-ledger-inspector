@@ -241,6 +241,13 @@
               and any(.result.intent.value.resolved_input_buckets[]; .bucket == "signer_controlled" and .lovelace == "7015148761")
               and any(.result.intent.value.output_buckets[]; .bucket == "signer_controlled" and .lovelace == "7009247848")
               and any(.result.intent.value.output_buckets[]; .bucket == "script" and .tx_out_count == 4)
+              and (.result.intent.value.outputs | type) == "array"
+              and (.result.intent.value.outputs | length) > 0
+              and any(.result.intent.value.outputs[]; .assets != {})
+              and any(
+                .result.intent.value.outputs[];
+                .assets["193ee65211bb3b4e0ea5f751f415269355a650e2e3706f625cdf1a4b"][""] == "1"
+              )
             ' response.json
             cp request.json response.json $out/
           '';

@@ -51,6 +51,10 @@
         "output_buckets": {
           "type": "array",
           "items": { "$ref": "#/$defs/valueBucket" }
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/intentOutput" }
         }
       },
       "additionalProperties": true
@@ -240,6 +244,44 @@
         "tx_out_count": { "type": "integer", "minimum": 0 },
         "lovelace": { "type": "string" },
         "asset_class_count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "assetMap": {
+      "type": "object",
+      "description": "Nested policy-id -> asset-name -> quantity map. Policy ids and asset names are hex strings; quantities are decimal strings.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "datumState": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["no_datum", "datum_hash", "inline_datum"]
+        },
+        "hash": { "type": "string" },
+        "cbor_hex": { "type": "string" },
+        "decoded": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "intentOutput": {
+      "type": "object",
+      "required": ["index", "bucket", "address_hex", "coin_lovelace", "assets", "datum"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "bucket": {
+          "type": "string",
+          "enum": ["signer_controlled", "external_key", "script", "bootstrap"]
+        },
+        "address_hex": { "type": "string" },
+        "coin_lovelace": { "type": "string" },
+        "assets": { "$ref": "#/$defs/assetMap" },
+        "datum": { "$ref": "#/$defs/datumState" }
       },
       "additionalProperties": true
     }

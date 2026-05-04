@@ -27,7 +27,7 @@ module TxDeepDiagnosisHost.Render.Summary (
 import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
-import Data.List (foldl')
+import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -592,8 +592,8 @@ outputsSection reg doc =
             then ""
             else
                 "## Outputs\n\n"
-                    <> "| # | Bucket | Destination | ADA | Datum |\n"
-                    <> "|---|--------|-------------|----:|-------|\n"
+                    <> "| # | Bucket | Destination | ADA | Assets | Datum |\n"
+                    <> "|---|--------|-------------|----:|--------|-------|\n"
                     <> Text.concat (map (renderOutputRow reg) items)
                     <> "\n"
 
@@ -614,6 +614,9 @@ renderOutputRow reg v = case v of
                 Just (String s) -> s
                 _ -> "0"
             ada = formatAdaSimple (parseLov lov)
+            assetsCell = case KeyMap.lookup "assets" o of
+                Just assets -> renderAssetsCell assets
+                Nothing -> "—"
             datumCell = case KeyMap.lookup "datum" o of
                 Just (Object d) -> renderDatumCell d
                 _ -> ""
@@ -626,9 +629,39 @@ renderOutputRow reg v = case v of
                 <> " | "
                 <> ada
                 <> " | "
+                <> escapeTable assetsCell
+                <> " | "
                 <> escapeTable datumCell
                 <> " |\n"
     _ -> ""
+
+renderAssetsCell :: Value -> Text
+renderAssetsCell (Object policies) =
+    let rows =
+            sortOn
+                (\(policy, assetName, _) -> (policy, assetName))
+                [ (Key.toText policy, Key.toText assetName, qty)
+                | (policy, Object assetMap) <- KeyMap.toList policies
+                , (assetName, String qty) <- KeyMap.toList assetMap
+                ]
+     in if null rows
+            then "—"
+            else Text.intercalate ", " (map renderAssetPreview rows)
+renderAssetsCell _ = "—"
+
+renderAssetPreview :: (Text, Text, Text) -> Text
+renderAssetPreview (policy, assetName, qty) =
+    shortHex policy <> "." <> assetLabel assetName <> "=" <> qty
+
+assetLabel :: Text -> Text
+assetLabel "" =
+    "[empty]"
+assetLabel assetName = shortHex assetName
+
+shortHex :: Text -> Text
+shortHex h
+    | Text.length h <= 16 = h
+    | otherwise = Text.take 8 h <> "…" <> Text.takeEnd 6 h
 
 renderDatumCell :: KeyMap.KeyMap Value -> Text
 renderDatumCell d = case KeyMap.lookup "kind" d of

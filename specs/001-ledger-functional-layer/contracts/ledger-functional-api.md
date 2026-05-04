@@ -508,6 +508,24 @@ it does not sign, validate, submit, balance, patch, or mutate the transaction.
           "lovelace": "1162532800000",
           "asset_class_count": 0
         }
+      ],
+      "outputs": [
+        {
+          "index": 0,
+          "bucket": "script",
+          "address_hex": "71193ee65211bb3b4e0ea5f751f415269355a650e2e3706f625cdf1a4b",
+          "coin_lovelace": "1400750",
+          "assets": {
+            "193ee65211bb3b4e0ea5f751f415269355a650e2e3706f625cdf1a4b": {
+              "": "1"
+            }
+          },
+          "datum": {
+            "kind": "inline_datum",
+            "cbor_hex": "d8799fd8799f4e4345522f4144412d555344412f331b0000019dc5b5da20d8799f1a94ab3f2d1b00000002540be400ffffd8799f581c3c12f6735ef87655c5b27bced3f828d857d0a27fd20f2cda18ebf2fbffff",
+            "decoded": { "kind": "constr" }
+          }
+        }
       ]
     },
     "warnings": [
@@ -525,7 +543,9 @@ consumers. Each `withdrawals[]` row exposes the serialized reward-account hex,
 its network and staking credential, and the withdrawn lovelace amount. Each
 `signing.required_signers[]` row exposes the declared signer hash, its source,
 and whether that signer is already covered by a vkey witness, a bootstrap
-witness, or still missing.
+witness, or still missing. Each `value.outputs[]` row exposes the exact output
+address, its lovelace amount, its native-asset map (`policy_id -> asset_name ->
+quantity`), and its datum state (`no_datum`, `datum_hash`, or `inline_datum`).
 When `context.producer_txs` resolves every regular input, `value.signer_lovelace`
 reports a known net ADA amount from resolved signer-controlled inputs minus
 signer-controlled outputs. Ownership is intentionally conservative: only output
