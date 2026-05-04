@@ -90,7 +90,7 @@ renderSummaryMarkdown reg doc files =
         , observationsSection reg doc
         , claimsSection doc
         , effectsSection doc
-        , scriptsSection reg doc
+        , scriptsSection doc
         , withdrawalsSection doc
         , outputsSection reg doc
         , datumsSection reg doc
@@ -390,13 +390,6 @@ metadataDestinations doc =
     in  [ d | Object o <- items, Just (String d) <- [KeyMap.lookup "destination" o], not (Text.null d)
         ]
 
-countOutputs :: DiagnosisDoc -> Maybe Int
-countOutputs doc = case valuePath
-    (ddIntent doc)
-    ["result", "intent", "features", "output_count"] of
-    Just (Number n) -> Just (floor n)
-    _ -> Nothing
-
 balanceSection :: ProtocolRegistry -> DiagnosisDoc -> Text
 balanceSection reg doc =
     let inputs = inputParties reg doc
@@ -567,22 +560,6 @@ stringNumber key o = case KeyMap.lookup (Key.fromText key) o of
 
 formatCount :: Integer -> Text
 formatCount = withThousandsSeparators . Text.pack . show
-
-scriptOutputCount :: DiagnosisDoc -> Maybe Int
-scriptOutputCount doc =
-    let path = ["result", "intent", "value", "output_buckets"]
-        items = case valuePath (ddIntent doc) path of
-            Just (Array xs) -> V.toList xs
-            _ -> []
-        scriptB =
-            [ floor n
-            | Object o <- items
-            , Just (String "Script") <- [KeyMap.lookup "label" o]
-            , Just (Number n) <- [KeyMap.lookup "tx_out_count" o]
-            ]
-    in  case scriptB of
-            (n : _) -> Just n
-            [] -> Nothing
 
 {- | Per-output table from @intent.value.outputs[]@. Lets the reader
 see exactly how a script bucket's lovelace splits across individual
@@ -1095,8 +1072,8 @@ the redeemer's purpose, what it targets, the ex_units it commits, and
 a CBOR preview so the reader can spot-check the redeemer body without
 re-running the inspector.
 -}
-scriptsSection :: ProtocolRegistry -> DiagnosisDoc -> Text
-scriptsSection reg doc =
+scriptsSection :: DiagnosisDoc -> Text
+scriptsSection doc =
     let path = ["result", "intent", "scripts"]
         items = case valuePath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
