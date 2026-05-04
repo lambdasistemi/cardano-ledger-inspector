@@ -338,7 +338,517 @@
       "parameterized": true,
       "parameters_known": false,
       "label": "Amaru Network Compliance treasury",
-      "labelled_by": "amaru-treasury/journal-2026.json#treasuries.network_compliance"
+      "labelled_by": "amaru-treasury/journal-2026.json#treasuries.network_compliance",
+      "datum_schema": {
+        "source": {
+          "kind": "manual",
+          "note": "observed on the Amaru Network Compliance treasury change output; the pinned SundaeSwap treasury validator accepts opaque Data, so these field names mirror the shared order-shaped commitment rather than an upstream treasury datum declaration"
+        },
+        "name": "TreasuryCommitmentDatum",
+        "constructors": [
+          {
+            "index": 0,
+            "name": "Commitment",
+            "fields": [
+              {
+                "name": "pool_ident",
+                "type": {
+                  "kind": "sum",
+                  "variants": [
+                    {
+                      "index": 0,
+                      "name": "Some",
+                      "fields": [
+                        {
+                          "name": "value",
+                          "type": {
+                            "kind": "bytes",
+                            "semantic": "PoolIdent"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 1,
+                      "name": "None",
+                      "fields": []
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "owner",
+                "type": {
+                  "kind": "sum",
+                  "variants": [
+                    {
+                      "index": 0,
+                      "name": "Signature",
+                      "fields": [
+                        {
+                          "name": "key_hash",
+                          "type": {
+                            "kind": "bytes",
+                            "semantic": "VerificationKeyHash"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 1,
+                      "name": "AllOf",
+                      "fields": [
+                        {
+                          "name": "scripts",
+                          "type": {
+                            "kind": "list",
+                            "element": {
+                              "kind": "data"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 2,
+                      "name": "AnyOf",
+                      "fields": [
+                        {
+                          "name": "scripts",
+                          "type": {
+                            "kind": "list",
+                            "element": {
+                              "kind": "data"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 3,
+                      "name": "AtLeast",
+                      "fields": [
+                        {
+                          "name": "required",
+                          "type": {
+                            "kind": "int"
+                          }
+                        },
+                        {
+                          "name": "scripts",
+                          "type": {
+                            "kind": "list",
+                            "element": {
+                              "kind": "data"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 4,
+                      "name": "Before",
+                      "fields": [
+                        {
+                          "name": "time",
+                          "type": {
+                            "kind": "int",
+                            "semantic": "POSIXTime"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 5,
+                      "name": "After",
+                      "fields": [
+                        {
+                          "name": "time",
+                          "type": {
+                            "kind": "int",
+                            "semantic": "POSIXTime"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 6,
+                      "name": "Script",
+                      "fields": [
+                        {
+                          "name": "script_hash",
+                          "type": {
+                            "kind": "bytes",
+                            "semantic": "ScriptHash"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "max_protocol_fee",
+                "type": {
+                  "kind": "int",
+                  "semantic": "Lovelace"
+                }
+              },
+              {
+                "name": "destination",
+                "type": {
+                  "kind": "sum",
+                  "variants": [
+                    {
+                      "index": 0,
+                      "name": "Fixed",
+                      "fields": [
+                        {
+                          "name": "address",
+                          "type": {
+                            "kind": "constr",
+                            "of": {
+                              "index": 0,
+                              "name": "Address",
+                              "fields": [
+                                {
+                                  "name": "payment_credential",
+                                  "type": {
+                                    "kind": "sum",
+                                    "variants": [
+                                      {
+                                        "index": 0,
+                                        "name": "VerificationKey",
+                                        "fields": [
+                                          {
+                                            "name": "hash",
+                                            "type": {
+                                              "kind": "bytes",
+                                              "semantic": "VerificationKeyHash"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "index": 1,
+                                        "name": "Script",
+                                        "fields": [
+                                          {
+                                            "name": "hash",
+                                            "type": {
+                                              "kind": "bytes",
+                                              "semantic": "ScriptHash"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "name": "stake_credential",
+                                  "type": {
+                                    "kind": "sum",
+                                    "variants": [
+                                      {
+                                        "index": 0,
+                                        "name": "Some",
+                                        "fields": [
+                                          {
+                                            "name": "value",
+                                            "type": {
+                                              "kind": "sum",
+                                              "variants": [
+                                                {
+                                                  "index": 0,
+                                                  "name": "Inline",
+                                                  "fields": [
+                                                    {
+                                                      "name": "credential",
+                                                      "type": {
+                                                        "kind": "sum",
+                                                        "variants": [
+                                                          {
+                                                            "index": 0,
+                                                            "name": "VerificationKey",
+                                                            "fields": [
+                                                              {
+                                                                "name": "hash",
+                                                                "type": {
+                                                                  "kind": "bytes",
+                                                                  "semantic": "VerificationKeyHash"
+                                                                }
+                                                              }
+                                                            ]
+                                                          },
+                                                          {
+                                                            "index": 1,
+                                                            "name": "Script",
+                                                            "fields": [
+                                                              {
+                                                                "name": "hash",
+                                                                "type": {
+                                                                  "kind": "bytes",
+                                                                  "semantic": "ScriptHash"
+                                                                }
+                                                              }
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "index": 1,
+                                                  "name": "Pointer",
+                                                  "fields": [
+                                                    {
+                                                      "name": "slot_number",
+                                                      "type": {
+                                                        "kind": "int"
+                                                      }
+                                                    },
+                                                    {
+                                                      "name": "transaction_index",
+                                                      "type": {
+                                                        "kind": "int"
+                                                      }
+                                                    },
+                                                    {
+                                                      "name": "certificate_index",
+                                                      "type": {
+                                                        "kind": "int"
+                                                      }
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "index": 1,
+                                        "name": "None",
+                                        "fields": []
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "name": "datum",
+                          "type": {
+                            "kind": "sum",
+                            "variants": [
+                              {
+                                "index": 0,
+                                "name": "NoDatum",
+                                "fields": []
+                              },
+                              {
+                                "index": 1,
+                                "name": "DatumHash",
+                                "fields": [
+                                  {
+                                    "name": "hash",
+                                    "type": {
+                                      "kind": "bytes"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "index": 2,
+                                "name": "InlineDatum",
+                                "fields": [
+                                  {
+                                    "name": "data",
+                                    "type": {
+                                      "kind": "data"
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 1,
+                      "name": "Self",
+                      "fields": []
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "details",
+                "type": {
+                  "kind": "sum",
+                  "variants": [
+                    {
+                      "index": 0,
+                      "name": "Strategy",
+                      "fields": [
+                        {
+                          "name": "auth",
+                          "type": {
+                            "kind": "data"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 1,
+                      "name": "Swap",
+                      "fields": [
+                        {
+                          "name": "offer",
+                          "type": {
+                            "kind": "tuple",
+                            "slots": [
+                              {
+                                "name": "policy",
+                                "type": {
+                                  "kind": "bytes",
+                                  "semantic": "PolicyId"
+                                }
+                              },
+                              {
+                                "name": "asset_name",
+                                "type": {
+                                  "kind": "bytes",
+                                  "semantic": "AssetName"
+                                }
+                              },
+                              {
+                                "name": "quantity",
+                                "type": {
+                                  "kind": "int"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "name": "min_received",
+                          "type": {
+                            "kind": "tuple",
+                            "slots": [
+                              {
+                                "name": "policy",
+                                "type": {
+                                  "kind": "bytes",
+                                  "semantic": "PolicyId"
+                                }
+                              },
+                              {
+                                "name": "asset_name",
+                                "type": {
+                                  "kind": "bytes",
+                                  "semantic": "AssetName"
+                                }
+                              },
+                              {
+                                "name": "quantity",
+                                "type": {
+                                  "kind": "int"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 2,
+                      "name": "Deposit",
+                      "fields": [
+                        {
+                          "name": "assets",
+                          "type": {
+                            "kind": "data"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 3,
+                      "name": "Withdrawal",
+                      "fields": [
+                        {
+                          "name": "amount",
+                          "type": {
+                            "kind": "tuple",
+                            "slots": [
+                              {
+                                "name": "policy",
+                                "type": {
+                                  "kind": "bytes",
+                                  "semantic": "PolicyId"
+                                }
+                              },
+                              {
+                                "name": "asset_name",
+                                "type": {
+                                  "kind": "bytes",
+                                  "semantic": "AssetName"
+                                }
+                              },
+                              {
+                                "name": "quantity",
+                                "type": {
+                                  "kind": "int"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 4,
+                      "name": "Donation",
+                      "fields": [
+                        {
+                          "name": "assets",
+                          "type": {
+                            "kind": "data"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "index": 5,
+                      "name": "Record",
+                      "fields": [
+                        {
+                          "name": "policy",
+                          "type": {
+                            "kind": "data"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "extension",
+                "type": {
+                  "kind": "data"
+                }
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "deployment_registries": [
