@@ -37,6 +37,11 @@
         "context": {
           "$ref": "producer-tx-context.schema.json",
           "description": "Explicit external context owned by the host workspace."
+        },
+        "vkey_witness_cbor_hex": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f\\s]+$",
+          "description": "Hex-encoded CBOR for one Shelley/Conway vkey witness used by tx.witness.attach."
         }
       },
       "additionalProperties": true

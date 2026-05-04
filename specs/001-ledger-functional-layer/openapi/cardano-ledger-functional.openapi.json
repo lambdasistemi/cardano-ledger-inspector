@@ -58,6 +58,9 @@
       "TxValidateResult": {
         "$ref": "tx-validate-result.schema.json"
       },
+      "TxWitnessAttachResult": {
+        "$ref": "tx-witness-attach-result.schema.json"
+      },
       "TxWitnessPlanResult": {
         "$ref": "tx-witness-plan-result.schema.json"
       }
@@ -201,6 +204,17 @@
                     },
                     "ledger_functional_layer": "cardano-ledger-functional/v1",
                     "op": "tx.validate",
+                    "tx_cbor": "84a4..."
+                  }
+                },
+                "witnessAttach": {
+                  "summary": "Attach or replace one vkey witness",
+                  "value": {
+                    "args": {
+                      "vkey_witness_cbor_hex": "825820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f5840202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+                    },
+                    "ledger_functional_layer": "cardano-ledger-functional/v1",
+                    "op": "tx.witness.attach",
                     "tx_cbor": "84a4..."
                   }
                 },
@@ -614,6 +628,52 @@
                           "status": "incomplete",
                           "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
                           "valid_for_supplied_context": null,
+                          "warnings": []
+                        }
+                      }
+                    }
+                  },
+                  "witnessAttach": {
+                    "summary": "Witness attachment response envelope",
+                    "value": {
+                      "ledger_functional_layer": "cardano-ledger-functional/v1",
+                      "op": "tx.witness.attach",
+                      "result": {
+                        "tx_cbor": "84a4...",
+                        "witness_attachment": {
+                          "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "errors": [],
+                          "signed_tx_cbor_hex": "84a4...",
+                          "status": "applied",
+                          "tx_cbor": "84a4...",
+                          "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "warnings": [],
+                          "witness_patch_action": "inserted"
+                        }
+                      }
+                    }
+                  },
+                  "witnessAttachRejected": {
+                    "summary": "Rejected witness attachment with stable diagnostics",
+                    "value": {
+                      "ledger_functional_layer": "cardano-ledger-functional/v1",
+                      "op": "tx.witness.attach",
+                      "result": {
+                        "witness_attachment": {
+                          "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "errors": [
+                            {
+                              "code": "missing_vkey_witness_cbor_hex",
+                              "details": null,
+                              "message": "Supply args.vkey_witness_cbor_hex as hex-encoded CBOR for a single vkey witness.",
+                              "path": [
+                                "args",
+                                "vkey_witness_cbor_hex"
+                              ]
+                            }
+                          ],
+                          "status": "rejected",
+                          "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
                           "warnings": []
                         }
                       }

@@ -213,6 +213,116 @@
             cp request.json response.json $out/
           '';
 
+          tx-witness-attach-smoke = pkgs.runCommand "tx-witness-attach-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.identify",
+                args: {}
+              }' > identify-original-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < identify-original-request.json > identify-original-response.json
+
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              --arg witness "825820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f5840202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f" \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.witness.attach",
+                args: {
+                  vkey_witness_cbor_hex: ($witness | gsub("\\s"; ""))
+                }
+              }' > attach-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < attach-request.json > attach-response.json
+
+            ${pkgs.jq}/bin/jq -n \
+              --slurpfile attach attach-response.json \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: $attach[0].result.witness_attachment.signed_tx_cbor_hex,
+                op: "tx.identify",
+                args: {}
+              }' > identify-patched-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < identify-patched-request.json > identify-patched-response.json
+
+            ${pkgs.jq}/bin/jq -n \
+              --slurpfile attach attach-response.json \
+              --arg witness "825820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f5840202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f" \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: $attach[0].result.witness_attachment.signed_tx_cbor_hex,
+                op: "tx.witness.attach",
+                args: {
+                  vkey_witness_cbor_hex: ($witness | gsub("\\s"; ""))
+                }
+              }' > reattach-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < reattach-request.json > reattach-response.json
+
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.witness.attach",
+                args: {}
+              }' > missing-witness-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < missing-witness-request.json > missing-witness-response.json
+
+            ${pkgs.jq}/bin/jq -e -s '
+              .[0].result.identification as $before
+              | .[1].result.witness_attachment as $attach
+              | .[2].result.identification as $after
+              | .[3].result.witness_attachment as $reattach
+              | .[4].result.witness_attachment as $missing
+              | .[1].ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .[1].op == "tx.witness.attach"
+              and $attach.status == "applied"
+              and $attach.witness_patch_action == "inserted"
+              and ($attach.signed_tx_cbor_hex | test("^[0-9a-f]+$"))
+              and ($attach.tx_id | test("^[0-9a-f]{64}$"))
+              and ($attach.body_hash | test("^[0-9a-f]{64}$"))
+              and ($attach.errors | length == 0)
+              and ($attach.warnings | type == "array")
+              and $after.tx_id == $before.tx_id
+              and $after.body_hash == $before.body_hash
+              and $after.witness_counts.vkey == ($before.witness_counts.vkey + 1)
+              and $reattach.status == "applied"
+              and $reattach.witness_patch_action == "replaced"
+              and $reattach.signed_tx_cbor_hex == $attach.signed_tx_cbor_hex
+              and $missing.status == "rejected"
+              and ($missing.errors | type == "array")
+              and ([$missing.errors[]? | select(.code == "missing_vkey_witness_cbor_hex")] | length == 1)
+            ' \
+              identify-original-response.json \
+              attach-response.json \
+              identify-patched-response.json \
+              reattach-response.json \
+              missing-witness-response.json
+            cp identify-original-request.json identify-original-response.json \
+              attach-request.json attach-response.json \
+              identify-patched-request.json identify-patched-response.json \
+              reattach-request.json reattach-response.json \
+              missing-witness-request.json missing-witness-response.json \
+              $out/
+          '';
+
           tx-intent-smoke = pkgs.runCommand "tx-intent-smoke" { } ''
             mkdir -p $out
             export HOME="$PWD"
@@ -721,6 +831,7 @@
               ledger-functional-openapi-check
               tx-identify-smoke
               tx-witness-plan-smoke
+              tx-witness-attach-smoke
               tx-intent-smoke
               tx-input-context-smoke
               tx-validate-smoke
@@ -817,6 +928,8 @@
                 mkApp (mkSmokeApp "tx-identify-smoke" tx-identify-smoke);
               tx-witness-plan-smoke =
                 mkApp (mkSmokeApp "tx-witness-plan-smoke" tx-witness-plan-smoke);
+              tx-witness-attach-smoke =
+                mkApp (mkSmokeApp "tx-witness-attach-smoke" tx-witness-attach-smoke);
               tx-intent-smoke =
                 mkApp (mkSmokeApp "tx-intent-smoke" tx-intent-smoke);
               tx-validate-smoke =
