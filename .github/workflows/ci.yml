@@ -198,6 +198,18 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - run: nix run --quiet .#format-check
 
+  hlint:
+    name: Hlint
+    needs: build-gate
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/cachix-action@v15
+        with:
+          name: paolino
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - run: nix run --quiet .#hlint
+
   playwright:
     name: Playwright
     needs: build-gate

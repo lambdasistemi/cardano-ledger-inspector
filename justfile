@@ -53,14 +53,21 @@ test:
     just check-input-context
     just check-validate
     just check-evaluate-scripts
+    just hlint
     just test-playwright
 
 build-smokes:
     nix build .#packages.x86_64-linux.wasm-smoke
     nix build .#packages.x86_64-linux.wasm-ledger-smoke
 
+format:
+    nix develop --quiet -c find libs apps nix/wasm -type f -name '*.hs' -exec fourmolu -m inplace {} +
+
 format-check:
     nix develop --quiet -c find libs apps nix/wasm -type f -name '*.hs' -exec fourmolu -m check {} +
+
+hlint:
+    nix develop --quiet -c hlint libs apps nix/wasm
 
 ui-check:
     nix develop --quiet -c sh -c 'cd docs/inspector && spago build'

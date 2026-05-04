@@ -14,13 +14,14 @@ output address data that the diagnosis envelope does not currently
 expose; bucket aggregates are used until the inspector library
 surfaces per-output addresses.
 -}
-module TxDeepDiagnosisHost.Render.Topology (
-    renderTopologyMermaid,
-) where
+module TxDeepDiagnosisHost.Render.Topology
+    ( renderTopologyMermaid
+    ) where
 
 import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
+import Data.Char (isDigit)
 import Data.List (foldl', nub)
 import Data.Maybe (mapMaybe)
 import Data.Set (Set)
@@ -33,11 +34,11 @@ import qualified Data.Vector as V
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
-import TxDeepDiagnosisHost.Render.Names (
-    PartyName (..),
-    resolveAddress,
-    truncateHash,
- )
+import TxDeepDiagnosisHost.Render.Names
+    ( PartyName (..)
+    , resolveAddress
+    , truncateHash
+    )
 
 -- | Render the L3 topology cut.
 renderTopologyMermaid :: ProtocolRegistry -> DiagnosisDoc -> Text
@@ -79,7 +80,7 @@ bodyNode failing doc =
     let cls = if failing then "bodyFail" else "body"
         annotations = bodyAnnotations doc
         label = "tx body\\n" <> Text.intercalate "\\n" annotations
-     in mconcat
+    in  mconcat
             [ "    body[\""
             , txt (escape label)
             , "\"]:::"
@@ -101,7 +102,11 @@ bodyAnnotations doc =
                     Just (Number n) -> Just (floor n :: Integer)
                     _ -> Nothing
                 _ -> Nothing
-        redeemers = maybe "redeemers ?" (\n -> "redeemers " <> Text.pack (show n)) (feat "redeemer_count")
+        redeemers =
+            maybe
+                "redeemers ?"
+                (\n -> "redeemers " <> Text.pack (show n))
+                (feat "redeemer_count")
         withdrawals =
             maybe
                 "withdrawals ?"
@@ -118,7 +123,7 @@ bodyAnnotations doc =
                 Just 0 -> "no collateral"
                 Just n -> "collateral " <> Text.pack (show n)
                 Nothing -> "collateral ?"
-     in [feeT, redeemers, withdrawals, mintBurn, collateralFlag]
+    in  [feeT, redeemers, withdrawals, mintBurn, collateralFlag]
 
 -- ---------------------------------------------------------------- --
 -- Inputs
@@ -128,7 +133,7 @@ inputBlock :: ProtocolRegistry -> DiagnosisDoc -> TB.Builder
 inputBlock reg doc =
     let inputs = resolvedInputs doc
         rows = zip [0 :: Int ..] inputs
-     in mconcat (map (renderInput reg) rows)
+    in  mconcat (map (renderInput reg) rows)
 
 renderInput :: ProtocolRegistry -> (Int, ResolvedInput) -> TB.Builder
 renderInput reg (i, ri) =
@@ -142,7 +147,7 @@ renderInput reg (i, ri) =
                 <> "\\n"
                 <> riLovelace ri
                 <> " lovelace"
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -159,7 +164,9 @@ data ResolvedInput = ResolvedInput
 
 resolvedInputs :: DiagnosisDoc -> [ResolvedInput]
 resolvedInputs doc =
-    parseResolvedList (ddValidate doc) ["result", "validation", "resolved_inputs"]
+    parseResolvedList
+        (ddValidate doc)
+        ["result", "validation", "resolved_inputs"]
 
 resolvedReferenceInputs :: DiagnosisDoc -> [ResolvedInput]
 resolvedReferenceInputs doc =
@@ -172,7 +179,7 @@ parseResolvedList v path =
     let items = case lookupPath v path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in mapMaybe parseInput items
+    in  mapMaybe parseInput items
   where
     parseInput (Object o) = case KeyMap.lookup "tx_out" o of
         Just (Object txOut) -> do
@@ -192,7 +199,8 @@ parseResolvedList v path =
 
 bucketBlock :: DiagnosisDoc -> TB.Builder
 bucketBlock doc =
-    mconcat (map renderBucket (zip [0 :: Int ..] (outputBuckets doc)))
+    mconcat
+        (zipWith (curry renderBucket) [0 :: Int ..] (outputBuckets doc))
 
 renderBucket :: (Int, OutputBucket) -> TB.Builder
 renderBucket (i, b) =
@@ -204,7 +212,7 @@ renderBucket (i, b) =
                 <> " outputs / "
                 <> obLovelace b
                 <> " lovelace"
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -228,7 +236,7 @@ outputBuckets doc =
                 ["result", "intent", "value", "output_buckets"] of
                 Just (Array xs) -> V.toList xs
                 _ -> []
-     in mapMaybe parseBucket items
+    in  mapMaybe parseBucket items
   where
     parseBucket (Object o) = do
         lab <- case KeyMap.lookup "label" o of
@@ -249,7 +257,12 @@ outputBuckets doc =
 
 refInputBlock :: ProtocolRegistry -> DiagnosisDoc -> TB.Builder
 refInputBlock reg doc =
-    mconcat (map (renderRef reg) (zip [0 :: Int ..] (resolvedReferenceInputs doc)))
+    mconcat
+        ( zipWith
+            (curry (renderRef reg))
+            [0 :: Int ..]
+            (resolvedReferenceInputs doc)
+        )
 
 renderRef :: ProtocolRegistry -> (Int, ResolvedInput) -> TB.Builder
 renderRef reg (i, ri) =
@@ -260,7 +273,7 @@ renderRef reg (i, ri) =
                 <> Text.pack (show i)
                 <> "\\n"
                 <> pnLabel pn
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -286,9 +299,17 @@ collateralBlock doc =
         hasCollIn = feat "collateral_input_count" == Just True
         hasReturn = feat "has_collateral_return" == Just True
         block =
-            (if hasCollIn then "    coll[\"collateral input\"]:::collateral\n    coll -. fee guard .-> body\n" else "")
-                <> (if hasReturn then "    collret[\"collateral return\"]:::collateral\n    body -. on script fail .-> collret\n" else "")
-     in TB.fromText block
+            ( if hasCollIn
+                then
+                    "    coll[\"collateral input\"]:::collateral\n    coll -. fee guard .-> body\n"
+                else ""
+            )
+                <> ( if hasReturn
+                        then
+                            "    collret[\"collateral return\"]:::collateral\n    body -. on script fail .-> collret\n"
+                        else ""
+                   )
+    in  TB.fromText block
 
 -- ---------------------------------------------------------------- --
 -- Signers
@@ -297,9 +318,10 @@ collateralBlock doc =
 signerBlock :: Set Text -> DiagnosisDoc -> TB.Builder
 signerBlock failing doc =
     mconcat
-        ( map
-            (renderSigner failing)
-            (zip [0 :: Int ..] (nub (declaredSignerHashes doc)))
+        ( zipWith
+            (curry (renderSigner failing))
+            [0 :: Int ..]
+            (nub (declaredSignerHashes doc))
         )
 
 renderSigner :: Set Text -> (Int, Text) -> TB.Builder
@@ -310,7 +332,7 @@ renderSigner failing (i, h) =
             if Set.member h failing
                 then "signerFail"
                 else "signer"
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -333,7 +355,7 @@ declaredSignerHashes doc =
         items = case lookupPath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in mapMaybe extractHash items
+    in  mapMaybe extractHash items
   where
     extractHash (Object o) = case KeyMap.lookup "hash" o of
         Just (String s) -> Just s
@@ -369,13 +391,16 @@ classifyFailures doc =
                     if isMissingWit
                         then extractHashesFromMessage blob
                         else Set.empty
-             in FailureClasses
+            in  FailureClasses
                     { fcBodyFail = fcBodyFail acc || not isMissingWit
                     , fcSignerFailHashes =
                         Set.union (fcSignerFailHashes acc) hashesIn
                     }
         classify acc _ = acc
-     in foldl' classify FailureClasses{fcBodyFail = False, fcSignerFailHashes = Set.empty} items
+    in  foldl'
+            classify
+            FailureClasses{fcBodyFail = False, fcSignerFailHashes = Set.empty}
+            items
 
 extractHashesFromMessage :: Text -> Set Text
 extractHashesFromMessage =
@@ -387,7 +412,7 @@ extractHashesFromMessage =
     cleanup t =
         Text.takeWhile (/= '"') (Text.drop 1 (Text.dropWhile (/= '"') t))
     isHashLike t = Text.length t == 56 && Text.all isHex t
-    isHex c = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+    isHex c = isDigit c || (c >= 'a' && c <= 'f')
 
 -- ---------------------------------------------------------------- --
 -- Helpers

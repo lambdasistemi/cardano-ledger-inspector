@@ -16,9 +16,9 @@ The diagram answers "who is moving what to whom" without the full
 topology. The body is a single central @tx@ node; consumed-by /
 produces / required edges connect parties to it.
 -}
-module TxDeepDiagnosisHost.Render.Parties (
-    renderPartiesMermaid,
-) where
+module TxDeepDiagnosisHost.Render.Parties
+    ( renderPartiesMermaid
+    ) where
 
 import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
@@ -33,12 +33,12 @@ import qualified Data.Vector as V
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
-import TxDeepDiagnosisHost.Render.Names (
-    PartyName (..),
-    PartySource (..),
-    resolveAddress,
-    truncateHash,
- )
+import TxDeepDiagnosisHost.Render.Names
+    ( PartyName (..)
+    , PartySource (..)
+    , resolveAddress
+    , truncateHash
+    )
 
 -- | Render the L1 parties cut as a Mermaid @flowchart LR@ document.
 renderPartiesMermaid :: ProtocolRegistry -> DiagnosisDoc -> Text
@@ -68,13 +68,13 @@ inputBlock :: ProtocolRegistry -> DiagnosisDoc -> TB.Builder
 inputBlock reg doc =
     let addrs = nub (resolvedInputAddresses doc)
         rows = zip [0 :: Int ..] addrs
-     in mconcat (map (renderInput reg) rows)
+    in  mconcat (map (renderInput reg) rows)
 
 renderInput :: ProtocolRegistry -> (Int, Text) -> TB.Builder
 renderInput reg (i, addr) =
     let pn = resolveAddress reg addr
         tag = "I" <> txt (Text.pack (show i))
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -93,7 +93,7 @@ resolvedInputAddresses doc =
                 Just (Array xs) -> V.toList xs
                 _ -> []
             _ -> []
-     in mapMaybe addressOfResolved resolved
+    in  mapMaybe addressOfResolved resolved
 
 addressOfResolved :: Value -> Maybe Text
 addressOfResolved v = case v of
@@ -112,7 +112,7 @@ bucketBlock :: DiagnosisDoc -> TB.Builder
 bucketBlock doc =
     let buckets = outputBuckets doc
         rows = zip [0 :: Int ..] buckets
-     in mconcat (map renderBucket rows)
+    in  mconcat (map renderBucket rows)
 
 renderBucket :: (Int, OutputBucket) -> TB.Builder
 renderBucket (i, b) =
@@ -124,7 +124,7 @@ renderBucket (i, b) =
                 <> " out, "
                 <> obLovelace b
                 <> " lovelace)"
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -148,7 +148,7 @@ outputBuckets doc =
         items = case bucketsArr of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in mapMaybe parseBucket items
+    in  mapMaybe parseBucket items
   where
     parseBucket (Object o) = do
         lab <- case KeyMap.lookup "label" o of
@@ -171,13 +171,13 @@ signerBlock :: ProtocolRegistry -> DiagnosisDoc -> TB.Builder
 signerBlock _reg doc =
     let hashes = nub (declaredSignerHashes doc)
         rows = zip [0 :: Int ..] hashes
-     in mconcat (map renderSigner rows)
+    in  mconcat (map renderSigner rows)
 
 renderSigner :: (Int, Text) -> TB.Builder
 renderSigner (i, h) =
     let tag = "S" <> txt (Text.pack (show i))
         label = "signer " <> truncateHash h
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -201,7 +201,7 @@ declaredSignerHashes doc =
         items = case sigs of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in mapMaybe extractHash items
+    in  mapMaybe extractHash items
   where
     extractHash (Object o) = case KeyMap.lookup "hash" o of
         Just (String s) -> Just s

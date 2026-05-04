@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TxDeepDiagnosisHost.Report (
-    buildReportValue,
-    renderReport,
-) where
+module TxDeepDiagnosisHost.Report
+    ( buildReportValue
+    , renderReport
+    ) where
 
 import Data.Aeson (Value, (.=))
 import qualified Data.Aeson as A
@@ -14,11 +14,11 @@ import qualified Data.Text.Encoding as TE
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 
-buildReportValue ::
-    Text ->
-    Value ->
-    Value ->
-    Value
+buildReportValue
+    :: Text
+    -> Value
+    -> Value
+    -> Value
 buildReportValue summary intent validate =
     A.object
         [ "tx-deep-diagnosis"
@@ -32,18 +32,20 @@ buildReportValue summary intent validate =
 {- | Render the diagnosis as one valid JSON document so the output
 pipes cleanly into jq, can be saved as a fixture, etc.
 -}
-renderReport ::
-    -- | summary line for the top of the document (resolution status, etc.)
-    Text ->
-    -- | tx.intent response from the inspector library
-    Value ->
-    -- | tx.validate response from the inspector library
-    Value ->
-    -- | the loaded protocol registry — included so the rendered report
+renderReport
+    :: Text
+    -- ^ summary line for the top of the document (resolution status, etc.)
+    -> Value
+    -- ^ tx.intent response from the inspector library
+    -> Value
+    -- ^ tx.validate response from the inspector library
+    -> ProtocolRegistry
+    -- ^ the loaded protocol registry — included so the rendered report
     -- carries the labelling sources alongside the typed validation result
-    ProtocolRegistry ->
-    Text
+    -> Text
 renderReport summary intent validate _reg =
     TE.decodeUtf8
-        (BSL.toStrict (APretty.encodePretty (buildReportValue summary intent validate)))
+        ( BSL.toStrict
+            (APretty.encodePretty (buildReportValue summary intent validate))
+        )
         <> "\n"

@@ -9,9 +9,9 @@ self-contained document. The summary stays reader-first; the Mermaid diagrams
 follow at the end behind collapsed @<details>@ blocks so they are available
 without dominating the first screen.
 -}
-module TxDeepDiagnosisHost.Render.Single (
-    renderSingleMarkdown,
-) where
+module TxDeepDiagnosisHost.Render.Single
+    ( renderSingleMarkdown
+    ) where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -20,10 +20,10 @@ import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc)
 import TxDeepDiagnosisHost.Render.Failures (renderFailuresMermaid)
 import TxDeepDiagnosisHost.Render.Parties (renderPartiesMermaid)
-import TxDeepDiagnosisHost.Render.Summary (
-    EmittedFiles (..),
-    renderSummaryMarkdown,
- )
+import TxDeepDiagnosisHost.Render.Summary
+    ( EmittedFiles (..)
+    , renderSummaryMarkdown
+    )
 import TxDeepDiagnosisHost.Render.Topology (renderTopologyMermaid)
 
 {- | Render the whole explain bundle into a single markdown document.
