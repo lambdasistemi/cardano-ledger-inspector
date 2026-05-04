@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-witness-attach-result.schema.json",
+  "title": "Cardano Ledger WASI tx.witness.attach Result",
+  "type": "object",
+  "required": [
+    "status",
+    "tx_id",
+    "body_hash",
+    "errors",
+    "warnings"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["applied", "rejected"]
+    },
+    "tx_id": {
+      "$ref": "#/$defs/hash32"
+    },
+    "body_hash": {
+      "$ref": "#/$defs/hash32"
+    },
+    "tx_cbor": {
+      "type": "string",
+      "pattern": "^[0-9a-f]+$",
+      "description": "Patched transaction CBOR hex when the witness attachment is applied."
+    },
+    "signed_tx_cbor_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]+$",
+      "description": "Patched transaction CBOR hex returned for signing-oriented hosts."
+    },
+    "witness_patch_action": {
+      "type": "string",
+      "enum": ["inserted", "replaced"]
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "applied"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": [
+          "tx_cbor",
+          "signed_tx_cbor_hex",
+          "witness_patch_action"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "hash32": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "path", "details"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

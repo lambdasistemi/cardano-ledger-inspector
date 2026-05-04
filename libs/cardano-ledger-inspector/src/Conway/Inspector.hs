@@ -36,10 +36,15 @@ import qualified Cardano.Ledger.TxIn as TxIn
 import Control.Monad ((>=>))
 import Conway.Inspector.Common
     ( InspectError (..)
+    , argsObject
+    , cborHexText
     , decodeTx
     , decodeTxWithBytes
+    , decodeVKeyWitness
     , keyHashHex
     , listAt
+    , lookupObjectValue
+    , lookupValue
     , multiAssetJson
     , safeHashHex
     , scriptHashHex
@@ -69,14 +74,16 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
 import Data.Foldable (toList)
+import Data.Function ((&))
 import Data.List (foldl', stripPrefix)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import Data.Typeable (Typeable)
 import Data.Word (Word64)
-import Lens.Micro ((^.))
+import Lens.Micro ((%~), (^.))
 import Text.Read (readMaybe)
 
 data LedgerOperationRequest = LedgerOperationRequest
@@ -124,6 +131,7 @@ instance Aeson.FromJSON LedgerOperationRequest where
         normalizeOperation "intent" = "tx.intent"
         normalizeOperation "identify" = "tx.identify"
         normalizeOperation "witness.plan" = "tx.witness.plan"
+        normalizeOperation "witness.attach" = "tx.witness.attach"
         normalizeOperation "validate" = "tx.validate"
         normalizeOperation "evaluate.scripts" = "tx.evaluate.scripts"
         normalizeOperation op = op
@@ -190,6 +198,11 @@ runLedgerOperation request = do
                     (lorOperation request)
                     [ "witness_plan" .= witnessPlanJson (lorArgs request) tx
                     ]
+        "tx.witness.attach" ->
+            pure $
+                ledgerOperationResponse
+                    (lorOperation request)
+                    (witnessAttachmentResultFields (lorArgs request) tx)
         "tx.validate" ->
             pure $
                 ledgerOperationResponse
@@ -213,6 +226,147 @@ ledgerOperationResponse operation resultFields =
         , "op" .= operation
         , "result" .= Aeson.object resultFields
         ]
+
+witnessAttachmentResultFields
+    :: Aeson.Value
+    -> L.Tx TopTx Conway.ConwayEra
+    -> [(AesonKey.Key, Aeson.Value)]
+witnessAttachmentResultFields args tx =
+    let attachment = witnessAttachmentJson args tx
+        txCborField =
+            case attachment of
+                Aeson.Object object ->
+                    case KeyMap.lookup "tx_cbor" object of
+                        Just txCbor -> ["tx_cbor" .= txCbor]
+                        Nothing -> []
+                _ -> []
+    in  txCborField <> ["witness_attachment" .= attachment]
+
+witnessAttachmentJson
+    :: Aeson.Value
+    -> L.Tx TopTx Conway.ConwayEra
+    -> Aeson.Value
+witnessAttachmentJson args tx =
+    let body = tx ^. L.bodyTxL
+    in  case decodeWitnessAttachmentArg args of
+            Left errors ->
+                Aeson.object
+                    [ "status" .= ("rejected" :: T.Text)
+                    , "tx_id" .= txIdHex (Core.txIdTx tx)
+                    , "body_hash" .= txIdHex (Core.txIdTxBody body)
+                    , "errors" .= errors
+                    , "warnings" .= ([] :: [T.Text])
+                    ]
+            Right witness ->
+                let existingWitnesses = tx ^. (Core.witsTxL . Core.addrTxWitsL)
+                    replacedExisting = any (sameWitnessKey witness) existingWitnesses
+                    nextWitnesses =
+                        Set.insert
+                            witness
+                            (Set.filter (not . sameWitnessKey witness) existingWitnesses)
+                    witnessPatchAction :: T.Text
+                    witnessPatchAction
+                        | replacedExisting =
+                            "replaced"
+                        | otherwise =
+                            "inserted"
+                    patchedTx =
+                        tx
+                            & Core.witsTxL
+                                . Core.addrTxWitsL
+                                %~ const nextWitnesses
+                    signedTxCborHex = cborHexText patchedTx
+                in  Aeson.object
+                        [ "status" .= ("applied" :: T.Text)
+                        , "tx_id" .= txIdHex (Core.txIdTx patchedTx)
+                        , "body_hash" .= txIdHex (Core.txIdTxBody body)
+                        , "tx_cbor" .= signedTxCborHex
+                        , "signed_tx_cbor_hex" .= signedTxCborHex
+                        , "witness_patch_action" .= witnessPatchAction
+                        , "errors" .= ([] :: [Aeson.Value])
+                        , "warnings" .= ([] :: [T.Text])
+                        ]
+
+decodeWitnessAttachmentArg
+    :: (Typeable kr)
+    => Aeson.Value
+    -> Either [Aeson.Value] (Keys.WitVKey kr)
+decodeWitnessAttachmentArg args =
+    case argsObject args >>= lookupObjectValue "vkey_witness_cbor_hex" of
+        Nothing ->
+            Left
+                [ witnessAttachmentErrorJson
+                    "missing_vkey_witness_cbor_hex"
+                    "Supply args.vkey_witness_cbor_hex as hex-encoded CBOR for a single vkey witness."
+                    ["args", "vkey_witness_cbor_hex"]
+                    Aeson.Null
+                ]
+        Just (Aeson.String witnessHex) ->
+            case decodeVKeyWitness (T.encodeUtf8 witnessHex) of
+                Left (MalformedHex err) ->
+                    Left
+                        [ witnessAttachmentErrorJson
+                            "malformed_vkey_witness_cbor_hex"
+                            "args.vkey_witness_cbor_hex must be valid hex."
+                            ["args", "vkey_witness_cbor_hex"]
+                            (Aeson.object ["detail" .= err])
+                        ]
+                Left (MalformedCbor err) ->
+                    Left
+                        [ witnessAttachmentErrorJson
+                            "malformed_vkey_witness_cbor"
+                            "args.vkey_witness_cbor_hex must decode as a single Shelley/Conway vkey witness."
+                            ["args", "vkey_witness_cbor_hex"]
+                            (Aeson.object ["detail" .= err])
+                        ]
+                Left other ->
+                    Left
+                        [ witnessAttachmentErrorJson
+                            "invalid_vkey_witness_cbor_hex"
+                            "args.vkey_witness_cbor_hex could not be used as a vkey witness."
+                            ["args", "vkey_witness_cbor_hex"]
+                            (Aeson.object ["detail" .= T.pack (show other)])
+                        ]
+                Right witness ->
+                    Right witness
+        Just value ->
+            Left
+                [ witnessAttachmentErrorJson
+                    "invalid_vkey_witness_cbor_hex_type"
+                    "args.vkey_witness_cbor_hex must be a hex string."
+                    ["args", "vkey_witness_cbor_hex"]
+                    (Aeson.object ["actual_type" .= jsonValueType value])
+                ]
+
+witnessAttachmentErrorJson
+    :: T.Text
+    -> T.Text
+    -> [T.Text]
+    -> Aeson.Value
+    -> Aeson.Value
+witnessAttachmentErrorJson code message path details =
+    Aeson.object
+        [ "code" .= code
+        , "message" .= message
+        , "path" .= path
+        , "details" .= details
+        ]
+
+sameWitnessKey
+    :: Keys.WitVKey leftRole
+    -> Keys.WitVKey rightRole
+    -> Bool
+sameWitnessKey left right =
+    Keys.witVKeyHash left == Keys.witVKeyHash right
+
+jsonValueType :: Aeson.Value -> T.Text
+jsonValueType = \case
+    Aeson.Object _ -> "object"
+    Aeson.Array _ -> "array"
+    Aeson.String _ -> "string"
+    Aeson.Number _ -> "number"
+    Aeson.Bool _ -> "boolean"
+    Aeson.Null -> "null"
 
 browserJson
     :: L.Tx TopTx Conway.ConwayEra

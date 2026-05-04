@@ -172,6 +172,7 @@ implicit network access during the final build.
 | `checks.<system>.ledger-functional-swagger-check` | Alias of the OpenAPI check for the Swagger compatibility name. |
 | `checks.<system>.tx-identify-smoke` | Runs `tx.identify` through `wasm-tx-inspector.wasm` and asserts stable identity, size, fee, and witness-count fields. |
 | `checks.<system>.tx-witness-plan-smoke` | Runs `tx.witness.plan` without context and asserts witness, script, datum, redeemer, and warning shapes. |
+| `checks.<system>.tx-witness-attach-smoke` | Runs `tx.witness.attach`, asserts inserted vs replaced behavior, preserves transaction identity, and checks rejected missing-witness diagnostics. |
 | `checks.<system>.tx-input-context-smoke` | Derives synthetic producer transaction context from inspection output and verifies resolved input reporting. |
 | `checks.<system>.tx-validate-smoke` | Covers missing context, unsupported provider-style UTxO JSON, complete valid context, deterministic validation output, and invalid supplied network context. |
 | `checks.<system>.tx-evaluate-scripts-smoke` | Covers missing context, rejected provider-style UTxO JSON, complete script evaluation, deterministic output, budgeted units, and evaluated units. |

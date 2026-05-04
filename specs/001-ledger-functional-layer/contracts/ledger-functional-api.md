@@ -296,6 +296,7 @@ and null it is compact JSON.
 | `tx.identify` | implemented | Return stable identifiers and metadata such as transaction id, body hash, era, size, and witness counts. |
 | `tx.intent` | implemented | Return a signer-focused summary of visible transaction effects, signer value perspective, self-declared metadata intent, required signers, scripts, withdrawals, mint/burn, collateral, and context coverage. |
 | `tx.witness.plan` | implemented | Explain body-declared signer hashes, present witnesses, scripts, redeemers, datums, and reference inputs that are visible from the transaction alone. |
+| `tx.witness.attach` | implemented | Attach or replace one vkey witness in transaction CBOR, preserve all other witness-set content, and return patched transaction bytes plus stable diagnostics. |
 | `tx.validate` | implemented | Report whether explicit validation context is usable or incomplete; run Conway `applyTx` when modeled context is complete. |
 | `tx.evaluate.scripts` | implemented | Evaluate phase-2 scripts and report per-redeemer execution units or failures with explicit context. |
 | `tx.patch` | 0.1 target | Apply a controlled structural patch and return new transaction CBOR. |
@@ -634,6 +635,62 @@ matching producer transaction. The operation reports coverage in
 `witness_plan.context`, plus `resolved_inputs` and
 `resolved_reference_inputs`.
 
+### `tx.witness.attach`
+
+Decode the supplied Conway transaction, decode one hex-encoded vkey witness,
+and attach it to the witness set. The operation only inserts or replaces a
+vkey witness with the same verification key hash; it preserves all non-target
+witness-set content. It does not sign, hold secret keys, or prove that the
+witness matches the transaction body.
+
+Arguments:
+
+```json
+{
+  "vkey_witness_cbor_hex": "<hex-encoded CBOR for one Shelley/Conway vkey witness>"
+}
+```
+
+Successful result payload:
+
+```json
+{
+  "status": "applied",
+  "tx_id": "<transaction id hex>",
+  "body_hash": "<transaction body hash hex>",
+  "tx_cbor": "<patched transaction CBOR hex>",
+  "signed_tx_cbor_hex": "<patched transaction CBOR hex>",
+  "witness_patch_action": "inserted",
+  "errors": [],
+  "warnings": []
+}
+```
+
+Rejected result payload:
+
+```json
+{
+  "status": "rejected",
+  "tx_id": "<transaction id hex>",
+  "body_hash": "<transaction body hash hex>",
+  "errors": [
+    {
+      "code": "missing_vkey_witness_cbor_hex",
+      "message": "Supply args.vkey_witness_cbor_hex as hex-encoded CBOR for a single vkey witness.",
+      "path": ["args", "vkey_witness_cbor_hex"],
+      "details": null
+    }
+  ],
+  "warnings": []
+}
+```
+
+When the attachment succeeds, the response also includes the same patched bytes
+at `result.tx_cbor` to satisfy the shared mutation contract. Within
+`witness_attachment`, `witness_patch_action` is `inserted` when the
+verification key was absent and `replaced` when an existing vkey witness for
+the same key hash was updated.
+
 ### `tx.validate`
 
 Decode the supplied Conway transaction and report whether explicit validation
@@ -853,6 +910,7 @@ Machine-readable draft schemas are tracked next to this contract:
 - `../schemas/tx-identify-result.schema.json`
 - `../schemas/tx-intent-result.schema.json`
 - `../schemas/tx-witness-plan-result.schema.json`
+- `../schemas/tx-witness-attach-result.schema.json`
 - `../schemas/tx-validate-result.schema.json`
 - `../schemas/tx-evaluate-scripts-result.schema.json`
 
@@ -876,3 +934,4 @@ Legacy operation names are normalized:
 | `identify` | `tx.identify` |
 | `intent` | `tx.intent` |
 | `witness.plan` | `tx.witness.plan` |
+| `witness.attach` | `tx.witness.attach` |

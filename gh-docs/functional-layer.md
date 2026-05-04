@@ -102,6 +102,14 @@ producer transaction CBOR that could not be fetched.
   input address credentials and reference scripts cannot be inferred from
   transaction CBOR alone.
 
+`tx.witness.attach`
+: Decode one hex-encoded vkey witness and attach it upstream in Haskell rather
+  than browser-only JavaScript. The operation only inserts or replaces the
+  matching vkey witness, preserves all other witness-set content, returns the
+  patched bytes at `result.tx_cbor`, and reports stable `errors[]` diagnostics
+  when the witness payload is missing or malformed. It does not handle secret
+  keys.
+
 `tx.validate`
 : Return structured validation status for the selected transaction and explicit
   context. The operation reports `valid`, `invalid`, `incomplete`, or
@@ -124,6 +132,9 @@ transaction id is passed as explicit `args.context.producer_txs`, and provider
 tip/protocol-parameter data is passed as explicit validation context. Missing
 governance, certificate, or failed provider context remains visible as
 validation diagnostics rather than being guessed by the UI.
+
+`tx.witness.attach` is available through the same WASI/API boundary for signing
+flows, so browser and CLI hosts can share the same witness-set patching logic.
 
 `tx.evaluate.scripts` is available through the WASI/API boundary; a dedicated
 browser panel can be added separately once its UI flow is selected.

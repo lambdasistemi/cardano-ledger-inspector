@@ -11,9 +11,11 @@
 module Conway.Inspector.Common
     ( InspectError (..)
     , argsObject
+    , cborHexText
     , decodeConway
     , decodeTx
     , decodeTxWithBytes
+    , decodeVKeyWitness
     , hashHex
     , hexDecode
     , keyHashHex
@@ -44,6 +46,7 @@ import qualified Cardano.Ledger.Conway as Conway
 import Cardano.Ledger.Core (TxLevel (..))
 import qualified Cardano.Ledger.Credential as Credential
 import qualified Cardano.Ledger.Hashes as Hashes
+import qualified Cardano.Ledger.Keys as Keys
 import qualified Cardano.Ledger.Mary.Value as Mary
 import qualified Cardano.Ledger.Plutus.Data as PData
 import qualified Cardano.Ledger.TxIn as TxIn
@@ -58,6 +61,7 @@ import qualified Data.ByteString.Short as SBS
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import Data.Typeable (Typeable)
 import Lens.Micro ((^.))
 import qualified PlutusLedgerApi.V1 as PV1
 
@@ -100,6 +104,26 @@ decodeConway bs =
         bs of
         Left err -> Left (MalformedCbor (show err))
         Right tx -> Right tx
+
+decodeVKeyWitness
+    :: (Typeable kr)
+    => BS.ByteString
+    -> Either InspectError (Keys.WitVKey kr)
+decodeVKeyWitness hexBytes = do
+    witnessBytes <- hexDecode hexBytes
+    case Binary.decodeFullAnnotator
+        (Binary.natVersion @11)
+        "WitVKey"
+        Binary.decCBOR
+        (BSL.fromStrict witnessBytes) of
+        Left err -> Left (MalformedCbor (show err))
+        Right witness -> Right witness
+
+cborHexText :: (Binary.EncCBOR a) => a -> T.Text
+cborHexText =
+    T.decodeUtf8
+        . B16.encode
+        . Binary.serialize' (Binary.natVersion @11)
 
 listAt :: Int -> [a] -> Maybe a
 listAt index xs
