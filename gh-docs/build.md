@@ -59,7 +59,8 @@ result-cli/bin/tx-deep-diagnosis --help
 
 ```text
 Usage: tx-deep-diagnosis --cbor FILE [--registry DIR] [--no-bundled-registry]
-                         [--network NETWORK] [--blockfrost-id PROJECT_ID]
+                         [--emit-explain DIR] [--network NETWORK]
+                         [--blockfrost-id PROJECT_ID]
 
 Available options:
   --cbor FILE              Path to a file containing the Conway tx CBOR hex
@@ -70,6 +71,8 @@ Available options:
   --no-bundled-registry    Skip the registry vendored into this binary at build
                            time. Only the directories passed via --registry are
                            consulted. Rare; meant for testing a clean replacement.
+  --emit-explain DIR       Write summary.md, explain.md, and diagram artifacts
+                           to DIR after printing the diagnosis JSON.
   --network NETWORK        mainnet | preprod | preview
   --blockfrost-id PID      Blockfrost project_id (or BLOCKFROST_PROJECT_ID env var)
 ```
@@ -79,10 +82,21 @@ Available options:
 ```bash
 export BLOCKFROST_PROJECT_ID=mainnet…
 result-cli/bin/tx-deep-diagnosis \
-    --cbor specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex
+    --cbor specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex \
+    --emit-explain out
 ```
 
-The CLI prints two blocks of typed JSON:
+The CLI prints one typed JSON diagnosis envelope on stdout and, when
+`--emit-explain` is present, also writes the human-facing artifacts to `out/`:
+
+- `summary.md`
+- `explain.md`
+- `parties.mmd`
+- `value-flow.tsv`
+- `topology.mmd`
+- `failures.mmd` when validation failures are present
+
+Inside the JSON envelope, the two important sub-documents are:
 
 1. **`tx.intent`** — decoded body, signer-perspective summary, claims drawn
    from auxiliary metadata (clearly labelled as self-declared), value buckets
@@ -97,6 +111,8 @@ When the `--blockfrost-id` is omitted, the CLI runs `tx.intent` and a
 context-less `tx.validate` (the validator says exactly which fields are
 missing — `source_output`, `protocol_parameters`, `slot`, `epoch`,
 `network` — instead of guessing).
+
+If `--emit-explain` is omitted, the CLI remains JSON-only.
 
 ### Adding your own protocol identifications
 
@@ -124,7 +140,8 @@ a fully replaced registry), add `--no-bundled-registry`.
 ```bash
 BLOCKFROST_PROJECT_ID=<key> \
   nix run github:lambdasistemi/cardano-ledger-inspector#tx-deep-diagnosis -- \
-    --cbor my-tx.hex
+    --cbor my-tx.hex \
+    --emit-explain out
 ```
 
 The bundled registry travels inside the flake output, so script-hash

@@ -649,6 +649,34 @@
               ${./apps/tx-deep-diagnosis/test/golden} \
               | tee $out/snapshot.log
           '';
+
+          tx-deep-diagnosis-emit-explain-smoke =
+            pkgs.runCommand "tx-deep-diagnosis-emit-explain-smoke"
+              { LANG = "C.UTF-8"; LC_ALL = "C.UTF-8"; } ''
+              mkdir -p $out/explain
+              export HOME="$PWD"
+              export XDG_CACHE_HOME="$PWD/.cache"
+              mkdir -p "$XDG_CACHE_HOME"
+              ${hostTargets.tx-deep-diagnosis}/bin/tx-deep-diagnosis \
+                --cbor ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
+                --network mainnet \
+                --emit-explain $out/explain \
+                > response.json
+              ${pkgs.jq}/bin/jq -e '
+                ."tx-deep-diagnosis".intent.result.intent.title == "Signing summary"
+                and (."tx-deep-diagnosis".intent.result.intent.sections | length >= 3)
+                and (."tx-deep-diagnosis".validate.result.validation | type) == "object"
+              ' response.json
+              test -f $out/explain/summary.md
+              test -f $out/explain/explain.md
+              test -f $out/explain/parties.mmd
+              test -f $out/explain/value-flow.tsv
+              test -f $out/explain/topology.mmd
+              ${pkgs.gnugrep}/bin/grep -F "## Verdict" $out/explain/summary.md
+              ${pkgs.gnugrep}/bin/grep -F "<details><summary>Topology</summary>" \
+                $out/explain/explain.md
+              cp response.json $out/
+            '';
         in
         {
           packages = {
@@ -675,7 +703,8 @@
               tx-validate-smoke
               tx-evaluate-scripts-smoke
               tx-extism-spike-smoke
-              tx-explain-render-smoke;
+              tx-explain-render-smoke
+              tx-deep-diagnosis-emit-explain-smoke;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
@@ -755,6 +784,10 @@
                 mkApp (mkSmokeApp "tx-extism-spike-smoke" tx-extism-spike-smoke);
               tx-explain-render-smoke =
                 mkApp (mkSmokeApp "tx-explain-render-smoke" tx-explain-render-smoke);
+              tx-deep-diagnosis-emit-explain-smoke =
+                mkApp
+                  (mkSmokeApp "tx-deep-diagnosis-emit-explain-smoke"
+                    tx-deep-diagnosis-emit-explain-smoke);
               ledger-functional-openapi-check =
                 mkApp (mkSmokeApp "ledger-functional-openapi-check"
                   ledger-functional-openapi-check);

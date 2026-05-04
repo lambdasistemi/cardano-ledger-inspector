@@ -20,12 +20,15 @@ import System.IO (hPutStrLn, stderr)
 import TxDeepDiagnosisHost.Blockfrost
 import TxDeepDiagnosisHost.Diagnosis
 import TxDeepDiagnosisHost.Registry (loadRegistries)
-import TxDeepDiagnosisHost.Report (renderReport)
+import TxDeepDiagnosisHost.Render.Doc (parseDiagnosisDoc)
+import TxDeepDiagnosisHost.Render.Emit (emitExplain)
+import TxDeepDiagnosisHost.Report (buildReportValue, renderReport)
 
 data Options = Options
     { optCborFile :: !FilePath
     , optExtraRegistries :: ![FilePath]
     , optNoBundledRegistry :: !Bool
+    , optEmitExplain :: !(Maybe FilePath)
     , optNetwork :: !Network
     , optProjectId :: !(Maybe String)
     }
@@ -57,6 +60,16 @@ parseOpts =
                         <> "time. Only the directories passed via --registry are "
                         <> "consulted. Rare; meant for testing a clean replacement."
                     )
+            )
+        <*> optional
+            ( strOption
+                ( long "emit-explain"
+                    <> metavar "DIR"
+                    <> help
+                        ( "Write summary.md, explain.md, and diagram artifacts "
+                            <> "to DIR after printing the diagnosis JSON."
+                        )
+                )
             )
         <*> option
             parseNet
@@ -153,18 +166,22 @@ main = do
     validate <- case runValidate hex fullCtx of
         Left e -> die ("validate error: " <> e)
         Right v -> pure v
-    TIO.putStr
-        ( renderReport
-            ( Text.pack (show (Map.size producerCbors))
+    let reportSummary =
+            Text.pack (show (Map.size producerCbors))
                 <> "/"
                 <> Text.pack (show (length producerHashes))
                 <> " producer txs resolved, network="
                 <> networkLedgerName (optNetwork opts)
-            )
-            intent
-            validate
-            reg
-        )
+        reportValue = buildReportValue reportSummary intent validate
+    TIO.putStr
+        (renderReport reportSummary intent validate reg)
+    case optEmitExplain opts of
+        Nothing -> pure ()
+        Just outDir -> case parseDiagnosisDoc reportValue of
+            Left e -> die ("internal explain parse error: " <> e)
+            Right doc -> do
+                _ <- emitExplain outDir reg doc
+                pure ()
 
 fetchProducer ::
     Manager -> Network -> Text -> Text -> IO (Text, Either String Text)
