@@ -93,13 +93,13 @@ instance FromJSON ResolvedOutput where
             <*> o .:? "data_hash"
             <*> o .:? "reference_script_hash"
 
-newtype UtxosResponse = UtxosResponse {urOutputs :: ![ResolvedOutput]}
+newtype UtxosResponse = UtxosResponse {urOutputs :: [ResolvedOutput]}
 
 instance FromJSON UtxosResponse where
     parseJSON = withObject "UtxosResponse" $ \o ->
         UtxosResponse <$> o .:? "outputs" .!= []
 
-newtype CborResponse = CborResponse {crCbor :: !Text}
+newtype CborResponse = CborResponse {crCbor :: Text}
 
 instance FromJSON CborResponse where
     parseJSON = withObject "CborResponse" $ \o -> CborResponse <$> o .: "cbor"
