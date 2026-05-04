@@ -241,6 +241,17 @@
               and any(.result.intent.value.resolved_input_buckets[]; .bucket == "signer_controlled" and .lovelace == "7015148761")
               and any(.result.intent.value.output_buckets[]; .bucket == "signer_controlled" and .lovelace == "7009247848")
               and any(.result.intent.value.output_buckets[]; .bucket == "script" and .tx_out_count == 4)
+              and (.result.intent.scripts | type) == "array"
+              and (.result.intent.scripts | length) == 1
+              and any(
+                .result.intent.scripts[];
+                .purpose == "minting"
+                and .index == 0
+                and .ex_units_committed.memory == "376813"
+                and .ex_units_committed.steps == "369524043"
+                and (.redeemer_cbor_hex | length) > 0
+                and (has("input") | not)
+              )
               and (.result.intent.value.outputs | type) == "array"
               and (.result.intent.value.outputs | length) > 0
               and any(.result.intent.value.outputs[]; .assets != {})
