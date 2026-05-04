@@ -654,8 +654,8 @@ which compresses better than JSON in the markdown view.
 
 Outputs whose datum is a hash-only reference, or a @no_datum@, are
 omitted. Identical datums (same hex string) are deduplicated — a
-SundaeSwap order with N identical outputs only shows the datum
-once with a count.
+SundaeSwap order with N identical outputs to the same destination
+only shows the datum once with a count.
 -}
 datumsSection :: ProtocolRegistry -> DiagnosisDoc -> Text
 datumsSection reg doc =
@@ -664,7 +664,7 @@ datumsSection reg doc =
             Just (Array xs) -> V.toList xs
             _ -> []
         decoded = mapMaybeDecoded reg items
-        groups = groupByCbor decoded
+        groups = groupByDatumBlock decoded
      in if null groups
             then ""
             else
@@ -714,12 +714,18 @@ data DecodedDatum = DecodedDatum
     , ddSchema :: !(Maybe DatumSchema)
     }
 
-groupByCbor :: [DecodedDatum] -> [(DecodedDatum, [Int])]
-groupByCbor = foldr add []
+groupByDatumBlock :: [DecodedDatum] -> [(DecodedDatum, [Int])]
+groupByDatumBlock = foldr add []
   where
-    add d acc = case partitionBy (\(rep, _) -> ddCbor rep == ddCbor d) acc of
-        (Just (rep, idxs), rest) -> (rep, ddIndex d : idxs) : rest
-        (Nothing, _) -> (d, [ddIndex d]) : acc
+    add d acc =
+        case partitionBy (\(rep, _) -> sameDatumBlock rep d) acc of
+            (Just (rep, idxs), rest) -> (rep, ddIndex d : idxs) : rest
+            (Nothing, _) -> (d, [ddIndex d]) : acc
+
+sameDatumBlock :: DecodedDatum -> DecodedDatum -> Bool
+sameDatumBlock a b =
+    ddCbor a == ddCbor b
+        && ddDestination a == ddDestination b
 
 partitionBy :: (a -> Bool) -> [a] -> (Maybe a, [a])
 partitionBy _ [] = (Nothing, [])

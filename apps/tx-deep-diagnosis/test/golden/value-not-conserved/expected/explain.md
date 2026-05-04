@@ -158,7 +158,56 @@ Inputs that also receive outputs (same payment credential on both sides):
 
 ## Datums
 
-<details><summary>Outputs #0, #1, #2, #3, #4, #5, #6, #7, #8 — SundaeSwap V3 order (9 identical)</summary>
+<details><summary>Output #0 — Amaru Network Compliance treasury (0baa0d)</summary>
+
+_Field names interpreted from manual analysis (no upstream typed source): observed on the Amaru Network Compliance treasury change output; the pinned SundaeSwap treasury validator accepts opaque Data, so these field names mirror the shared order-shaped commitment rather than an upstream treasury datum declaration._
+
+```
+TreasuryCommitmentDatum (= Commitment)
+  pool_ident: Some
+    value: Bytes 28B 64f35d26b237ad58…6e2540ef  // PoolIdent
+  owner: AllOf
+    scripts: List 4
+      - _(Data, untyped)_
+        Constr 0
+          Bytes 28B 7095faf3d48d582f…2bbdeffb
+      - _(Data, untyped)_
+        Constr 0
+          Bytes 28B f3ab64b0f97dcf0f…04d23e2e
+      - _(Data, untyped)_
+        Constr 0
+          Bytes 28B 8bd03209d227956a…b24fb1c1
+      - _(Data, untyped)_
+        Constr 0
+          Bytes 28B 97e0f6d6c86dbebf…edd49df2
+  max_protocol_fee: Int 1280000  // Lovelace
+  destination: Fixed
+    address: Address
+      payment_credential: Script
+        hash: Bytes 28B 32201dc1e8270836…a10baa0d  // ScriptHash
+      stake_credential: Some
+        value: Inline
+          credential: Script
+            hash: Bytes 28B 32201dc1e8270836…a10baa0d  // ScriptHash
+    datum: NoDatum
+  details: Swap
+    offer: (
+      policy: Bytes 0B   // PolicyId
+      asset_name: Bytes 0B   // AssetName
+      quantity: Int 12500000000
+    )
+    min_received: (
+      policy: Bytes 28B c48cbb3d5e57ed56…02da47ad  // PolicyId
+      asset_name: Bytes 8B 0014df105553444d  // AssetName
+      quantity: Int 3062500000
+    )
+  extension: _(Data, untyped)_
+    Constr 0
+```
+
+</details>
+
+<details><summary>Outputs #1, #2, #3, #4, #5, #6, #7, #8 — SundaeSwap V3 order (8 identical)</summary>
 
 _Field names interpreted from the upstream Aiken source: [SundaeSwap-finance/sundae-contracts@be33466b7d](https://github.com/SundaeSwap-finance/sundae-contracts/blob/be33466b7dbe0f8e6c0e0f46ff23737897f45835/lib/types/order.ak#L8-L33) — MultisigScript variants follow KtorZ/aicone @ a9ae9ef8 lib/sundae/multisig.ak; Address/Credential/Referenced follow aiken-lang/stdlib v3.0.0 lib/cardano/address.ak._
 
