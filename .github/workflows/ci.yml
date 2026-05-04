@@ -18,7 +18,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -57,21 +57,21 @@ jobs:
           (cd artifacts/ledger-functional-openapi && sha256sum *.json > SHA256SUMS)
           chmod -R u+w artifacts
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: wasm-tx-inspector
           path: artifacts/wasm-tx-inspector
           if-no-files-found: error
           retention-days: 30
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: tx-inspector-ui
           path: artifacts/tx-inspector-ui
           if-no-files-found: error
           retention-days: 30
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: ledger-functional-openapi
           path: artifacts/ledger-functional-openapi
@@ -84,7 +84,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -96,7 +96,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -108,7 +108,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -120,7 +120,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -132,7 +132,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -144,7 +144,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -156,7 +156,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -168,7 +168,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -180,7 +180,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -192,7 +192,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -204,7 +204,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -216,7 +216,7 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
