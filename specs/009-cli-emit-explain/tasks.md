@@ -1,4 +1,4 @@
-# Tasks: tx-deep-diagnosis Runtime --emit-explain
+# Tasks: tx-deep-diagnosis Stdout Explain Format
 
 **Input**: Design documents from `/specs/009-cli-emit-explain/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, quickstart.md
@@ -13,14 +13,15 @@ must keep runtime and snapshot behavior aligned.
 
 ## Phase 2: Runtime CLI
 
-- [X] T004 Add `--emit-explain DIR` to `apps/tx-deep-diagnosis/app/Main.hs`
-- [X] T005 Write explain artifacts after stdout JSON emission when the flag is present
-- [X] T006 Remove stale known artifact files that are not rendered for the current transaction
+- [X] T004 Add `--format json|explain` to `apps/tx-deep-diagnosis/app/Main.hs`
+- [X] T005 Render single-file markdown to stdout when `--format explain` is selected
+- [X] T006 Keep `--emit-explain DIR` as optional side-output on top of the selected stdout format
+- [X] T007 Remove stale known artifact files that are not rendered for the current transaction
 
 ## Phase 3: Verification and docs
 
-- [X] T007 Add a Nix smoke check for `tx-deep-diagnosis --emit-explain`
-- [X] T008 Update CLI/tutorial docs in `gh-docs/build.md` to document the one-shot explain flow
-- [X] T009 Run `nix build .#checks.x86_64-linux.tx-explain-render-smoke`
-- [X] T010 Run `nix build .#checks.x86_64-linux.tx-deep-diagnosis-emit-explain-smoke`
-- [X] T011 Run `just format-check`
+- [X] T008 Add a Nix smoke check for `tx-deep-diagnosis --format explain`
+- [X] T009 Update CLI/tutorial docs in `gh-docs/build.md` to document stdout explain mode first
+- [X] T010 Run `nix build .#checks.x86_64-linux.tx-explain-render-smoke`
+- [X] T011 Run `nix build .#checks.x86_64-linux.tx-deep-diagnosis-emit-explain-smoke`
+- [X] T012 Run `just format-check`

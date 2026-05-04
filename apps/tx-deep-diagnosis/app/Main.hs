@@ -5,7 +5,7 @@ module Main (main) where
 import Control.Applicative ((<|>))
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TIO
@@ -22,12 +22,19 @@ import TxDeepDiagnosisHost.Diagnosis
 import TxDeepDiagnosisHost.Registry (loadRegistries)
 import TxDeepDiagnosisHost.Render.Doc (parseDiagnosisDoc)
 import TxDeepDiagnosisHost.Render.Emit (emitExplain)
+import TxDeepDiagnosisHost.Render.Single (renderSingleMarkdown)
 import TxDeepDiagnosisHost.Report (buildReportValue, renderReport)
+
+data OutputFormat
+    = OutputJson
+    | OutputExplain
+    deriving (Eq, Show)
 
 data Options = Options
     { optCborFile :: !FilePath
     , optExtraRegistries :: ![FilePath]
     , optNoBundledRegistry :: !Bool
+    , optOutputFormat :: !OutputFormat
     , optEmitExplain :: !(Maybe FilePath)
     , optNetwork :: !Network
     , optProjectId :: !(Maybe String)
@@ -61,13 +68,20 @@ parseOpts =
                         <> "consulted. Rare; meant for testing a clean replacement."
                     )
             )
+        <*> option
+            parseOutputFormat
+            ( long "format"
+                <> metavar "FORMAT"
+                <> value OutputJson
+                <> help "stdout format: json | explain"
+            )
         <*> optional
             ( strOption
                 ( long "emit-explain"
                     <> metavar "DIR"
                     <> help
-                        ( "Write summary.md, explain.md, and diagram artifacts "
-                            <> "to DIR after printing the diagnosis JSON."
+                        ( "Also write summary.md, explain.md, and diagram "
+                            <> "artifacts to DIR."
                         )
                 )
             )
@@ -91,6 +105,12 @@ parseOpts =
         "preprod" -> Right Preprod
         "preview" -> Right Preview
         _ -> Left ("unknown network: " <> s)
+    parseOutputFormat = eitherReader $ \s -> case s of
+        "json" -> Right OutputJson
+        "explain" -> Right OutputExplain
+        _ ->
+            Left
+                ("unknown format: " <> s <> " (expected json or explain)")
 
 main :: IO ()
 main = do
@@ -173,15 +193,29 @@ main = do
                 <> " producer txs resolved, network="
                 <> networkLedgerName (optNetwork opts)
         reportValue = buildReportValue reportSummary intent validate
-    TIO.putStr
-        (renderReport reportSummary intent validate reg)
-    case optEmitExplain opts of
-        Nothing -> pure ()
-        Just outDir -> case parseDiagnosisDoc reportValue of
-            Left e -> die ("internal explain parse error: " <> e)
-            Right doc -> do
-                _ <- emitExplain outDir reg doc
-                pure ()
+        needsExplainDoc =
+            optOutputFormat opts == OutputExplain
+                || isJust (optEmitExplain opts)
+    mDoc <-
+        if needsExplainDoc
+            then case parseDiagnosisDoc reportValue of
+                Left e -> die ("internal explain parse error: " <> e)
+                Right doc -> pure (Just doc)
+            else pure Nothing
+    case (optOutputFormat opts, mDoc) of
+        (OutputJson, _) ->
+            TIO.putStr (renderReport reportSummary intent validate reg)
+        (OutputExplain, Just doc) ->
+            TIO.putStr (renderSingleMarkdown reg doc)
+        (OutputExplain, Nothing) ->
+            die "internal explain parse error: missing explain document"
+    case (optEmitExplain opts, mDoc) of
+        (Nothing, _) -> pure ()
+        (Just outDir, Just doc) -> do
+            _ <- emitExplain outDir reg doc
+            pure ()
+        (Just _, Nothing) ->
+            die "internal explain emit error: missing explain document"
 
 fetchProducer ::
     Manager -> Network -> Text -> Text -> IO (Text, Either String Text)

@@ -660,13 +660,13 @@
               ${hostTargets.tx-deep-diagnosis}/bin/tx-deep-diagnosis \
                 --cbor ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
                 --network mainnet \
+                --format explain \
                 --emit-explain $out/explain \
-                > response.json
-              ${pkgs.jq}/bin/jq -e '
-                ."tx-deep-diagnosis".intent.result.intent.title == "Signing summary"
-                and (."tx-deep-diagnosis".intent.result.intent.sections | length >= 3)
-                and (."tx-deep-diagnosis".validate.result.validation | type) == "object"
-              ' response.json
+                > response.md
+              ${pkgs.gnugrep}/bin/grep -F "# Signing summary" response.md
+              ${pkgs.gnugrep}/bin/grep -F "## Verdict" response.md
+              ${pkgs.gnugrep}/bin/grep -F "<details><summary>Topology</summary>" \
+                response.md
               test -f $out/explain/summary.md
               test -f $out/explain/explain.md
               test -f $out/explain/parties.mmd
@@ -675,7 +675,7 @@
               ${pkgs.gnugrep}/bin/grep -F "## Verdict" $out/explain/summary.md
               ${pkgs.gnugrep}/bin/grep -F "<details><summary>Topology</summary>" \
                 $out/explain/explain.md
-              cp response.json $out/
+              cp response.md $out/
             '';
         in
         {

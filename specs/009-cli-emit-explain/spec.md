@@ -1,9 +1,9 @@
-# Feature Specification: tx-deep-diagnosis Runtime --emit-explain
+# Feature Specification: tx-deep-diagnosis Stdout Explain Format
 
 **Feature Branch**: `009-cli-emit-explain`
 **Created**: 2026-05-04
 **Status**: Draft
-**Input**: GitHub issue #63: "tx-deep-diagnosis: implement the missing --emit-explain CLI flag"
+**Input**: GitHub issue #63: "tx-deep-diagnosis: choose stdout output as json or explain"
 
 ## Context
 
@@ -11,71 +11,69 @@
 the repository already has pure renderers plus a snapshot harness that can turn
 that envelope into `summary.md`, `explain.md`, and the related diagram files.
 
-The gap is runtime usability: the spec and plan for the explain-artifact work
-promised a one-shot `--emit-explain <DIR>` flag on the CLI, but the current
-implementation never shipped that flag. Users currently have to know the
-internal two-step flow instead of asking the CLI to write the explanation
-bundle directly.
+The runtime usability gap is narrower than that artifact workflow: users want
+the CLI to choose the primary stdout representation directly. If they ask for
+an explanation, the standard route should be markdown on stdout instead of a
+JSON envelope. Side-output files can exist, but they are secondary.
 
 ## User Scenarios & Testing
 
-### User Story 1 — One-shot explain bundle from the CLI (Priority: P1)
+### User Story 1 — Explain markdown on stdout (Priority: P1)
 
-A user runs `tx-deep-diagnosis --cbor tx.hex --emit-explain out/` and gets the
-normal JSON envelope on stdout plus a directory of human-readable explanation
-artifacts on disk.
+A user runs `tx-deep-diagnosis --cbor tx.hex --format explain` and gets the
+human-readable markdown explanation on stdout instead of JSON.
 
-**Why this priority**: this is the missing runtime contract the earlier explain
-feature promised.
+**Why this priority**: this is the interface users actually reach for. They
+care about what comes out of stdout, not about an auxiliary output directory.
 
 **Independent Test**: run the CLI on a committed fixture without Blockfrost and
-verify that stdout is still JSON while `out/` contains `summary.md`,
-`explain.md`, `parties.mmd`, `value-flow.tsv`, and `topology.mmd`.
+verify that stdout is markdown with the standard explanation headings and
+embedded Mermaid sections.
 
 **Acceptance Scenarios**:
 
-1. **Given** a transaction and an empty destination directory, **When** the
-   user passes `--emit-explain out/`, **Then** the CLI writes the explanation
-   artifacts under `out/` and still prints the diagnosis JSON to stdout.
-2. **Given** a transaction with validation failures, **When** the flag is
-   present, **Then** `failures.mmd` is written and `summary.md` links to it.
-3. **Given** a transaction without validation failures, **When** the flag is
-   present, **Then** `failures.mmd` is omitted and `summary.md` does not link
-   to it.
+1. **Given** a transaction, **When** the user passes `--format explain`,
+   **Then** stdout contains the single-file markdown explanation and no JSON.
+2. **Given** a transaction, **When** the user omits `--format` or passes
+   `--format json`, **Then** stdout remains the existing JSON envelope.
+3. **Given** a transaction with validation failures, **When** explain output is
+   requested, **Then** the markdown includes the failure overlay section.
 
-### User Story 2 — One renderer pipeline for runtime and tests (Priority: P1)
+### User Story 2 — Optional artifact directory remains available (Priority: P2)
+
+A user who wants both the markdown stdout output and the directory-shaped
+artifact bundle can add `--emit-explain out/` without changing the stdout
+contract.
+
+**Why this priority**: the directory output is useful, but it is not the main
+interface.
+
+**Independent Test**: run the CLI with `--format explain --emit-explain out/`
+and verify that stdout is markdown while `out/` contains the artifact bundle.
+
+### User Story 3 — One renderer pipeline for runtime and tests (Priority: P1)
 
 The runtime CLI and the snapshot harness use the same artifact assembly logic,
-so file ordering, conditional artifacts, and markdown content cannot drift
-between them.
+so markdown content, file ordering, and optional artifacts cannot drift between
+them.
 
-**Why this priority**: the current bug exists because the snapshot path and the
-runtime path diverged.
+**Why this priority**: once stdout explain is part of the CLI contract, the
+single-file renderer and the file emitter must stay aligned.
 
 **Independent Test**: compare the artifact list produced by the reused runtime
 emitter against the existing golden test flow; both succeed with the same
 renderer outputs.
 
-### User Story 3 — Re-running into the same output directory is safe (Priority: P2)
-
-If a user reuses an output directory, stale optional artifacts do not survive
-from an earlier run.
-
-**Why this priority**: otherwise a previous `failures.mmd` can remain on disk
-after a later valid run and mislead readers.
-
-**Independent Test**: write an invalid case first, then a valid case into the
-same directory and verify that only the currently rendered files remain.
-
 ## Functional Requirements
 
-- **FR-001**: `tx-deep-diagnosis` MUST accept a new CLI option
-  `--emit-explain <DIR>`.
-- **FR-002**: When `--emit-explain` is absent, CLI behavior MUST remain
-  unchanged.
-- **FR-003**: When `--emit-explain` is present, the CLI MUST still print the
-  diagnosis JSON envelope to stdout exactly as before.
-- **FR-004**: When `--emit-explain` is present, the CLI MUST create the target
+- **FR-001**: `tx-deep-diagnosis` MUST accept a CLI option
+  `--format <FORMAT>`, where `FORMAT` includes at least `json` and `explain`.
+- **FR-002**: When `--format` is absent, stdout behavior MUST remain the
+  existing JSON envelope.
+- **FR-003**: When `--format explain` is present, stdout MUST be the single-file
+  markdown explanation instead of JSON.
+- **FR-004**: `tx-deep-diagnosis` MAY also accept `--emit-explain <DIR>` as an
+  optional side-output request. When present, it MUST create the target
   directory if needed and write:
   - `summary.md`
   - `explain.md`
@@ -83,17 +81,22 @@ same directory and verify that only the currently rendered files remain.
   - `value-flow.tsv`
   - `topology.mmd`
   - `failures.mmd` only when validation failures are present
-- **FR-005**: Runtime artifact assembly and snapshot artifact assembly MUST use
+- **FR-005**: When `--format explain` and `--emit-explain` are used together,
+  stdout MUST remain markdown; the file emission MUST be additional, not a
+  replacement.
+- **FR-006**: Runtime artifact assembly and snapshot artifact assembly MUST use
   the same underlying renderer orchestration logic.
-- **FR-006**: Re-running into the same output directory MUST remove known
+- **FR-007**: Re-running into the same output directory MUST remove known
   explain-artifact files that are not rendered for the current transaction.
-- **FR-007**: The CLI help text and the build/tutorial docs MUST describe the
+- **FR-008**: The CLI help text and the build/tutorial docs MUST describe the
   runtime explain workflow accurately.
-- **FR-008**: A repository smoke check MUST cover the new CLI flag.
+- **FR-009**: A repository smoke check MUST cover the stdout explain mode.
 
 ## Edge Cases
 
 - Destination directory already exists and contains stale `failures.mmd`.
+- Re-running `--format explain --emit-explain out/` into a directory that still
+  contains a stale `failures.mmd` from an earlier invalid transaction.
 - Destination directory already exists and contains unrelated user files; only
   known explain-artifact paths are touched.
 - The diagnosis JSON parses successfully for runtime emission because it is
@@ -108,7 +111,9 @@ same directory and verify that only the currently rendered files remain.
 
 ## Acceptance
 
-- `tx-deep-diagnosis --cbor <hex> --emit-explain out/` exits 0, prints JSON to
-  stdout, and writes the explanation bundle to `out/`.
+- `tx-deep-diagnosis --cbor <hex> --format explain` exits 0 and prints markdown
+  explanation to stdout.
+- `tx-deep-diagnosis --cbor <hex> --format explain --emit-explain out/` exits 0,
+  prints markdown to stdout, and writes the explanation bundle to `out/`.
 - Existing snapshot rendering tests still pass using the shared emission path.
-- A CLI smoke test for `--emit-explain` is green in CI.
+- A CLI smoke test for stdout explain mode is green in CI.
