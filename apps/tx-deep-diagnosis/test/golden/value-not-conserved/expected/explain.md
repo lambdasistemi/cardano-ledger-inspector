@@ -141,20 +141,20 @@ Inputs that also receive outputs (same payment credential on both sides):
 
 ## Outputs
 
-| # | Bucket | Destination | ADA | Datum |
-|---|--------|-------------|----:|-------|
-| 0 | script | Amaru Network Compliance treasury (0baa0d) | 1,041,836.734694 | inline `d8799fd8799f58…` (338B) |
-| 1 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 2 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 3 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 4 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 5 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 6 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 7 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 8 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 9 | script | SundaeSwap V3 order | 12,503.280000 | inline `d8799fd8799f58…` (338B) |
-| 10 | script | SundaeSwap V3 order | 8,166.545306 | — |
-| 11 | external_key | key d2626d | 49,897.955481 | — |
+| # | Bucket | Destination | ADA | Assets | Datum |
+|---|--------|-------------|----:|--------|-------|
+| 0 | script | Amaru Network Compliance treasury (0baa0d) | 1,041,836.734694 | — | inline `d8799fd8799f58…` (338B) |
+| 1 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 2 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 3 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 4 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 5 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 6 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 7 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 8 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 9 | script | SundaeSwap V3 order | 12,503.280000 | — | inline `d8799fd8799f58…` (338B) |
+| 10 | script | SundaeSwap V3 order | 8,166.545306 | — | — |
+| 11 | external_key | key d2626d | 49,897.955481 | — | — |
 
 ## Datums
 
