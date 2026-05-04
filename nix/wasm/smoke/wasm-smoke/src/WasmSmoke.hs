@@ -8,9 +8,9 @@
   pkg-config + wasm32-wasi-built libsodium/secp256k1/blst — C-library
   infrastructure that is tracked as a follow-up task.
 -}
-module WasmSmoke (
-    smokeRoundTrip,
-) where
+module WasmSmoke
+    ( smokeRoundTrip
+    ) where
 
 import Codec.CBOR.Decoding (decodeInt)
 import Codec.CBOR.Encoding (encodeInt)

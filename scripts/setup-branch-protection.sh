@@ -15,7 +15,7 @@
 set -euo pipefail
 
 OWNER="${1:-lambdasistemi}"
-REPO="${2:-cardano-ledger-wasi}"
+REPO="${2:-cardano-ledger-inspector}"
 BRANCH="${3:-main}"
 
 gh api -X PUT "repos/$OWNER/$REPO/branches/$BRANCH/protection" \
@@ -35,6 +35,7 @@ gh api -X PUT "repos/$OWNER/$REPO/branches/$BRANCH/protection" \
       "Smoke explicit UTxO input context",
       "Smoke Extism conformance vs WASI",
       "Format (fourmolu)",
+      "Hlint",
       "Playwright",
       "preview"
     ]

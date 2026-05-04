@@ -8,9 +8,9 @@
   The operation builds the minimal ledger environment from explicit caller
   context and reports the ledger predicates returned by the Conway rules.
 -}
-module Conway.Inspector.Validation (
-    validateTxJson,
-) where
+module Conway.Inspector.Validation
+    ( validateTxJson
+    ) where
 
 import qualified Cardano.Crypto.Hash as Crypto
 import qualified Cardano.Ledger.Address as Addr
@@ -30,31 +30,31 @@ import qualified Cardano.Ledger.State as LedgerState
 import qualified Cardano.Ledger.TxIn as TxIn
 import qualified Cardano.Slotting.EpochInfo as EpochInfo
 import qualified Cardano.Slotting.Time as SlottingTime
-import Conway.Inspector.Common (
-    argsObject,
-    hashHex,
-    lookupObjectValue,
-    lookupValue,
-    txIdHex,
-    txInIndex,
-    txInKey,
-    txInTxIdHex,
-    txOutJson,
-    withdrawalsCount,
- )
-import Conway.Inspector.Context (
-    ProducerContext (..),
-    ProducerTx (..),
-    decodedProducerTxCount,
-    inputPolicyFromArgs,
-    missingContextTxIns,
-    producerContextFromArgs,
-    producerContextSupplied,
-    producerOutputAt,
-    producerTxErrors,
-    producerTxLookup,
-    producerTxOutput,
- )
+import Conway.Inspector.Common
+    ( argsObject
+    , hashHex
+    , lookupObjectValue
+    , lookupValue
+    , txIdHex
+    , txInIndex
+    , txInKey
+    , txInTxIdHex
+    , txOutJson
+    , withdrawalsCount
+    )
+import Conway.Inspector.Context
+    ( ProducerContext (..)
+    , ProducerTx (..)
+    , decodedProducerTxCount
+    , inputPolicyFromArgs
+    , missingContextTxIns
+    , producerContextFromArgs
+    , producerContextSupplied
+    , producerOutputAt
+    , producerTxErrors
+    , producerTxLookup
+    , producerTxOutput
+    )
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
@@ -79,11 +79,11 @@ data LedgerApplyResult
     | LedgerApplyAccepted
     | LedgerApplyRejected [Aeson.Value]
 
-validateTxJson ::
-    BS.ByteString ->
-    Aeson.Value ->
-    L.Tx TopTx Conway.ConwayEra ->
-    Aeson.Value
+validateTxJson
+    :: BS.ByteString
+    -> Aeson.Value
+    -> L.Tx TopTx Conway.ConwayEra
+    -> Aeson.Value
 validateTxJson _txBytes args tx =
     let body = tx ^. L.bodyTxL
         context = producerContextFromArgs args
@@ -192,7 +192,7 @@ validateTxJson _txBytes args tx =
         failures =
             ledgerApplyFailures ledgerApplyResult
         warnings = validationWarnings contextErrors missingContext
-     in Aeson.object
+    in  Aeson.object
             [ "status" .= status
             , "valid_for_supplied_context" .= validForSuppliedContext
             , "complete" .= complete
@@ -208,7 +208,11 @@ validateTxJson _txBytes args tx =
                     inputs
             , "resolved_reference_inputs"
                 .= zipWith
-                    (validationResolvedTxInJson "reference_input" "reference_inputs" context)
+                    ( validationResolvedTxInJson
+                        "reference_input"
+                        "reference_inputs"
+                        context
+                    )
                     [0 :: Int ..]
                     referenceInputs
             , "context"
@@ -227,11 +231,11 @@ validateTxJson _txBytes args tx =
             , "errors" .= contextErrors
             ]
 
-validationStatus ::
-    [Aeson.Value] ->
-    [Aeson.Value] ->
-    LedgerApplyResult ->
-    T.Text
+validationStatus
+    :: [Aeson.Value]
+    -> [Aeson.Value]
+    -> LedgerApplyResult
+    -> T.Text
 validationStatus contextErrors missingContext ledgerApplyResult
     | not (null contextErrors) = "rejected"
     | not (null missingContext) = "incomplete"
@@ -241,11 +245,11 @@ validationStatus contextErrors missingContext ledgerApplyResult
             LedgerApplyRejected _ -> "invalid"
             LedgerApplyNotEvaluated _ -> "incomplete"
 
-validationChecks ::
-    [Aeson.Value] ->
-    [Aeson.Value] ->
-    LedgerApplyResult ->
-    [Aeson.Value]
+validationChecks
+    :: [Aeson.Value]
+    -> [Aeson.Value]
+    -> LedgerApplyResult
+    -> [Aeson.Value]
 validationChecks contextErrors missingContext ledgerApplyResult =
     [ validationCheckJson
         "context.explicit"
@@ -298,15 +302,15 @@ requiredLedgerContextKinds =
     , "network"
     ]
 
-validationCheckJson ::
-    T.Text ->
-    T.Text ->
-    T.Text ->
-    T.Text ->
-    [T.Text] ->
-    [T.Text] ->
-    T.Text ->
-    Aeson.Value
+validationCheckJson
+    :: T.Text
+    -> T.Text
+    -> T.Text
+    -> T.Text
+    -> [T.Text]
+    -> [T.Text]
+    -> T.Text
+    -> Aeson.Value
 validationCheckJson checkId title status scope requiredContext path message =
     Aeson.object
         [ "id" .= checkId
@@ -318,19 +322,19 @@ validationCheckJson checkId title status scope requiredContext path message =
         , "message" .= message
         ]
 
-runLedgerApplyTx ::
-    [Aeson.Value] ->
-    [Aeson.Value] ->
-    Maybe BaseTypes.Network ->
-    Maybe Word64 ->
-    Maybe Word64 ->
-    Maybe (Core.PParams Conway.ConwayEra) ->
-    [CertStateRewardEntry] ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    L.Tx TopTx Conway.ConwayEra ->
-    LedgerApplyResult
+runLedgerApplyTx
+    :: [Aeson.Value]
+    -> [Aeson.Value]
+    -> Maybe BaseTypes.Network
+    -> Maybe Word64
+    -> Maybe Word64
+    -> Maybe (Core.PParams Conway.ConwayEra)
+    -> [CertStateRewardEntry]
+    -> ProducerContext
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> L.Tx TopTx Conway.ConwayEra
+    -> LedgerApplyResult
 runLedgerApplyTx contextErrors missingContext network slot epoch pparams rewards context inputs referenceInputs tx
     | not (null contextErrors) =
         LedgerApplyNotEvaluated
@@ -351,7 +355,7 @@ runLedgerApplyTx contextErrors missingContext network slot epoch pparams rewards
                             newEpochState
                             (BaseTypes.SlotNo slot')
                     state = Mempool.mkMempoolState newEpochState
-                 in case Mempool.applyTx globals env state tx of
+                in  case Mempool.applyTx globals env state tx of
                         Right _ -> LedgerApplyAccepted
                         Left err -> LedgerApplyRejected (ledgerApplyErrorJson err)
             _ ->
@@ -393,11 +397,11 @@ defaultActiveSlotCoeff =
     BaseTypes.mkActiveSlotCoeff $
         fromMaybe maxBound (BaseTypes.boundRational (1 % 20))
 
-validationNewEpochState ::
-    Word64 ->
-    Core.PParams Conway.ConwayEra ->
-    ShelleyState.UTxO Conway.ConwayEra ->
-    ShelleyState.NewEpochState Conway.ConwayEra
+validationNewEpochState
+    :: Word64
+    -> Core.PParams Conway.ConwayEra
+    -> ShelleyState.UTxO Conway.ConwayEra
+    -> ShelleyState.NewEpochState Conway.ConwayEra
 validationNewEpochState epoch pparams utxo =
     (def :: ShelleyState.NewEpochState Conway.ConwayEra)
         & ShelleyState.nesELL .~ BaseTypes.EpochNo epoch
@@ -408,10 +412,10 @@ validationNewEpochState epoch pparams utxo =
             . ShelleyState.utxoL
             .~ utxo
 
-validationSourceUTxO ::
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    ShelleyState.UTxO Conway.ConwayEra
+validationSourceUTxO
+    :: ProducerContext
+    -> [TxIn.TxIn]
+    -> ShelleyState.UTxO Conway.ConwayEra
 validationSourceUTxO context txIns =
     ShelleyState.UTxO $
         Map.fromList
@@ -420,11 +424,15 @@ validationSourceUTxO context txIns =
             , Just txOut <- [producerTxOutput context txIn]
             ]
 
-ledgerApplyErrorJson :: Conway.ApplyTxError Conway.ConwayEra -> [Aeson.Value]
+ledgerApplyErrorJson
+    :: Conway.ApplyTxError Conway.ConwayEra -> [Aeson.Value]
 ledgerApplyErrorJson (Conway.ConwayApplyTxError failures) =
     zipWith ledgerFailureJson [0 :: Int ..] (toList failures)
 
-ledgerFailureJson :: Int -> ConwayRules.ConwayLedgerPredFailure Conway.ConwayEra -> Aeson.Value
+ledgerFailureJson
+    :: Int
+    -> ConwayRules.ConwayLedgerPredFailure Conway.ConwayEra
+    -> Aeson.Value
 ledgerFailureJson ix failure =
     Aeson.object
         [ "kind" .= ("ledger_failure" :: T.Text)
@@ -435,7 +443,8 @@ ledgerFailureJson ix failure =
         , "path" .= (["body"] :: [T.Text])
         ]
 
-ledgerFailureRule :: ConwayRules.ConwayLedgerPredFailure Conway.ConwayEra -> T.Text
+ledgerFailureRule
+    :: ConwayRules.ConwayLedgerPredFailure Conway.ConwayEra -> T.Text
 ledgerFailureRule = \case
     ConwayRules.ConwayUtxowFailure _ -> "UTXOW"
     ConwayRules.ConwayCertsFailure _ -> "CERTS"
@@ -447,26 +456,33 @@ ledgerFailureRule = \case
     ConwayRules.ConwayWithdrawalsMissingAccounts _ -> "LEDGER.withdrawals"
     ConwayRules.ConwayIncompleteWithdrawals _ -> "LEDGER.withdrawals"
 
-ledgerFailureMessage :: ConwayRules.ConwayLedgerPredFailure Conway.ConwayEra -> T.Text
+ledgerFailureMessage
+    :: ConwayRules.ConwayLedgerPredFailure Conway.ConwayEra -> T.Text
 ledgerFailureMessage = \case
     ConwayRules.ConwayUtxowFailure failure ->
-        "Transaction witness or UTxO validation failed: " <> T.pack (show failure)
+        "Transaction witness or UTxO validation failed: "
+            <> T.pack (show failure)
     ConwayRules.ConwayCertsFailure failure ->
         "Certificate validation failed: " <> T.pack (show failure)
     ConwayRules.ConwayGovFailure failure ->
         "Governance validation failed: " <> T.pack (show failure)
     ConwayRules.ConwayWdrlNotDelegatedToDRep hashes ->
-        "Withdrawal credentials are not delegated to a DRep: " <> T.pack (show hashes)
+        "Withdrawal credentials are not delegated to a DRep: "
+            <> T.pack (show hashes)
     ConwayRules.ConwayTreasuryValueMismatch mismatch ->
-        "Treasury value does not match the ledger rule expectation: " <> T.pack (show mismatch)
+        "Treasury value does not match the ledger rule expectation: "
+            <> T.pack (show mismatch)
     ConwayRules.ConwayTxRefScriptsSizeTooBig mismatch ->
-        "Referenced scripts exceed the maximum allowed size: " <> T.pack (show mismatch)
+        "Referenced scripts exceed the maximum allowed size: "
+            <> T.pack (show mismatch)
     ConwayRules.ConwayMempoolFailure message ->
         message
     ConwayRules.ConwayWithdrawalsMissingAccounts withdrawals ->
-        "Withdrawals reference missing reward accounts: " <> T.pack (show withdrawals)
+        "Withdrawals reference missing reward accounts: "
+            <> T.pack (show withdrawals)
     ConwayRules.ConwayIncompleteWithdrawals withdrawals ->
-        "Withdrawals are incomplete for the supplied accounts: " <> T.pack (show withdrawals)
+        "Withdrawals are incomplete for the supplied accounts: "
+            <> T.pack (show withdrawals)
 
 validationWarnings :: [Aeson.Value] -> [Aeson.Value] -> [T.Text]
 validationWarnings contextErrors missingContext
@@ -474,13 +490,13 @@ validationWarnings contextErrors missingContext
         ["tx.validate did not mutate or return transaction CBOR."]
     | otherwise = []
 
-requiredContextField ::
-    T.Text ->
-    T.Text ->
-    T.Text ->
-    (Aeson.Value -> Either T.Text a) ->
-    Maybe Aeson.Value ->
-    (Maybe a, [Aeson.Value], [Aeson.Value])
+requiredContextField
+    :: T.Text
+    -> T.Text
+    -> T.Text
+    -> (Aeson.Value -> Either T.Text a)
+    -> Maybe Aeson.Value
+    -> (Maybe a, [Aeson.Value], [Aeson.Value])
 requiredContextField field kind message parse maybeContext =
     case maybeContext >>= lookupValue (AesonKey.fromText field) of
         Nothing ->
@@ -538,9 +554,9 @@ word64Text :: Word64 -> T.Text
 word64Text =
     T.pack . show
 
-parseProtocolParametersValue ::
-    Aeson.Value ->
-    Either T.Text (Core.PParams Conway.ConwayEra)
+parseProtocolParametersValue
+    :: Aeson.Value
+    -> Either T.Text (Core.PParams Conway.ConwayEra)
 parseProtocolParametersValue value =
     case Aeson.fromJSON value of
         Aeson.Success pparams -> Right pparams
@@ -596,12 +612,12 @@ producerTxIdContextErrors context =
     , declaredTxId /= actualTxId
     ]
 
-producerOutputIndexContextErrors ::
-    T.Text ->
-    T.Text ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [Aeson.Value]
+producerOutputIndexContextErrors
+    :: T.Text
+    -> T.Text
+    -> ProducerContext
+    -> [TxIn.TxIn]
+    -> [Aeson.Value]
 producerOutputIndexContextErrors inputKind collection context txIns =
     [ contextErrorJson
         "producer_output_index_missing"
@@ -657,17 +673,17 @@ data CertStateInput
   > { "rewards": [{ "credential": {"kind":"key"|"script","hash":"<hex>"}
   >              , "balance_lovelace": "<integer>" }, ...] }
 -}
-parseCertStateContext ::
-    Core.TxBody TopTx Conway.ConwayEra ->
-    Maybe Aeson.Value ->
-    CertStateInput
+parseCertStateContext
+    :: Core.TxBody TopTx Conway.ConwayEra
+    -> Maybe Aeson.Value
+    -> CertStateInput
 parseCertStateContext body mContext =
-    let certCount = length (toList (body ^. L.certsTxBodyL))
+    let certCount = length (body ^. L.certsTxBodyL)
         withdrawals = body ^. L.withdrawalsTxBodyL
         withdrawalCount = withdrawalsCount withdrawals
         required = certCount > 0 || withdrawalCount > 0
         suppliedValue = mContext >>= lookupValue "cert_state"
-     in case suppliedValue of
+    in  case suppliedValue of
             Nothing
                 | required ->
                     CertStateAbsent (withdrawalAbsentDetails body withdrawals)
@@ -690,12 +706,12 @@ parseCertStateContext body mContext =
   emitted under @args.context.cert_state@ to keep one logical
   missing-context bucket per kind, so callers iterate one place.
 -}
-withdrawalAbsentDetails ::
-    Core.TxBody TopTx Conway.ConwayEra ->
-    L.Withdrawals ->
-    [Aeson.Value]
+withdrawalAbsentDetails
+    :: Core.TxBody TopTx Conway.ConwayEra
+    -> L.Withdrawals
+    -> [Aeson.Value]
 withdrawalAbsentDetails body (L.Withdrawals m) =
-    let certCount = length (toList (body ^. L.certsTxBodyL))
+    let certCount = length (body ^. L.certsTxBodyL)
         creds = withdrawalCredentialsJson m
         message :: T.Text
         message
@@ -709,11 +725,11 @@ withdrawalAbsentDetails body (L.Withdrawals m) =
             Aeson.object
                 [ "withdrawal_credentials" .= creds
                 , "schema"
-                    .= ( "{rewards:[{credential:{kind,hash},balance_lovelace}]}" ::
-                            T.Text
+                    .= ( "{rewards:[{credential:{kind,hash},balance_lovelace}]}"
+                            :: T.Text
                        )
                 ]
-     in [ Aeson.object
+    in  [ Aeson.object
             [ "kind" .= ("cert_state" :: T.Text)
             , "message" .= message
             , "path"
@@ -723,15 +739,15 @@ withdrawalAbsentDetails body (L.Withdrawals m) =
             ]
         ]
 
-withdrawalCredentialsJson ::
-    Map.Map Addr.AccountAddress Coin.Coin -> [Aeson.Value]
+withdrawalCredentialsJson
+    :: Map.Map Addr.AccountAddress Coin.Coin -> [Aeson.Value]
 withdrawalCredentialsJson =
     map (credentialJson . accountCredential) . Map.keys
   where
     accountCredential (Addr.AccountAddress _ (Addr.AccountId cred)) = cred
 
-credentialJson ::
-    Credential.Credential r -> Aeson.Value
+credentialJson
+    :: Credential.Credential r -> Aeson.Value
 credentialJson = \case
     Credential.KeyHashObj (Hashes.KeyHash h) ->
         Aeson.object ["kind" .= ("key" :: T.Text), "hash" .= hashHex h]
@@ -743,7 +759,8 @@ credentialJson = \case
   pre-existing "minimal supplied object satisfies the gate"
   behaviour).
 -}
-parseCertStateValue :: Aeson.Value -> Either T.Text [CertStateRewardEntry]
+parseCertStateValue
+    :: Aeson.Value -> Either T.Text [CertStateRewardEntry]
 parseCertStateValue (Aeson.Object o) =
     case AesonKeyMap.lookup "rewards" o of
         Nothing -> Right []
@@ -759,13 +776,14 @@ parseRewardEntry (Aeson.Object o) = do
         maybe (Left "rewards[*].credential is required.") Right $
             AesonKeyMap.lookup "credential" o
     cred <- parseCredentialValue credValue
-    balance <- parseBalanceLovelace (AesonKeyMap.lookup "balance_lovelace" o)
+    balance <-
+        parseBalanceLovelace (AesonKeyMap.lookup "balance_lovelace" o)
     pure CertStateRewardEntry{csrCredential = cred, csrBalance = balance}
 parseRewardEntry _ =
     Left "rewards[*] must be a JSON object."
 
-parseCredentialValue ::
-    Aeson.Value -> Either T.Text (Credential.Credential Hashes.Staking)
+parseCredentialValue
+    :: Aeson.Value -> Either T.Text (Credential.Credential Hashes.Staking)
 parseCredentialValue (Aeson.Object o) = do
     kind <-
         case AesonKeyMap.lookup "kind" o of
@@ -780,7 +798,8 @@ parseCredentialValue (Aeson.Object o) = do
     bytes <- decodeHashHex hashHex'
     case kind of
         "key" -> Credential.KeyHashObj . Hashes.KeyHash <$> decodeHash28 bytes
-        "script" -> Credential.ScriptHashObj . Hashes.ScriptHash <$> decodeHash28 bytes
+        "script" ->
+            Credential.ScriptHashObj . Hashes.ScriptHash <$> decodeHash28 bytes
         _ -> Left ("Unknown credential.kind: " <> kind)
 parseCredentialValue _ =
     Left "credential must be a JSON object."
@@ -790,8 +809,8 @@ decodeHashHex t = case B16.decode (T.encodeUtf8 t) of
     Right bs -> Right bs
     Left err -> Left ("hash hex decode failed: " <> T.pack err)
 
-decodeHash28 ::
-    BS.ByteString -> Either T.Text (Crypto.Hash Crypto.Blake2b_224 a)
+decodeHash28
+    :: BS.ByteString -> Either T.Text (Crypto.Hash Crypto.Blake2b_224 a)
 decodeHash28 bs = case Crypto.hashFromBytes bs of
     Just h -> Right h
     Nothing ->
@@ -815,8 +834,9 @@ parseBalanceLovelace (Just (Aeson.Number _)) =
 parseBalanceLovelace _ =
     Left "balance_lovelace must be a non-negative integer string."
 
-classifyCertStateInput ::
-    CertStateInput -> ([Aeson.Value], [Aeson.Value], [CertStateRewardEntry])
+classifyCertStateInput
+    :: CertStateInput
+    -> ([Aeson.Value], [Aeson.Value], [CertStateRewardEntry])
 classifyCertStateInput = \case
     CertStateAbsent missing -> (missing, [], [])
     CertStateMalformed errs -> ([], errs, [])
@@ -828,10 +848,10 @@ classifyCertStateInput = \case
   credential. The returned state is what gets fed into Conway
   @applyTx@.
 -}
-seedCertStateRewards ::
-    [CertStateRewardEntry] ->
-    ShelleyState.NewEpochState Conway.ConwayEra ->
-    ShelleyState.NewEpochState Conway.ConwayEra
+seedCertStateRewards
+    :: [CertStateRewardEntry]
+    -> ShelleyState.NewEpochState Conway.ConwayEra
+    -> ShelleyState.NewEpochState Conway.ConwayEra
 seedCertStateRewards [] nes = nes
 seedCertStateRewards entries nes =
     nes
@@ -842,7 +862,11 @@ seedCertStateRewards entries nes =
             . LedgerState.accountsL
             %~ \accounts ->
                 foldr
-                    (\e -> LedgerState.addAccountState (csrCredential e) (rewardEntryAccountState e))
+                    ( \e ->
+                        LedgerState.addAccountState
+                            (csrCredential e)
+                            (rewardEntryAccountState e)
+                    )
                     accounts
                     entries
 
@@ -851,8 +875,8 @@ seedCertStateRewards entries nes =
   which is fine for the CERTS withdrawal rule — it only inspects
   @casBalance@ (via @balanceAccountStateL@).
 -}
-rewardEntryAccountState ::
-    CertStateRewardEntry -> ConwayAccountState Conway.ConwayEra
+rewardEntryAccountState
+    :: CertStateRewardEntry -> ConwayAccountState Conway.ConwayEra
 rewardEntryAccountState entry =
     ConwayAccountState
         { casBalance = compactCoin (csrBalance entry)
@@ -864,18 +888,18 @@ rewardEntryAccountState entry =
     -- Lovelace amounts already validated as non-negative during parsing.
     compactCoin = Coin.compactCoinOrError
 
-missingSourceOutputContextJson ::
-    T.Text ->
-    T.Text ->
-    Int ->
-    TxIn.TxIn ->
-    Aeson.Value
+missingSourceOutputContextJson
+    :: T.Text
+    -> T.Text
+    -> Int
+    -> TxIn.TxIn
+    -> Aeson.Value
 missingSourceOutputContextJson inputKind collection ix txIn =
     Aeson.object
         [ "kind" .= ("source_output" :: T.Text)
         , "message"
-            .= ( "Supply producer transaction CBOR for the referenced transaction input." ::
-                    T.Text
+            .= ( "Supply producer transaction CBOR for the referenced transaction input."
+                    :: T.Text
                )
         , "path" .= (["body", collection, "#" <> T.pack (show ix)] :: [T.Text])
         , "tx_id" .= txInTxIdHex txIn
@@ -884,12 +908,12 @@ missingSourceOutputContextJson inputKind collection ix txIn =
         , "required_for" .= (["ledger.apply_tx"] :: [T.Text])
         ]
 
-missingContextJson ::
-    T.Text ->
-    T.Text ->
-    [T.Text] ->
-    [T.Text] ->
-    Aeson.Value
+missingContextJson
+    :: T.Text
+    -> T.Text
+    -> [T.Text]
+    -> [T.Text]
+    -> Aeson.Value
 missingContextJson kind message path requiredFor =
     Aeson.object
         [ "kind" .= kind
@@ -898,12 +922,12 @@ missingContextJson kind message path requiredFor =
         , "required_for" .= requiredFor
         ]
 
-contextErrorJson ::
-    T.Text ->
-    T.Text ->
-    [T.Text] ->
-    Aeson.Value ->
-    Aeson.Value
+contextErrorJson
+    :: T.Text
+    -> T.Text
+    -> [T.Text]
+    -> Aeson.Value
+    -> Aeson.Value
 contextErrorJson code message path details =
     Aeson.object
         [ "code" .= code
@@ -912,13 +936,13 @@ contextErrorJson code message path details =
         , "details" .= details
         ]
 
-validationResolvedTxInJson ::
-    T.Text ->
-    T.Text ->
-    ProducerContext ->
-    Int ->
-    TxIn.TxIn ->
-    Aeson.Value
+validationResolvedTxInJson
+    :: T.Text
+    -> T.Text
+    -> ProducerContext
+    -> Int
+    -> TxIn.TxIn
+    -> Aeson.Value
 validationResolvedTxInJson inputKind collection context ix txIn =
     let key = txInKey txIn
         baseFields =
@@ -928,7 +952,7 @@ validationResolvedTxInJson inputKind collection context ix txIn =
             , "kind" .= inputKind
             , "path" .= (["body", collection, "#" <> T.pack (show ix)] :: [T.Text])
             ]
-     in case producerTxLookup context txIn of
+    in  case producerTxLookup context txIn of
             Nothing ->
                 Aeson.object $
                     baseFields
@@ -959,18 +983,18 @@ validationResolvedTxInJson inputKind collection context ix txIn =
                                    , "tx_out" .= txOutJson txOut
                                    ]
 
-validationContextSummaryJson ::
-    T.Text ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    Maybe T.Text ->
-    Maybe T.Text ->
-    Maybe T.Text ->
-    Bool ->
-    Aeson.Value
+validationContextSummaryJson
+    :: T.Text
+    -> ProducerContext
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> Maybe T.Text
+    -> Maybe T.Text
+    -> Maybe T.Text
+    -> Bool
+    -> Aeson.Value
 validationContextSummaryJson
     inputPolicy
     context
@@ -990,7 +1014,7 @@ validationContextSummaryJson
                 maybeTextField "network" network
                     <> maybeTextField "slot" slot
                     <> maybeTextField "epoch" epoch
-         in Aeson.object $
+        in  Aeson.object $
                 [ "input_policy" .= inputPolicy
                 , "producer_tx_count" .= Map.size (pcProducerTxs context)
                 , "decoded_producer_tx_count" .= decodedProducerTxCount context
@@ -1008,6 +1032,7 @@ validationContextSummaryJson
                 ]
                     <> optionalFields
 
-maybeTextField :: AesonKey.Key -> Maybe T.Text -> [(AesonKey.Key, Aeson.Value)]
+maybeTextField
+    :: AesonKey.Key -> Maybe T.Text -> [(AesonKey.Key, Aeson.Value)]
 maybeTextField key =
     maybe [] (\value -> [key .= value])

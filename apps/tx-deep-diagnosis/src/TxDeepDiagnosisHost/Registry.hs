@@ -1,30 +1,37 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TxDeepDiagnosisHost.Registry (
-    ProtocolRegistry (..),
-    RegistryValidator (..),
-    RegistryInstance (..),
-    AmaruScope (..),
-    AmaruScript (..),
-    AmaruJournal (..),
-    DatumSchema (..),
-    SchemaSource (..),
-    AikenSource (..),
-    SchemaConstructor (..),
-    SchemaField (..),
-    FieldType (..),
-    TupleField (..),
-    aikenSourceUrl,
-    loadRegistry,
-    loadRegistries,
-    identifyByHash,
-    datumSchemaForHash,
-    findScopeByOwner,
-    findScopeByRefOutref,
-    Identification (..),
-) where
+module TxDeepDiagnosisHost.Registry
+    ( ProtocolRegistry (..)
+    , RegistryValidator (..)
+    , RegistryInstance (..)
+    , AmaruScope (..)
+    , AmaruScript (..)
+    , AmaruJournal (..)
+    , DatumSchema (..)
+    , SchemaSource (..)
+    , AikenSource (..)
+    , SchemaConstructor (..)
+    , SchemaField (..)
+    , FieldType (..)
+    , TupleField (..)
+    , aikenSourceUrl
+    , loadRegistry
+    , loadRegistries
+    , identifyByHash
+    , datumSchemaForHash
+    , findScopeByOwner
+    , findScopeByRefOutref
+    , Identification (..)
+    ) where
 
-import Data.Aeson (FromJSON (..), eitherDecodeFileStrict, withObject, (.!=), (.:), (.:?))
+import Data.Aeson
+    ( FromJSON (..)
+    , eitherDecodeFileStrict
+    , withObject
+    , (.!=)
+    , (.:)
+    , (.:?)
+    )
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -300,7 +307,7 @@ instance FromJSON AmaruJournal where
       where
         parseScope (k, v) =
             let name = Key.toText k
-             in case A.parseEither (parseScopeBody name) v of
+            in  case A.parseEither (parseScopeBody name) v of
                     Right s -> Just s
                     Left _ -> Nothing
         parseScopeBody name = withObject "Scope" $ \so ->
@@ -321,7 +328,9 @@ loadRegistry root = do
     rf <- do
         exists <- doesFileExist registryPath
         if exists
-            then either (\e -> error ("registry.json decode: " <> e)) id <$> eitherDecodeFileStrict registryPath
+            then
+                either (\e -> error ("registry.json decode: " <> e)) id
+                    <$> eitherDecodeFileStrict registryPath
             else pure (RegistryFile [] [])
     aj <- do
         exists <- doesFileExist amaruPath
@@ -383,7 +392,7 @@ identifyByHash reg hh =
                 let scope = case prAmaru reg of
                         Just j -> findAmaruScopeByTreasury j hh
                         Nothing -> Nothing
-                 in IdInstance inst scope
+                in  IdInstance inst scope
             Nothing -> case prAmaru reg of
                 Just j -> case findAmaruRole j hh of
                     Just (s, role) -> IdAmaruRole s role
@@ -400,7 +409,7 @@ findAmaruRole j hh =
             | asHash (ascPermissionsScript s) == hh = Just (s, "permissions")
             | asHash (ascRegistryScript s) == hh = Just (s, "registry")
             | otherwise = Nothing
-     in case mapMaybe check (ajScopes j) of
+    in  case mapMaybe check (ajScopes j) of
             (m : _) -> Just m
             [] -> Nothing
 
@@ -408,13 +417,17 @@ findScopeByOwner :: AmaruJournal -> Text -> Maybe AmaruScope
 findScopeByOwner j ownerHex =
     find (\s -> ascOwner s == Just ownerHex) (ajScopes j)
 
-findScopeByRefOutref :: AmaruJournal -> Text -> Maybe (AmaruScope, Text)
+findScopeByRefOutref
+    :: AmaruJournal -> Text -> Maybe (AmaruScope, Text)
 findScopeByRefOutref j outref =
     let check s
-            | asDeployedAt (ascTreasuryScript s) == outref = Just (s, "treasury_script")
-            | asDeployedAt (ascPermissionsScript s) == outref = Just (s, "permissions_script")
-            | asDeployedAt (ascRegistryScript s) == outref = Just (s, "registry_script")
+            | asDeployedAt (ascTreasuryScript s) == outref =
+                Just (s, "treasury_script")
+            | asDeployedAt (ascPermissionsScript s) == outref =
+                Just (s, "permissions_script")
+            | asDeployedAt (ascRegistryScript s) == outref =
+                Just (s, "registry_script")
             | otherwise = Nothing
-     in case mapMaybe check (ajScopes j) of
+    in  case mapMaybe check (ajScopes j) of
             (m : _) -> Just m
             [] -> Nothing

@@ -8,31 +8,31 @@
   This module contains low-level helpers that are used by inspection,
   witness planning, producer-context resolution, and validation.
 -}
-module Conway.Inspector.Common (
-    InspectError (..),
-    argsObject,
-    decodeConway,
-    decodeTx,
-    decodeTxWithBytes,
-    hashHex,
-    hexDecode,
-    keyHashHex,
-    listAt,
-    lookupObjectValue,
-    lookupValue,
-    multiAssetJson,
-    rewardAccountJson,
-    safeHashHex,
-    scriptHashHex,
-    txIdHex,
-    txInIndex,
-    txInJson,
-    txInKey,
-    txInTxIdHex,
-    txOutJson,
-    withdrawalRowsJson,
-    withdrawalsCount,
-) where
+module Conway.Inspector.Common
+    ( InspectError (..)
+    , argsObject
+    , decodeConway
+    , decodeTx
+    , decodeTxWithBytes
+    , hashHex
+    , hexDecode
+    , keyHashHex
+    , listAt
+    , lookupObjectValue
+    , lookupValue
+    , multiAssetJson
+    , rewardAccountJson
+    , safeHashHex
+    , scriptHashHex
+    , txIdHex
+    , txInIndex
+    , txInJson
+    , txInKey
+    , txInTxIdHex
+    , txOutJson
+    , withdrawalRowsJson
+    , withdrawalsCount
+    ) where
 
 import qualified Cardano.Crypto.Hash as Crypto
 import qualified Cardano.Ledger.Address as Addr
@@ -68,15 +68,15 @@ data InspectError
     | UnknownLedgerOperation T.Text
     deriving (Show)
 
-decodeTx ::
-    BS.ByteString ->
-    Either InspectError (L.Tx TopTx Conway.ConwayEra)
+decodeTx
+    :: BS.ByteString
+    -> Either InspectError (L.Tx TopTx Conway.ConwayEra)
 decodeTx =
     fmap snd . decodeTxWithBytes
 
-decodeTxWithBytes ::
-    BS.ByteString ->
-    Either InspectError (BS.ByteString, L.Tx TopTx Conway.ConwayEra)
+decodeTxWithBytes
+    :: BS.ByteString
+    -> Either InspectError (BS.ByteString, L.Tx TopTx Conway.ConwayEra)
 decodeTxWithBytes hexBytes = do
     txBytes <- hexDecode hexBytes
     tx <- decodeConway (BSL.fromStrict txBytes)
@@ -90,9 +90,14 @@ hexDecode bs =
   where
     isHexWhitespace c = c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d
 
-decodeConway :: BSL.ByteString -> Either InspectError (L.Tx TopTx Conway.ConwayEra)
+decodeConway
+    :: BSL.ByteString -> Either InspectError (L.Tx TopTx Conway.ConwayEra)
 decodeConway bs =
-    case Binary.decodeFullAnnotator (Binary.natVersion @11) "Tx" Binary.decCBOR bs of
+    case Binary.decodeFullAnnotator
+        (Binary.natVersion @11)
+        "Tx"
+        Binary.decCBOR
+        bs of
         Left err -> Left (MalformedCbor (show err))
         Right tx -> Right tx
 
@@ -128,7 +133,8 @@ withdrawalRowsJson :: L.Withdrawals -> [Aeson.Value]
 withdrawalRowsJson (L.Withdrawals m) =
     zipWith withdrawalRowJson [0 :: Int ..] (Map.toList m)
 
-withdrawalRowJson :: Int -> (Addr.AccountAddress, Coin.Coin) -> Aeson.Value
+withdrawalRowJson
+    :: Int -> (Addr.AccountAddress, Coin.Coin) -> Aeson.Value
 withdrawalRowJson index (rewardAccount, coin) =
     case rewardAccountJson rewardAccount of
         Aeson.Object fields ->
@@ -179,8 +185,9 @@ txOutJson :: L.TxOut Conway.ConwayEra -> Aeson.Value
 txOutJson txOut =
     let value = txOut ^. L.valueTxOutL
         Mary.MaryValue c m = value
-     in Aeson.object
-            [ "address_hex" .= T.decodeUtf8 (B16.encode (Addr.serialiseAddr (txOut ^. L.addrTxOutL)))
+    in  Aeson.object
+            [ "address_hex"
+                .= T.decodeUtf8 (B16.encode (Addr.serialiseAddr (txOut ^. L.addrTxOutL)))
             , "coin_lovelace" .= T.pack (show (Coin.unCoin c))
             , "assets" .= multiAssetJson m
             , "datum" .= datumJson (txOut ^. L.datumTxOutL)
@@ -215,7 +222,8 @@ datumJson PData.NoDatum =
 datumJson (PData.DatumHash h) =
     Aeson.object
         [ "kind" .= ("datum_hash" :: T.Text)
-        , "hash" .= T.decodeUtf8 (B16.encode (Crypto.hashToBytes (Hashes.extractHash h)))
+        , "hash"
+            .= T.decodeUtf8 (B16.encode (Crypto.hashToBytes (Hashes.extractHash h)))
         ]
 datumJson (PData.Datum bd) =
     Aeson.object
@@ -282,7 +290,7 @@ plutusDataJson = \case
                 , "hex" .= hex
                 , "len" .= BS.length bs
                 ]
-         in Aeson.object
+        in  Aeson.object
                 ( base
                     <> maybe [] (\u -> ["utf8" .= u]) asUtf8
                 )

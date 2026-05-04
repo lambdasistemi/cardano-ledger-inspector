@@ -21,9 +21,9 @@ diagnosis envelope:
 The unaccounted edge captures the @ValueNotConservedUTxO@ delta
 honestly rather than smearing it across buckets.
 -}
-module TxDeepDiagnosisHost.Render.ValueFlow (
-    renderValueFlowTsv,
-) where
+module TxDeepDiagnosisHost.Render.ValueFlow
+    ( renderValueFlowTsv
+    ) where
 
 import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
@@ -36,10 +36,10 @@ import qualified Data.Vector as V
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
-import TxDeepDiagnosisHost.Render.Names (
-    PartyName (..),
-    resolveAddress,
- )
+import TxDeepDiagnosisHost.Render.Names
+    ( PartyName (..)
+    , resolveAddress
+    )
 
 -- | Render the L2 value flow as TSV.
 renderValueFlowTsv :: ProtocolRegistry -> DiagnosisDoc -> Text
@@ -52,7 +52,7 @@ renderValueFlowTsv reg doc =
                 , feeRow doc
                 , unaccountedRow doc
                 ]
-     in header <> body
+    in  header <> body
 
 -- ---------------------------------------------------------------- --
 -- Input rows
@@ -62,13 +62,13 @@ inputRows :: ProtocolRegistry -> DiagnosisDoc -> Text
 inputRows reg doc =
     let inputs = resolvedInputs doc
         rows = zip [0 :: Int ..] inputs
-     in Text.concat (map (renderInputRow reg) rows)
+    in  Text.concat (map (renderInputRow reg) rows)
 
 renderInputRow :: ProtocolRegistry -> (Int, ResolvedInput) -> Text
 renderInputRow reg (i, ri) =
     let pn = resolveAddress reg (riAddress ri)
         sourceLabel = "input#" <> Text.pack (show i) <> " " <> pnLabel pn
-     in tsvRow
+    in  tsvRow
             [ sourceLabel
             , "tx"
             , riLovelace ri
@@ -86,7 +86,7 @@ resolvedInputs doc =
         items = case lookupPath (ddValidate doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in mapMaybe parseInput items
+    in  mapMaybe parseInput items
   where
     parseInput (Object o) = case KeyMap.lookup "tx_out" o of
         Just (Object txOut) -> do
@@ -129,7 +129,7 @@ outputBuckets doc =
         items = case lookupPath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in mapMaybe parseBucket items
+    in  mapMaybe parseBucket items
   where
     parseBucket (Object o) = do
         lab <- case KeyMap.lookup "label" o of
@@ -163,7 +163,7 @@ unaccountedRow doc =
         outputTotal = sumOutputs doc
         feeTotal = parseLovelace (feeOf doc)
         delta = inputTotal - (outputTotal + feeTotal)
-     in if delta == 0
+    in  if delta == 0
             then ""
             else
                 tsvRow
@@ -175,10 +175,14 @@ unaccountedRow doc =
                     ]
 
 sumInputs :: DiagnosisDoc -> Integer
-sumInputs = foldl' (\acc ri -> acc + parseLovelace (riLovelace ri)) 0 . resolvedInputs
+sumInputs =
+    foldl' (\acc ri -> acc + parseLovelace (riLovelace ri)) 0
+        . resolvedInputs
 
 sumOutputs :: DiagnosisDoc -> Integer
-sumOutputs = foldl' (\acc b -> acc + parseLovelace (obLovelace b)) 0 . outputBuckets
+sumOutputs =
+    foldl' (\acc b -> acc + parseLovelace (obLovelace b)) 0
+        . outputBuckets
 
 feeOf :: DiagnosisDoc -> Text
 feeOf doc = case lookupPath (ddIntent doc) ["result", "intent", "fee_lovelace"] of

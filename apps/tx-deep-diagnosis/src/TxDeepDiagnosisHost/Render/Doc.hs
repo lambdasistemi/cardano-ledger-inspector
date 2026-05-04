@@ -9,10 +9,10 @@ a @tx-deep-diagnosis@ object with @summary@, @intent@ and @validate@
 children. Renderers operate on this typed view rather than walking the
 raw 'A.Value' from the top.
 -}
-module TxDeepDiagnosisHost.Render.Doc (
-    DiagnosisDoc (..),
-    parseDiagnosisDoc,
-) where
+module TxDeepDiagnosisHost.Render.Doc
+    ( DiagnosisDoc (..)
+    , parseDiagnosisDoc
+    ) where
 
 import Data.Aeson (Value)
 import qualified Data.Aeson as A
@@ -53,7 +53,8 @@ parseDiagnosisDoc raw = case raw of
                 , ddValidate = validate
                 }
 
-requireValue :: KeyMap.Key -> KeyMap.KeyMap Value -> Either String Value
+requireValue
+    :: KeyMap.Key -> KeyMap.KeyMap Value -> Either String Value
 requireValue k m = case KeyMap.lookup k m of
     Just v -> Right v
     Nothing -> Left ("missing field: " <> show k)

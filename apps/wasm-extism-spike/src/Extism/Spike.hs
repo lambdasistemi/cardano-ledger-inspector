@@ -22,11 +22,11 @@ Input is the canonical JSON envelope:
 Output is the matching response envelope. Errors go through
 'Extism.PDK.setError'.
 -}
-module Extism.Spike (
-    tx_evaluate_scripts,
-    tx_identify,
-    tx_validate,
-)
+module Extism.Spike
+    ( txEvaluateScripts
+    , txIdentify
+    , txValidate
+    )
 where
 
 import qualified Conway.Inspector as Inspector
@@ -35,14 +35,14 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text as T
 import Extism.PDK (inputByteString, output, setError)
 
-tx_identify :: IO ()
-tx_identify = runOp
+txIdentify :: IO ()
+txIdentify = runOp
 
-tx_validate :: IO ()
-tx_validate = runOp
+txValidate :: IO ()
+txValidate = runOp
 
-tx_evaluate_scripts :: IO ()
-tx_evaluate_scripts = runOp
+txEvaluateScripts :: IO ()
+txEvaluateScripts = runOp
 
 runOp :: IO ()
 runOp = do
@@ -62,6 +62,6 @@ errorMessage = \case
     Inspector.UnknownLedgerOperation operation ->
         "unknown_ledger_operation: " <> T.unpack operation
 
-foreign export ccall "tx_identify" tx_identify :: IO ()
-foreign export ccall "tx_validate" tx_validate :: IO ()
-foreign export ccall "tx_evaluate_scripts" tx_evaluate_scripts :: IO ()
+foreign export ccall "tx_identify" txIdentify :: IO ()
+foreign export ccall "tx_validate" txValidate :: IO ()
+foreign export ccall "tx_evaluate_scripts" txEvaluateScripts :: IO ()

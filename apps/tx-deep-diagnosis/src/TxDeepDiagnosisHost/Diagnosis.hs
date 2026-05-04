@@ -1,18 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TxDeepDiagnosisHost.Diagnosis (
-    ValidationContext (..),
-    WithdrawalCredential (..),
-    emptyContext,
-    runIntent,
-    runValidate,
-    buildIntentRequest,
-    buildValidateRequest,
-    buildProducerTxsObject,
-    extractProducerTxIds,
-    extractMissingWithdrawalCredentials,
-    showInspectError,
-) where
+module TxDeepDiagnosisHost.Diagnosis
+    ( ValidationContext (..)
+    , WithdrawalCredential (..)
+    , emptyContext
+    , runIntent
+    , runValidate
+    , buildIntentRequest
+    , buildValidateRequest
+    , buildProducerTxsObject
+    , extractProducerTxIds
+    , extractMissingWithdrawalCredentials
+    , showInspectError
+    ) where
 
 import qualified Conway.Inspector as Inspector
 import Data.Aeson (Value)
@@ -101,9 +101,18 @@ buildValidateRequest txHex ctx =
     contextEntries =
         [("producer_txs", buildProducerTxsObject (vcProducerTxs ctx))]
             <> maybe [] (\n -> [("network", A.String n)]) (vcNetwork ctx)
-            <> maybe [] (\s -> [("slot", A.String (Text.pack (show s)))]) (vcSlot ctx)
-            <> maybe [] (\e -> [("epoch", A.String (Text.pack (show e)))]) (vcEpoch ctx)
-            <> maybe [] (\p -> [("protocol_parameters", p)]) (vcProtocolParameters ctx)
+            <> maybe
+                []
+                (\s -> [("slot", A.String (Text.pack (show s)))])
+                (vcSlot ctx)
+            <> maybe
+                []
+                (\e -> [("epoch", A.String (Text.pack (show e)))])
+                (vcEpoch ctx)
+            <> maybe
+                []
+                (\p -> [("protocol_parameters", p)])
+                (vcProtocolParameters ctx)
             -- cert_state is required by the validator when the tx has
             -- withdrawals or certificates. The inspector library reads
             -- the @rewards@ entries to seed the Accounts map before
@@ -111,7 +120,11 @@ buildValidateRequest txHex ctx =
             -- gate but yields no seeded entries (CERTS will then reject
             -- the withdrawal).
             <> maybe [] (\c -> [("cert_state", c)]) (vcCertState ctx)
-            <> [("source", A.String "tx-deep-diagnosis.blockfrost+latest+pparams+cert_state")]
+            <> [
+                   ( "source"
+                   , A.String "tx-deep-diagnosis.blockfrost+latest+pparams+cert_state"
+                   )
+               ]
 
 buildProducerTxsObject :: Map Text Text -> Value
 buildProducerTxsObject m =
@@ -157,7 +170,8 @@ extractMissingWithdrawalCredentials resp =
         , A.Object entry <- foldr (:) [] missing
         , Just (A.String "cert_state") <- [KeyMap.lookup "kind" entry]
         , Just (A.Object details) <- [KeyMap.lookup "details" entry]
-        , Just (A.Array creds) <- [KeyMap.lookup "withdrawal_credentials" details]
+        , Just (A.Array creds) <-
+            [KeyMap.lookup "withdrawal_credentials" details]
         , A.Object cred <- foldr (:) [] creds
         , Just (A.String kind) <- [KeyMap.lookup "kind" cred]
         , Just (A.String hash) <- [KeyMap.lookup "hash" cred]

@@ -6,45 +6,45 @@
   The context is explicit ledger evidence supplied by the caller, usually as
   producer transaction CBOR keyed by transaction id.
 -}
-module Conway.Inspector.Context (
-    ProducerContext (..),
-    ProducerTx (..),
-    contextSummaryJson,
-    decodedProducerTxCount,
-    inputPolicyFromArgs,
-    missingContextTxIns,
-    producerContextFromArgs,
-    producerContextSupplied,
-    producerOutputAt,
-    producerTxErrors,
-    producerTxLookup,
-    producerTxOutput,
-    resolvedTxInJson,
-) where
+module Conway.Inspector.Context
+    ( ProducerContext (..)
+    , ProducerTx (..)
+    , contextSummaryJson
+    , decodedProducerTxCount
+    , inputPolicyFromArgs
+    , missingContextTxIns
+    , producerContextFromArgs
+    , producerContextSupplied
+    , producerOutputAt
+    , producerTxErrors
+    , producerTxLookup
+    , producerTxOutput
+    , resolvedTxInJson
+    ) where
 
 import qualified Cardano.Ledger.Api as L
 import qualified Cardano.Ledger.Conway as Conway
 import Cardano.Ledger.Core (TxLevel (..))
 import qualified Cardano.Ledger.TxIn as TxIn
-import Conway.Inspector.Common (
-    InspectError,
-    argsObject,
-    decodeTx,
-    listAt,
-    lookupObjectValue,
-    lookupValue,
-    txInIndex,
-    txInKey,
-    txInTxIdHex,
-    txOutJson,
- )
+import Conway.Inspector.Common
+    ( InspectError
+    , argsObject
+    , decodeTx
+    , listAt
+    , lookupObjectValue
+    , lookupValue
+    , txInIndex
+    , txInKey
+    , txInTxIdHex
+    , txOutJson
+    )
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Foldable (toList)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isNothing)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Lens.Micro ((^.))
@@ -86,7 +86,7 @@ producerTxFromValue value =
             case lookupValue "source" value of
                 Just (Aeson.String s) -> s
                 _ -> "context.producer_txs"
-     in ProducerTx
+    in  ProducerTx
             { ptSource = source
             , ptDecoded =
                 case producerTxCbor value of
@@ -123,16 +123,16 @@ inputPolicyFromArgs args =
 
 missingContextTxIns :: ProducerContext -> [TxIn.TxIn] -> [TxIn.TxIn]
 missingContextTxIns context =
-    filter (not . isJust . producerTxOutput context)
+    filter (isNothing . producerTxOutput context)
 
-contextSummaryJson ::
-    T.Text ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    Aeson.Value
+contextSummaryJson
+    :: T.Text
+    -> ProducerContext
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> Aeson.Value
 contextSummaryJson
     inputPolicy
     context
@@ -145,7 +145,7 @@ contextSummaryJson
                 length inputs - length missingInputs
             resolvedReferenceInputs =
                 length referenceInputs - length missingReferenceInputs
-         in Aeson.object
+        in  Aeson.object
                 [ "input_policy" .= inputPolicy
                 , "producer_tx_count" .= Map.size (pcProducerTxs context)
                 , "decoded_producer_tx_count" .= decodedProducerTxCount context
@@ -187,7 +187,7 @@ resolvedTxInJson context txIn =
             , "tx_id" .= txInTxIdHex txIn
             , "index" .= txInIndex txIn
             ]
-     in case producerTxLookup context txIn of
+    in  case producerTxLookup context txIn of
             Nothing ->
                 Aeson.object $
                     baseFields
@@ -222,18 +222,19 @@ producerTxLookup :: ProducerContext -> TxIn.TxIn -> Maybe ProducerTx
 producerTxLookup context txIn =
     Map.lookup (txInTxIdHex txIn) (pcProducerTxs context)
 
-producerTxOutput ::
-    ProducerContext ->
-    TxIn.TxIn ->
-    Maybe (L.TxOut Conway.ConwayEra)
+producerTxOutput
+    :: ProducerContext
+    -> TxIn.TxIn
+    -> Maybe (L.TxOut Conway.ConwayEra)
 producerTxOutput context txIn = do
-    ProducerTx{ptDecoded = Right producer} <- producerTxLookup context txIn
+    ProducerTx{ptDecoded = Right producer} <-
+        producerTxLookup context txIn
     producerOutputAt txIn producer
 
-producerOutputAt ::
-    TxIn.TxIn ->
-    L.Tx TopTx Conway.ConwayEra ->
-    Maybe (L.TxOut Conway.ConwayEra)
+producerOutputAt
+    :: TxIn.TxIn
+    -> L.Tx TopTx Conway.ConwayEra
+    -> Maybe (L.TxOut Conway.ConwayEra)
 producerOutputAt txIn producer =
     listAt (txInIndex txIn) $
-        toList ((producer ^. L.bodyTxL) ^. L.outputsTxBodyL)
+        toList (producer ^. (L.bodyTxL . L.outputsTxBodyL))

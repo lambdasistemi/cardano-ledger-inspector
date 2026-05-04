@@ -24,15 +24,25 @@ import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Paths_tx_deep_diagnosis as Paths
-import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
+import System.Directory
+    ( doesDirectoryExist
+    , doesFileExist
+    , listDirectory
+    )
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>))
 import System.IO (hPutStrLn, stderr)
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry, loadRegistries)
-import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc, parseDiagnosisDoc)
-import TxDeepDiagnosisHost.Render.Emit (emitExplain, renderExplainArtifacts)
+import TxDeepDiagnosisHost.Render.Doc
+    ( DiagnosisDoc
+    , parseDiagnosisDoc
+    )
+import TxDeepDiagnosisHost.Render.Emit
+    ( emitExplain
+    , renderExplainArtifacts
+    )
 
 main :: IO ()
 main = do
@@ -84,7 +94,12 @@ match, @False@ otherwise.
 data Mode = CompareMode | WriteMode
     deriving (Eq)
 
-runCase :: Mode -> ProtocolRegistry -> FilePath -> FilePath -> IO (FilePath, Bool)
+runCase
+    :: Mode
+    -> ProtocolRegistry
+    -> FilePath
+    -> FilePath
+    -> IO (FilePath, Bool)
 runCase mode reg root name = do
     let inputPath = root </> name </> "input.json"
     inputExists <- doesFileExist inputPath
@@ -108,16 +123,16 @@ runCase mode reg root name = do
                 CompareMode -> do
                     outcomes <-
                         mapM
-                            (\(file, actual) -> handleCompare root name file actual)
+                            (uncurry (handleCompare root name))
                             (renderExplainArtifacts reg doc)
                     pure (name, and outcomes)
 
-handleCompare ::
-    FilePath ->
-    FilePath ->
-    FilePath ->
-    Text ->
-    IO Bool
+handleCompare
+    :: FilePath
+    -> FilePath
+    -> FilePath
+    -> Text
+    -> IO Bool
 handleCompare root name file actual = do
     let expectedPath = root </> name </> "expected" </> file
     expectedExists <- doesFileExist expectedPath

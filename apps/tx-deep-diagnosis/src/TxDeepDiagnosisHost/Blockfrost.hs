@@ -1,33 +1,41 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module TxDeepDiagnosisHost.Blockfrost (
-    Network (..),
-    networkBaseUrl,
-    networkLedgerName,
-    CredentialKind (..),
-    ResolvedOutput (..),
-    ResolvedAsset (..),
-    LatestBlock (..),
-    AccountInfo (..),
-    fetchTxUtxos,
-    fetchTxCbor,
-    fetchOutputAtIndex,
-    fetchLatestBlock,
-    fetchProtocolParametersJson,
-    fetchAccountInfo,
-    remapPParamsToLedger,
-    stakeAddressBech32,
-) where
+module TxDeepDiagnosisHost.Blockfrost
+    ( Network (..)
+    , networkBaseUrl
+    , networkLedgerName
+    , CredentialKind (..)
+    , ResolvedOutput (..)
+    , ResolvedAsset (..)
+    , LatestBlock (..)
+    , AccountInfo (..)
+    , fetchTxUtxos
+    , fetchTxCbor
+    , fetchOutputAtIndex
+    , fetchLatestBlock
+    , fetchProtocolParametersJson
+    , fetchAccountInfo
+    , remapPParamsToLedger
+    , stakeAddressBech32
+    ) where
 
 import qualified Codec.Binary.Bech32 as Bech32
 import Control.Exception (SomeException, try)
-import Data.Aeson (FromJSON (..), eitherDecode, withObject, (.!=), (.:), (.:?))
+import Data.Aeson
+    ( FromJSON (..)
+    , eitherDecode
+    , withObject
+    , (.!=)
+    , (.:)
+    , (.:?)
+    )
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
@@ -85,18 +93,23 @@ instance FromJSON ResolvedOutput where
             <*> o .:? "data_hash"
             <*> o .:? "reference_script_hash"
 
-data UtxosResponse = UtxosResponse {urOutputs :: ![ResolvedOutput]}
+newtype UtxosResponse = UtxosResponse {urOutputs :: ![ResolvedOutput]}
 
 instance FromJSON UtxosResponse where
     parseJSON = withObject "UtxosResponse" $ \o ->
         UtxosResponse <$> o .:? "outputs" .!= []
 
-data CborResponse = CborResponse {crCbor :: !Text}
+newtype CborResponse = CborResponse {crCbor :: !Text}
 
 instance FromJSON CborResponse where
     parseJSON = withObject "CborResponse" $ \o -> CborResponse <$> o .: "cbor"
 
-fetchTxUtxos :: Manager -> Network -> Text -> Text -> IO (Either String [ResolvedOutput])
+fetchTxUtxos
+    :: Manager
+    -> Network
+    -> Text
+    -> Text
+    -> IO (Either String [ResolvedOutput])
 fetchTxUtxos mgr net pid txHash = do
     let url = networkBaseUrl net <> "/txs/" <> txHash <> "/utxos"
     eBody <- callBlockfrost mgr url pid
@@ -106,7 +119,8 @@ fetchTxUtxos mgr net pid txHash = do
             Left e -> Left ("JSON decode error: " <> e)
             Right (UtxosResponse outs) -> Right outs
 
-fetchTxCbor :: Manager -> Network -> Text -> Text -> IO (Either String Text)
+fetchTxCbor
+    :: Manager -> Network -> Text -> Text -> IO (Either String Text)
 fetchTxCbor mgr net pid txHash = do
     let url = networkBaseUrl net <> "/txs/" <> txHash <> "/cbor"
     eBody <- callBlockfrost mgr url pid
@@ -116,13 +130,13 @@ fetchTxCbor mgr net pid txHash = do
             Left e -> Left ("JSON decode error: " <> e)
             Right (CborResponse h) -> Right h
 
-fetchOutputAtIndex ::
-    Manager ->
-    Network ->
-    Text ->
-    Text ->
-    Int ->
-    IO (Either String (Maybe ResolvedOutput))
+fetchOutputAtIndex
+    :: Manager
+    -> Network
+    -> Text
+    -> Text
+    -> Int
+    -> IO (Either String (Maybe ResolvedOutput))
 fetchOutputAtIndex mgr net pid txHash ix = do
     eOuts <- fetchTxUtxos mgr net pid txHash
     pure $
@@ -143,7 +157,8 @@ instance FromJSON LatestBlock where
     parseJSON = withObject "LatestBlock" $ \o ->
         LatestBlock <$> o .: "slot" <*> o .: "epoch"
 
-fetchLatestBlock :: Manager -> Network -> Text -> IO (Either String LatestBlock)
+fetchLatestBlock
+    :: Manager -> Network -> Text -> IO (Either String LatestBlock)
 fetchLatestBlock mgr net pid = do
     let url = networkBaseUrl net <> "/blocks/latest"
     eBody <- callBlockfrost mgr url pid
@@ -156,8 +171,8 @@ fetchLatestBlock mgr net pid = do
 -- Returns the raw Blockfrost protocol-parameters JSON. Use
 -- 'remapPParamsToLedger' to convert into the camelCase shape the
 -- ledger functional layer expects.
-fetchProtocolParametersJson ::
-    Manager -> Network -> Text -> IO (Either String A.Value)
+fetchProtocolParametersJson
+    :: Manager -> Network -> Text -> IO (Either String A.Value)
 fetchProtocolParametersJson mgr net pid = do
     let url = networkBaseUrl net <> "/epochs/latest/parameters"
     eBody <- callBlockfrost mgr url pid
@@ -212,7 +227,10 @@ remapPParamsToLedger raw = case raw of
                     , ("committeeNormal", num "pvt_committee_normal")
                     , ("committeeNoConfidence", num "pvt_committee_no_confidence")
                     , ("hardForkInitiation", num "pvt_hard_fork_initiation")
-                    , ("ppSecurityGroup", numFirst ["pvt_p_p_security_group", "pvtpp_security_group"])
+                    ,
+                        ( "ppSecurityGroup"
+                        , numFirst ["pvt_p_p_security_group", "pvtpp_security_group"]
+                        )
                     ]
             asDRepVoting =
                 A.object
@@ -227,10 +245,9 @@ remapPParamsToLedger raw = case raw of
                     , ("ppGovGroup", num "dvt_p_p_gov_group")
                     , ("treasuryWithdrawal", num "dvt_treasury_withdrawal")
                     ]
-            costModels = case lookFirst ["cost_models_raw", "cost_models"] of
-                Just v -> v
-                Nothing -> A.Null
-         in [ ("txFeePerByte", num "min_fee_a")
+            costModels =
+                fromMaybe A.Null (lookFirst ["cost_models_raw", "cost_models"])
+        in  [ ("txFeePerByte", num "min_fee_a")
             , ("txFeeFixed", num "min_fee_b")
             , ("maxBlockBodySize", num "max_block_size")
             , ("maxTxSize", num "max_tx_size")
@@ -244,7 +261,10 @@ remapPParamsToLedger raw = case raw of
             , ("treasuryCut", num "tau")
             , ("protocolVersion", asProtocolVersion)
             , ("minPoolCost", num "min_pool_cost")
-            , ("utxoCostPerByte", numFirst ["coins_per_utxo_size", "coins_per_utxo_word"])
+            ,
+                ( "utxoCostPerByte"
+                , numFirst ["coins_per_utxo_size", "coins_per_utxo_word"]
+                )
             , ("costModels", costModels)
             , ("executionUnitPrices", asExUnitPrices)
             , ("maxTxExecutionUnits", asMaxTxEx)
@@ -262,7 +282,7 @@ remapPParamsToLedger raw = case raw of
             , ("dRepActivity", num "drep_activity")
             , ("minFeeRefScriptCostPerByte", num "min_fee_ref_script_cost_per_byte")
             ]
-    lookupVal k o = KeyMap.lookup (Key.fromString k) o
+    lookupVal k = KeyMap.lookup (Key.fromString k)
     numberOrNull Nothing = A.Null
     numberOrNull (Just (A.String t)) = case Text.unpack t of
         s -> case reads s :: [(Double, String)] of
@@ -320,8 +340,8 @@ instance FromJSON AccountInfo where
 {- | Fetch the account state for the given bech32 stake address. Use
  'stakeAddressBech32' to derive the address from a credential.
 -}
-fetchAccountInfo ::
-    Manager -> Network -> Text -> Text -> IO (Either String AccountInfo)
+fetchAccountInfo
+    :: Manager -> Network -> Text -> Text -> IO (Either String AccountInfo)
 fetchAccountInfo mgr net pid stake = do
     let url = networkBaseUrl net <> "/accounts/" <> stake
     eBody <- callBlockfrost mgr url pid
@@ -339,14 +359,18 @@ fetchAccountInfo mgr net pid stake = do
   > address     = header_byte || 28-byte credential hash
   > hrp         = "stake" (mainnet)     | "stake_test" (testnet)
 -}
-stakeAddressBech32 ::
-    Network -> CredentialKind -> Text -> Either String Text
+stakeAddressBech32
+    :: Network -> CredentialKind -> Text -> Either String Text
 stakeAddressBech32 net kind hashHex = do
     bytes <- case B16.decode (TE.encodeUtf8 hashHex) of
         Right bs -> Right bs
         Left err -> Left ("hash hex decode failed: " <> err)
     if BS.length bytes /= 28
-        then Left ("expected 28 bytes for credential hash, got " <> show (BS.length bytes))
+        then
+            Left
+                ( "expected 28 bytes for credential hash, got "
+                    <> show (BS.length bytes)
+                )
         else
             let header :: Word8
                 header = case (net, kind) of
@@ -358,12 +382,13 @@ stakeAddressBech32 net kind hashHex = do
                 hrpText = case net of
                     Mainnet -> "stake"
                     _ -> "stake_test"
-             in case Bech32.humanReadablePartFromText hrpText of
+            in  case Bech32.humanReadablePartFromText hrpText of
                     Left err -> Left ("bad hrp: " <> show err)
                     Right hrp ->
                         Right (Bech32.encodeLenient hrp (Bech32.dataPartFromBytes payload))
 
-callBlockfrost :: Manager -> Text -> Text -> IO (Either String BSL.ByteString)
+callBlockfrost
+    :: Manager -> Text -> Text -> IO (Either String BSL.ByteString)
 callBlockfrost mgr url pid = do
     eResult <-
         try
@@ -371,16 +396,18 @@ callBlockfrost mgr url pid = do
                 initReq <- parseUrlThrow (Text.unpack url)
                 let req =
                         initReq
-                            { requestHeaders = [(hAccept, "application/json"), ("project_id", TE.encodeUtf8 pid)]
+                            { requestHeaders =
+                                [(hAccept, "application/json"), ("project_id", TE.encodeUtf8 pid)]
                             , method = "GET"
                             }
                 resp <- httpLbs req mgr
                 let code = statusCode (responseStatus resp)
                 if code == 200
                     then pure $ Right (responseBody resp)
-                    else pure $ Left ("Blockfrost " <> show code <> ": " <> Text.unpack url)
-            ) ::
-            IO (Either SomeException (Either String BSL.ByteString))
+                    else
+                        pure $ Left ("Blockfrost " <> show code <> ": " <> Text.unpack url)
+            )
+            :: IO (Either SomeException (Either String BSL.ByteString))
     case eResult of
         Left e -> pure $ Left ("HTTP error: " <> show e)
         Right r -> pure r

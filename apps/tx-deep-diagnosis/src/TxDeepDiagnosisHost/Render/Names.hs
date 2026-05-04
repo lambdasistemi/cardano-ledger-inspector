@@ -9,28 +9,28 @@ hash, payment-credential hash, signer hash) flows through 'resolveScript'
 or 'resolveAddress'. Unknown hashes are truncated rather than guessed so
 the rendered output stays honest.
 -}
-module TxDeepDiagnosisHost.Render.Names (
-    PartyName (..),
-    PartySource (..),
-    resolveScript,
-    resolveAddress,
-    paymentScriptHash,
-    truncateHash,
-) where
+module TxDeepDiagnosisHost.Render.Names
+    ( PartyName (..)
+    , PartySource (..)
+    , resolveScript
+    , resolveAddress
+    , paymentScriptHash
+    , truncateHash
+    ) where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
 
-import TxDeepDiagnosisHost.Registry (
-    AmaruScope (..),
-    Identification (..),
-    ProtocolRegistry,
-    RegistryInstance (..),
-    RegistryValidator (..),
-    findScopeByOwner,
-    identifyByHash,
-    prAmaru,
- )
+import TxDeepDiagnosisHost.Registry
+    ( AmaruScope (..)
+    , Identification (..)
+    , ProtocolRegistry
+    , RegistryInstance (..)
+    , RegistryValidator (..)
+    , findScopeByOwner
+    , identifyByHash
+    , prAmaru
+    )
 
 {- | Origin of a resolved label. Preserved so renderers can style or
 caveat labels by source.
@@ -96,12 +96,13 @@ owner.
 -}
 resolveAddress :: ProtocolRegistry -> Text -> PartyName
 resolveAddress reg addrHex
-    | Text.length addrHex < 2 = PartyName{pnLabel = truncateHash addrHex, pnSource = TruncatedHex}
+    | Text.length addrHex < 2 =
+        PartyName{pnLabel = truncateHash addrHex, pnSource = TruncatedHex}
     | otherwise =
         let header = Text.take 2 addrHex
             paymentHex = Text.take 56 (Text.drop 2 addrHex)
             isScriptPayment = headerHasScriptPayment header
-         in if isScriptPayment
+        in  if isScriptPayment
                 then resolveScript reg paymentHex
                 else case prAmaru reg >>= \j -> findScopeByOwner j paymentHex of
                     Just scope ->
@@ -124,7 +125,7 @@ paymentScriptHash addrHex
     | Text.length addrHex < 58 = Nothing
     | otherwise =
         let header = Text.take 2 addrHex
-         in if headerHasScriptPayment header
+        in  if headerHasScriptPayment header
                 then Just (Text.take 56 (Text.drop 2 addrHex))
                 else Nothing
 

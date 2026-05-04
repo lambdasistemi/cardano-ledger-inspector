@@ -18,40 +18,41 @@ screen stays reader-first:
 * Warnings
 * Diagrams
 -}
-module TxDeepDiagnosisHost.Render.Summary (
-    EmittedFiles (..),
-    noEmittedFiles,
-    renderSummaryMarkdown,
-) where
+module TxDeepDiagnosisHost.Render.Summary
+    ( EmittedFiles (..)
+    , noEmittedFiles
+    , renderSummaryMarkdown
+    ) where
 
 import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
+import Data.Char (isDigit)
 import Data.List (foldl', sortOn)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Vector as V
 
-import TxDeepDiagnosisHost.Registry (
-    AikenSource (..),
-    DatumSchema (..),
-    FieldType (..),
-    ProtocolRegistry,
-    SchemaConstructor (..),
-    SchemaField (..),
-    SchemaSource (..),
-    TupleField (..),
-    aikenSourceUrl,
-    datumSchemaForHash,
- )
+import TxDeepDiagnosisHost.Registry
+    ( AikenSource (..)
+    , DatumSchema (..)
+    , FieldType (..)
+    , ProtocolRegistry
+    , SchemaConstructor (..)
+    , SchemaField (..)
+    , SchemaSource (..)
+    , TupleField (..)
+    , aikenSourceUrl
+    , datumSchemaForHash
+    )
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
-import TxDeepDiagnosisHost.Render.Names (
-    PartyName (..),
-    PartySource (..),
-    paymentScriptHash,
-    resolveAddress,
- )
+import TxDeepDiagnosisHost.Render.Names
+    ( PartyName (..)
+    , PartySource (..)
+    , paymentScriptHash
+    , resolveAddress
+    )
 
 {- | Which artifacts the caller wrote alongside @summary.md@.
 Each Maybe holds the relative file name when written.
@@ -73,11 +74,11 @@ noEmittedFiles =
         , efFailures = Nothing
         }
 
-renderSummaryMarkdown ::
-    ProtocolRegistry ->
-    DiagnosisDoc ->
-    EmittedFiles ->
-    Text
+renderSummaryMarkdown
+    :: ProtocolRegistry
+    -> DiagnosisDoc
+    -> EmittedFiles
+    -> Text
 renderSummaryMarkdown reg doc files =
     Text.concat
         [ titleSection doc
@@ -109,7 +110,7 @@ titleSection doc =
                 doc
                 ["result", "intent", "subtitle"]
                 ""
-     in "# "
+    in  "# "
             <> title
             <> "\n\n"
             <> ( if Text.null subtitle
@@ -130,7 +131,7 @@ headlineSection doc =
                 " and sends most value to the **"
                     <> bucket
                     <> "** bucket"
-     in "**Headline:** "
+    in  "**Headline:** "
             <> subject
             <> " "
             <> outcome
@@ -141,7 +142,7 @@ verdictSection :: DiagnosisDoc -> Text
 verdictSection doc =
     let topSummary = ddSummary doc
         verdict = validationStatus doc
-     in "## Verdict\n\n"
+    in  "## Verdict\n\n"
             <> "- "
             <> topSummary
             <> "\n"
@@ -171,7 +172,7 @@ headlineSubject doc =
         Just label | not (Text.null label) -> "Claimed **" <> label <> "**"
         _ ->
             let title = textPath doc ["result", "intent", "title"] "Transaction"
-             in case title of
+            in  case title of
                     "Signing summary" -> "This transaction"
                     "Transaction" -> "This transaction"
                     _ -> "**" <> title <> "**"
@@ -199,11 +200,11 @@ dominantOutputBucketLabel doc =
         [] -> Nothing
         (x : xs) ->
             let best = foldl' maxBucket (obLabel x, parseLov (obLovelace x)) xs
-             in Just (fst best)
+            in  Just (fst best)
   where
     maxBucket best bucket =
         let current = (obLabel bucket, parseLov (obLovelace bucket))
-         in if snd current > snd best then current else best
+        in  if snd current > snd best then current else best
 
 {- | Lists the facts that drive flow understanding: who owns the
 inputs (per registry), what the metadata declares as the destination
@@ -233,7 +234,7 @@ observationsSection reg doc =
                 , metaSection metaDestinations
                 , crossoverSection crossover
                 ]
-     in if null inParties && null outParties && null metaDestinations
+    in  if null inParties && null outParties && null metaDestinations
             then ""
             else "## Observations\n\n" <> body
   where
@@ -285,7 +286,8 @@ partySource pn = Text.pack (show (pnSource pn))
 address); duplicates collapsed by 'pnLabel' to keep the list short
 when many script outputs share a contract.
 -}
-outputParties :: ProtocolRegistry -> DiagnosisDoc -> [(Text, PartyName)]
+outputParties
+    :: ProtocolRegistry -> DiagnosisDoc -> [(Text, PartyName)]
 outputParties reg doc =
     let path = ["result", "intent", "value", "output_buckets"]
         items = case valuePath (ddIntent doc) path of
@@ -298,7 +300,7 @@ outputParties reg doc =
             , Just (Array as) <- [KeyMap.lookup "addresses" o]
             , let addrs = [a | String a <- V.toList as]
             ]
-     in dedupByLabel
+    in  dedupByLabel
             [ (b, resolveAddress reg a)
             | (b, addrs) <- bucketEntries
             , a <- addrs
@@ -319,7 +321,8 @@ addresses. The match is on registry-resolved label, so a treasury
 that owns both input and output is detected even if its addresses use
 different stake credentials.
 -}
-inputOutputOverlap :: [(Int, Text, PartyName)] -> [(Text, PartyName)] -> [Text]
+inputOutputOverlap
+    :: [(Int, Text, PartyName)] -> [(Text, PartyName)] -> [Text]
 inputOutputOverlap inputs outputs =
     [ "input #"
         <> Text.pack (show i)
@@ -334,13 +337,14 @@ inputOutputOverlap inputs outputs =
     , pnLabel ipn == pnLabel opn
     ]
 
-inputParties :: ProtocolRegistry -> DiagnosisDoc -> [(Int, Text, PartyName)]
+inputParties
+    :: ProtocolRegistry -> DiagnosisDoc -> [(Int, Text, PartyName)]
 inputParties reg doc =
     let path = ["result", "validation", "resolved_inputs"]
         items = case valuePath (ddValidate doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in zipWith (\i v -> mkParty i v) [0 ..] items
+    in  zipWith mkParty [0 ..] items
             >>= maybe [] pure
   where
     mkParty i (Object o) = case KeyMap.lookup "tx_out" o of
@@ -349,7 +353,7 @@ inputParties reg doc =
                 let lov = case KeyMap.lookup "coin_lovelace" txOut of
                         Just (String s) -> s
                         _ -> "0"
-                 in Just (i, lov, resolveAddress reg addr)
+                in  Just (i, lov, resolveAddress reg addr)
             _ -> Nothing
         _ -> Nothing
     mkParty _ _ = Nothing
@@ -365,7 +369,7 @@ outputBuckets doc =
         items = case valuePath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in mapMaybe parseBucket items
+    in  mapMaybe parseBucket items
   where
     parseBucket (Object o) = do
         label <- case KeyMap.lookup "label" o of
@@ -383,7 +387,8 @@ metadataDestinations doc =
         items = case valuePath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in [d | Object o <- items, Just (String d) <- [KeyMap.lookup "destination" o], not (Text.null d)]
+    in  [ d | Object o <- items, Just (String d) <- [KeyMap.lookup "destination" o], not (Text.null d)
+        ]
 
 countOutputs :: DiagnosisDoc -> Maybe Int
 countOutputs doc = case valuePath
@@ -398,7 +403,9 @@ balanceSection reg doc =
         outBuckets = outputBuckets doc
         feeLov = feeLovelace doc
         inTotal = sum [parseLov lov | (_, lov, _) <- inputs]
-        outTotal = sum [parseLov lov | b <- outBuckets, let { lov = obLovelace b }] + parseLov feeLov
+        outTotal =
+            sum [parseLov lov | b <- outBuckets, let lov = obLovelace b]
+                + parseLov feeLov
         delta = inTotal - outTotal
         inputsTable =
             "### Inputs\n\n"
@@ -449,7 +456,7 @@ balanceSection reg doc =
                 "**Over-spent: "
                     <> formatAdaSimple (negate delta)
                     <> " more in outputs + fee than inputs — `ValueNotConservedUTxO`**\n\n"
-     in if null inputs && null outBuckets && parseLov feeLov == 0
+    in  if null inputs && null outBuckets && parseLov feeLov == 0
             then ""
             else
                 "## Balance\n\n"
@@ -487,8 +494,8 @@ feesResourcesSection doc =
                     , "summed from per-redeemer committed budgets"
                     )
             Nothing -> Nothing
-        rows = mapMaybe id [feeRow, txSizeRow, redeemerRow, exUnitsRow]
-     in if null rows
+        rows = catMaybes [feeRow, txSizeRow, redeemerRow, exUnitsRow]
+    in  if null rows
             then ""
             else
                 "## Fees & resources\n\n"
@@ -521,7 +528,9 @@ txSizeBytes doc = case valuePath (ddIntent doc) ["result", "intent", "tx_size_by
 
 redeemerCount :: DiagnosisDoc -> Int
 redeemerCount doc =
-    case valuePath (ddIntent doc) ["result", "intent", "features", "redeemer_count"] of
+    case valuePath
+        (ddIntent doc)
+        ["result", "intent", "features", "redeemer_count"] of
         Just (Number n) -> floor n
         _ -> length (scriptRows doc)
 
@@ -534,7 +543,7 @@ committedExUnits doc =
             , Just mem <- [stringNumber "memory" ex]
             , Just steps <- [stringNumber "steps" ex]
             ]
-     in case units of
+    in  case units of
             [] -> Nothing
             _ ->
                 Just
@@ -571,7 +580,7 @@ scriptOutputCount doc =
             , Just (String "Script") <- [KeyMap.lookup "label" o]
             , Just (Number n) <- [KeyMap.lookup "tx_out_count" o]
             ]
-     in case scriptB of
+    in  case scriptB of
             (n : _) -> Just n
             [] -> Nothing
 
@@ -588,7 +597,7 @@ outputsSection reg doc =
         items = case valuePath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in if null items
+    in  if null items
             then ""
             else
                 "## Outputs\n\n"
@@ -614,13 +623,12 @@ renderOutputRow reg v = case v of
                 Just (String s) -> s
                 _ -> "0"
             ada = formatAdaSimple (parseLov lov)
-            assetsCell = case KeyMap.lookup "assets" o of
-                Just assets -> renderAssetsCell assets
-                Nothing -> "—"
+            assetsCell =
+                maybe "—" renderAssetsCell (KeyMap.lookup "assets" o)
             datumCell = case KeyMap.lookup "datum" o of
                 Just (Object d) -> renderDatumCell d
                 _ -> ""
-         in "| "
+        in  "| "
                 <> idx
                 <> " | "
                 <> escapeTable bucket
@@ -644,7 +652,7 @@ renderAssetsCell (Object policies) =
                 | (policy, Object assetMap) <- KeyMap.toList policies
                 , (assetName, String qty) <- KeyMap.toList assetMap
                 ]
-     in if null rows
+    in  if null rows
             then "—"
             else Text.intercalate ", " (map renderAssetPreview rows)
 renderAssetsCell _ = "—"
@@ -670,7 +678,12 @@ renderDatumCell d = case KeyMap.lookup "kind" d of
         Just (String h) -> "hash `" <> Text.take 10 h <> "…`"
         _ -> "hash"
     Just (String "inline_datum") -> case KeyMap.lookup "cbor_hex" d of
-        Just (String h) -> "inline `" <> Text.take 14 h <> "…` (" <> Text.pack (show (Text.length h `div` 2)) <> "B)"
+        Just (String h) ->
+            "inline `"
+                <> Text.take 14 h
+                <> "…` ("
+                <> Text.pack (show (Text.length h `div` 2))
+                <> "B)"
         _ -> "inline"
     _ -> ""
 
@@ -698,16 +711,16 @@ datumsSection reg doc =
             _ -> []
         decoded = mapMaybeDecoded reg items
         groups = groupByDatumBlock decoded
-     in if null groups
+    in  if null groups
             then ""
             else
                 "## Datums\n\n"
                     <> Text.concat (map renderDatumGroup groups)
 
-mapMaybeDecoded ::
-    ProtocolRegistry ->
-    [Value] ->
-    [DecodedDatum]
+mapMaybeDecoded
+    :: ProtocolRegistry
+    -> [Value]
+    -> [DecodedDatum]
 mapMaybeDecoded reg = mapMaybe step
   where
     step (Object o) = do
@@ -790,7 +803,7 @@ renderDatumGroup (rep, indices) =
                     <> "```\n"
                     <> prettyPlutusData 0 (ddAst rep)
                     <> "```\n"
-     in "<details><summary>"
+    in  "<details><summary>"
             <> escapeTable title
             <> "</summary>\n\n"
             <> body
@@ -803,7 +816,7 @@ The renderer will not emit typed names without one — every
 provenanceLine :: DatumSchema -> Text
 provenanceLine schema =
     let prefix = "_Field names "
-     in case dsSource schema of
+    in  case dsSource schema of
             SourcePlutusJson ->
                 prefix <> "from the contract's CIP-57 plutus.json blueprint._\n"
             SourceAiken src ->
@@ -815,7 +828,7 @@ provenanceLine schema =
                     <> "]("
                     <> aikenSourceUrl src
                     <> ")"
-                    <> maybe "" (\n -> " — " <> n) (asNote src)
+                    <> maybe "" (" — " <>) (asNote src)
                     <> "._\n"
             SourceManual note ->
                 prefix
@@ -848,7 +861,8 @@ prettySchemaBound schema ast =
             "_AST shape disagrees with schema; rendering untyped._\n\n"
                 <> prettyPlutusData 0 ast
 
-findConstructor :: Integer -> [SchemaConstructor] -> Maybe SchemaConstructor
+findConstructor
+    :: Integer -> [SchemaConstructor] -> Maybe SchemaConstructor
 findConstructor ix = foldr step Nothing
   where
     step c acc = if scIndex c == ix then Just c else acc
@@ -860,7 +874,7 @@ renderFields lvl sc values =
         zipped = zip fields (values <> repeat Null)
         usedFieldCount = length fields
         extras = drop usedFieldCount values
-     in Text.concat (map (renderTypedField lvl pad) zipped)
+    in  Text.concat (map (renderTypedField lvl pad) zipped)
             <> if null extras
                 then ""
                 else
@@ -912,7 +926,7 @@ renderTyped lvl ty v = case (ty, v) of
                     take
                         (length slots)
                         (zip slots (V.toList xs <> repeat Null))
-             in "(\n"
+            in  "(\n"
                     <> Text.concat
                         [ pad
                             <> tfName slot
@@ -966,7 +980,7 @@ renderBytes hint o =
         hintTail = case hint of
             Just h -> "  // " <> h
             Nothing -> ""
-     in "Bytes "
+    in  "Bytes "
             <> Text.pack (show len)
             <> "B "
             <> hexShort
@@ -982,7 +996,7 @@ renderInt hint o =
         hintTail = case hint of
             Just h -> "  // " <> h
             Nothing -> ""
-     in "Int " <> s <> hintTail <> "\n"
+    in  "Int " <> s <> hintTail <> "\n"
 
 sortedIndices :: [Int] -> [Int]
 sortedIndices = foldr insertSorted []
@@ -1000,7 +1014,7 @@ preview when present; ints render as decimal.
 prettyPlutusData :: Int -> Value -> Text
 prettyPlutusData lvl v =
     let pad = Text.replicate (lvl * 2) " "
-     in case v of
+    in  case v of
             Object o -> case KeyMap.lookup "kind" o of
                 Just (String "constr") ->
                     let idx = case KeyMap.lookup "index" o of
@@ -1009,7 +1023,7 @@ prettyPlutusData lvl v =
                         fields = case KeyMap.lookup "fields" o of
                             Just (Array xs) -> V.toList xs
                             _ -> []
-                     in pad
+                    in  pad
                             <> "Constr "
                             <> idx
                             <> "\n"
@@ -1019,7 +1033,7 @@ prettyPlutusData lvl v =
                     let items = case KeyMap.lookup "items" o of
                             Just (Array xs) -> V.toList xs
                             _ -> []
-                     in pad
+                    in  pad
                             <> "List "
                             <> Text.pack (show (length items))
                             <> "\n"
@@ -1029,7 +1043,7 @@ prettyPlutusData lvl v =
                     let entries = case KeyMap.lookup "entries" o of
                             Just (Array xs) -> V.toList xs
                             _ -> []
-                     in pad
+                    in  pad
                             <> "Map\n"
                             <> Text.concat
                                 (map (prettyMapEntry (lvl + 1)) entries)
@@ -1052,7 +1066,7 @@ prettyPlutusData lvl v =
                         utfTail = case utf of
                             Just s -> "  // \"" <> s <> "\""
                             Nothing -> ""
-                     in pad
+                    in  pad
                             <> "Bytes "
                             <> Text.pack (show len)
                             <> "B "
@@ -1068,7 +1082,7 @@ prettyMapEntry lvl v = case v of
         let pad = Text.replicate (lvl * 2) " "
             k = fromMaybe Null (KeyMap.lookup "k" o)
             mv = fromMaybe Null (KeyMap.lookup "v" o)
-         in pad
+        in  pad
                 <> "k:\n"
                 <> prettyPlutusData (lvl + 1) k
                 <> pad
@@ -1087,7 +1101,7 @@ scriptsSection reg doc =
         items = case valuePath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in if null items
+    in  if null items
             then ""
             else
                 "## Smart-contract calls\n\n"
@@ -1114,7 +1128,7 @@ renderScriptRow doc n v = case v of
                             i = case KeyMap.lookup "index" inp of
                                 Just (Number x) -> Text.pack (show (floor x :: Int))
                                 _ -> "?"
-                         in "input " <> txid <> "#" <> i
+                        in  "input " <> txid <> "#" <> i
                     _ -> "input #" <> idx
                 "rewarding" -> withdrawalTarget doc idx
                 _ -> purpose <> " #" <> idx
@@ -1126,13 +1140,17 @@ renderScriptRow doc n v = case v of
                         st = case KeyMap.lookup "steps" e of
                             Just (String s) -> s
                             _ -> "?"
-                     in mem <> " / " <> st
+                    in  mem <> " / " <> st
                 _ -> "?"
             cbor = case KeyMap.lookup "redeemer_cbor_hex" o of
                 Just (String s) ->
-                    "`" <> Text.take 14 s <> "…` (" <> Text.pack (show (Text.length s `div` 2)) <> "B)"
+                    "`"
+                        <> Text.take 14 s
+                        <> "…` ("
+                        <> Text.pack (show (Text.length s `div` 2))
+                        <> "B)"
                 _ -> ""
-         in "| "
+        in  "| "
                 <> Text.pack (show n)
                 <> " | "
                 <> escapeTable purpose
@@ -1151,7 +1169,7 @@ withdrawalsSection doc =
         items = case valuePath (ddIntent doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in if null items
+    in  if null items
             then ""
             else
                 "## Withdrawals\n\n"
@@ -1170,7 +1188,7 @@ renderWithdrawalRow v = case v of
                 Just (String s) -> formatAdaSimple (parseLov s)
                 _ -> formatAdaSimple 0
             account = withdrawalAccountLabel o
-         in "| "
+        in  "| "
                 <> idx
                 <> " | "
                 <> escapeTable account
@@ -1186,7 +1204,13 @@ withdrawalTarget doc idxText =
             let amount = case KeyMap.lookup "amount_lovelace" o of
                     Just (String s) -> formatAdaSimple (parseLov s) <> " ADA"
                     _ -> formatAdaSimple 0 <> " ADA"
-             in "withdrawal #" <> idxText <> " " <> withdrawalCredentialLabel o <> " (" <> amount <> ")"
+            in  "withdrawal #"
+                    <> idxText
+                    <> " "
+                    <> withdrawalCredentialLabel o
+                    <> " ("
+                    <> amount
+                    <> ")"
         Nothing -> "withdrawal #" <> idxText
 
 findWithdrawal :: DiagnosisDoc -> Int -> Maybe (KeyMap.KeyMap Value)
@@ -1210,14 +1234,14 @@ withdrawalAccountLabel o =
             Just (String s) -> "`" <> previewHex 20 s <> "`"
             _ -> ""
         parts = filter (not . Text.null) [network, credential, rewardHex]
-     in Text.intercalate " / " parts
+    in  Text.intercalate " / " parts
 
 withdrawalCredentialLabel :: KeyMap.KeyMap Value -> Text
 withdrawalCredentialLabel o = case KeyMap.lookup "credential" o of
     Just (Object cred) ->
         let kind = textOf "kind" cred "credential"
             hashText = textOf "hash" cred "?"
-         in kind <> " " <> hashText
+        in  kind <> " " <> hashText
     _ -> "credential ?"
 
 previewHex :: Int -> Text -> Text
@@ -1238,7 +1262,7 @@ claimsSection doc =
             ["result", "intent", "claims"] of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in if null claims
+    in  if null claims
             then ""
             else
                 "## Claims\n\n"
@@ -1251,7 +1275,7 @@ claimsSection doc =
         let lab = textOf "label" o ""
             val = textOf "value" o ""
             det = textOf "detail" o ""
-         in "| "
+        in  "| "
                 <> escapeTable lab
                 <> " | "
                 <> escapeTable val
@@ -1263,7 +1287,7 @@ claimsSection doc =
 selfDeclaredDetail :: Text -> Text
 selfDeclaredDetail det =
     let stripped = Text.replace " / self-declared" "" det
-     in if Text.null stripped
+    in  if Text.null stripped
             then "self-declared, not verified"
             else "self-declared, not verified / " <> stripped
 
@@ -1275,7 +1299,7 @@ effectsSection doc =
             ["result", "intent", "sections"] of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in Text.concat (map renderSectionHeading sections)
+    in  Text.concat (map renderSectionHeading sections)
   where
     renderSectionHeading (Object o) =
         let title = textOf "title" o ""
@@ -1283,7 +1307,7 @@ effectsSection doc =
                 Just (Array xs) -> V.toList xs
                 _ -> []
             empty = textOf "empty" o ""
-         in "## "
+        in  "## "
                 <> title
                 <> "\n\n"
                 <> ( if null rows
@@ -1299,7 +1323,7 @@ effectsSection doc =
         let lab = textOf "label" o ""
             val = textOf "value" o ""
             det = textOf "detail" o ""
-         in "| "
+        in  "| "
                 <> escapeTable lab
                 <> " | "
                 <> escapeTable val
@@ -1315,7 +1339,7 @@ failuresSection doc =
             ["result", "validation", "failures"] of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in if null items
+    in  if null items
             then ""
             else
                 "## Validation failures\n\n"
@@ -1325,7 +1349,7 @@ failuresSection doc =
         let rule = textOf "rule" o ""
             predicate = textOf "predicate" o ""
             msg = textOf "message" o ""
-         in "### "
+        in  "### "
                 <> failureLead predicate msg
                 <> "\n\n"
                 <> "_Raw rule:_ `"
@@ -1343,7 +1367,7 @@ failureLead predicate _msg
         let supplied = extractCoin "supplied: MaryValue (Coin " predicate
             expected = extractCoin "expected: MaryValue (Coin " predicate
             delta = supplied - expected
-         in if delta > 0
+        in  if delta > 0
                 then
                     "Inputs and outputs do not conserve value: "
                         <> formatAdaSimple delta
@@ -1354,8 +1378,11 @@ failureLead predicate _msg
                         <> " ADA over-spent"
     | "MissingVKeyWitnessesUTXOW" `Text.isInfixOf` predicate =
         let missing = length (extractKeyHashes predicate)
-            noun = if missing == 1 then "required signer witness is" else "required signer witnesses are"
-         in Text.pack (show missing) <> " " <> noun <> " missing"
+            noun =
+                if missing == 1
+                    then "required signer witness is"
+                    else "required signer witnesses are"
+        in  Text.pack (show missing) <> " " <> noun <> " missing"
     | "BadInputsUTxO" `Text.isInfixOf` predicate =
         "One or more declared inputs are missing from the supplied context"
     | "OutsideValidityIntervalUTxO" `Text.isInfixOf` predicate =
@@ -1403,8 +1430,9 @@ humaniseValueNotConserved predicate =
                 "Outputs + fee claim **"
                     <> formatAdaSimple (negate delta)
                     <> " ADA** more than inputs supply — over-spent."
-            | otherwise = "Both sides equal but the ledger still rejected — re-check predicate."
-     in "- supplied (inputs): **"
+            | otherwise =
+                "Both sides equal but the ledger still rejected — re-check predicate."
+    in  "- supplied (inputs): **"
             <> formatAdaSimple supplied
             <> " ADA**\n"
             <> "- expected (outputs + fee): **"
@@ -1417,7 +1445,7 @@ humaniseValueNotConserved predicate =
 humaniseMissingVKey :: Text -> Text
 humaniseMissingVKey predicate =
     let hashes = extractKeyHashes predicate
-     in if null hashes
+    in  if null hashes
             then "No vkey witness hashes recovered from the predicate.\n"
             else
                 "The following payment-key hashes are listed as required \
@@ -1437,8 +1465,8 @@ extractCoin marker predicate =
         (_, rest)
             | not (Text.null rest) ->
                 let after = Text.drop (Text.length marker) rest
-                    digits = Text.takeWhile (\c -> c >= '0' && c <= '9') after
-                 in case reads (Text.unpack digits) of
+                    digits = Text.takeWhile isDigit after
+                in  case reads (Text.unpack digits) of
                         [(n, "")] -> n
                         _ -> 0
         _ -> 0
@@ -1457,7 +1485,7 @@ extractKeyHashes =
     isHashLike t =
         Text.length t == 56 && Text.all isHex t
     isHex c =
-        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+        isDigit c || (c >= 'a' && c <= 'f')
 
 {- | Format an Integer lovelace amount as ADA with thousands
 separators and 6 decimals. Local copy to avoid a Render.Single ↔
@@ -1471,7 +1499,7 @@ formatAdaSimple n =
         frac = m `mod` 1000000
         wholeT = withThousandsSeparators (Text.pack (show whole))
         fracT = Text.justifyRight 6 '0' (Text.pack (show frac))
-     in sign <> wholeT <> "." <> fracT
+    in  sign <> wholeT <> "." <> fracT
 
 withThousandsSeparators :: Text -> Text
 withThousandsSeparators t =
@@ -1481,7 +1509,8 @@ withThousandsSeparators t =
         groups
             | null tailGroups = [head']
             | otherwise = head' : chunksOf 3 tailGroups
-     in Text.pack (concatMap (\g -> if g == head' then g else "," <> g) groups)
+    in  Text.pack
+            (concatMap (\g -> if g == head' then g else "," <> g) groups)
   where
     chunksOf k xs = case splitAt k xs of
         (h, []) -> [h]
@@ -1495,7 +1524,7 @@ warningsSection doc =
             Just (Array xs) -> V.toList xs
             _ -> []
         textWarnings = [s | String s <- warnings]
-     in if null textWarnings
+    in  if null textWarnings
             then ""
             else
                 "## Warnings\n\n"
@@ -1514,7 +1543,7 @@ diagramsSection files =
             [ "- [" <> label <> "](" <> Text.pack p <> ")\n"
             | (label, Just p) <- entries
             ]
-     in if null present
+    in  if null present
             then ""
             else "## Diagrams\n\n" <> Text.concat present <> "\n"
 
@@ -1538,7 +1567,7 @@ textPath doc path def =
                   ddIntent doc
                 )
                 path
-     in case v of
+    in  case v of
             Just (String s) -> s
             _ -> fromMaybe def (Just def)
 

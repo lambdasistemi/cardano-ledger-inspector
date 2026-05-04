@@ -127,7 +127,7 @@ main = do
     hex <- Text.strip <$> TIO.readFile (optCborFile opts)
     bundledRegistry <- Paths.getDataDir
     let registryRoots =
-            (if optNoBundledRegistry opts then [] else [bundledRegistry])
+            [bundledRegistry | not (optNoBundledRegistry opts)]
                 <> optExtraRegistries opts
     reg <- loadRegistries registryRoots
     intent <- case runIntent hex of
@@ -148,7 +148,8 @@ main = do
                 "WARNING: no Blockfrost project_id; tx.validate will run with empty context (only the probe response is shown)."
             pure (Map.empty, Nothing, Nothing)
         Just pid -> do
-            entries <- mapM (fetchProducer mgr (optNetwork opts) pid) producerHashes
+            entries <-
+                mapM (fetchProducer mgr (optNetwork opts) pid) producerHashes
             let prods =
                     Map.fromList
                         [(h, c) | (h, Right c) <- entries]
@@ -217,8 +218,8 @@ main = do
         (Just _, Nothing) ->
             die "internal explain emit error: missing explain document"
 
-fetchProducer ::
-    Manager -> Network -> Text -> Text -> IO (Text, Either String Text)
+fetchProducer
+    :: Manager -> Network -> Text -> Text -> IO (Text, Either String Text)
 fetchProducer mgr net pid h = do
     eCbor <- fetchTxCbor mgr net pid h
     case eCbor of
@@ -237,8 +238,8 @@ fetchProducer mgr net pid h = do
  the ledger will then surface its own CERTS error for them, which is
  more useful diagnostic output than a host-side abort.
 -}
-buildCertState ::
-    Manager -> Network -> Text -> [WithdrawalCredential] -> IO Aeson.Value
+buildCertState
+    :: Manager -> Network -> Text -> [WithdrawalCredential] -> IO Aeson.Value
 buildCertState mgr net pid creds = do
     rewardEntries <- mapM (fetchRewardsEntry mgr net pid) creds
     pure $
@@ -246,8 +247,12 @@ buildCertState mgr net pid creds = do
             [ ("rewards", Aeson.toJSON (catMaybes rewardEntries))
             ]
 
-fetchRewardsEntry ::
-    Manager -> Network -> Text -> WithdrawalCredential -> IO (Maybe Aeson.Value)
+fetchRewardsEntry
+    :: Manager
+    -> Network
+    -> Text
+    -> WithdrawalCredential
+    -> IO (Maybe Aeson.Value)
 fetchRewardsEntry mgr net pid cred = do
     let kind = case wcKind cred of
             "script" -> Just ScriptCred

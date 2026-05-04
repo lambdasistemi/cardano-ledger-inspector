@@ -752,6 +752,17 @@
                 '';
               };
               mkApp = drv: { type = "app"; program = pkgs.lib.getExe drv; };
+              format = pkgs.writeShellApplication {
+                name = "format";
+                runtimeInputs = [
+                  pkgs.haskellPackages.fourmolu
+                  pkgs.findutils
+                ];
+                text = ''
+                  find libs apps nix/wasm -type f -name '*.hs' \
+                    -exec fourmolu -m inplace {} +
+                '';
+              };
               format-check = pkgs.writeShellApplication {
                 name = "format-check";
                 runtimeInputs = [
@@ -761,6 +772,15 @@
                 text = ''
                   find libs apps nix/wasm -type f -name '*.hs' \
                     -exec fourmolu -m check {} +
+                '';
+              };
+              hlint = pkgs.writeShellApplication {
+                name = "hlint";
+                runtimeInputs = [
+                  pkgs.haskellPackages.hlint
+                ];
+                text = ''
+                  hlint libs apps nix/wasm
                 '';
               };
               test-playwright = pkgs.writeShellApplication {
@@ -789,7 +809,9 @@
               };
             in
             {
+              format = mkApp format;
               format-check = mkApp format-check;
+              hlint = mkApp hlint;
               test-playwright = mkApp test-playwright;
               tx-identify-smoke =
                 mkApp (mkSmokeApp "tx-identify-smoke" tx-identify-smoke);
@@ -828,6 +850,7 @@
               pkgs.playwright-test
               pkgs.nixfmt-rfc-style
               pkgs.haskellPackages.fourmolu
+              pkgs.haskellPackages.hlint
               mkdocsEnv
               psPkgs.purs
               psPkgs.spago-unstable

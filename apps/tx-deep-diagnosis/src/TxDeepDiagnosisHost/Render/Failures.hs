@@ -9,13 +9,14 @@ not to write the file. When non-empty: emits a small Mermaid
 @flowchart TD@ with one node per failure routed onto its target node
 (body, signer, or input) per the same mapping used by 'Render.Topology'.
 -}
-module TxDeepDiagnosisHost.Render.Failures (
-    renderFailuresMermaid,
-) where
+module TxDeepDiagnosisHost.Render.Failures
+    ( renderFailuresMermaid
+    ) where
 
 import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
+import Data.Char (isDigit)
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
@@ -29,10 +30,11 @@ import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
 import TxDeepDiagnosisHost.Render.Names (truncateHash)
 
 -- | Render a Mermaid failures diagram, or 'Nothing' when valid.
-renderFailuresMermaid :: ProtocolRegistry -> DiagnosisDoc -> Maybe Text
+renderFailuresMermaid
+    :: ProtocolRegistry -> DiagnosisDoc -> Maybe Text
 renderFailuresMermaid _reg doc =
     let failures = failureItems doc
-     in if null failures
+    in  if null failures
             then Nothing
             else
                 Just
@@ -62,7 +64,7 @@ renderFailure doc i fi =
                 , txt (escape (fiTitle fi))
                 , "\"]:::ruleFail\n"
                 ]
-     in case fiClass fi of
+    in  case fiClass fi of
             BodyFail ->
                 ruleNode
                     <> mconcat ["    ", tag, " --> body\n"]
@@ -73,7 +75,7 @@ renderFailure doc i fi =
                             (renderSignerNode tag)
                             [0 :: Int ..]
                             hashes
-                 in ruleNode <> mconcat signerNodes
+                in  ruleNode <> mconcat signerNodes
   where
     _unused = doc
 
@@ -81,7 +83,7 @@ renderSignerNode :: TB.Builder -> Int -> Text -> TB.Builder
 renderSignerNode parent j h =
     let tag = parent <> "_s" <> txt (Text.pack (show j))
         label = "missing signer " <> truncateHash h
-     in mconcat
+    in  mconcat
             [ "    "
             , tag
             , "[\""
@@ -113,7 +115,7 @@ failureItems doc =
         items = case lookupPath (ddValidate doc) path of
             Just (Array xs) -> V.toList xs
             _ -> []
-     in map parseItem items
+    in  map parseItem items
   where
     parseItem (Object o) =
         let predicate = fromMaybe "" (textOf "predicate" o)
@@ -123,7 +125,7 @@ failureItems doc =
                 | "MissingVKeyWitnesses" `Text.isInfixOf` predicate =
                     SignerFail (extractKeyHashes predicate)
                 | otherwise = BodyFail
-         in FailureItem
+        in  FailureItem
                 { fiTitle = rule <> " / " <> short
                 , fiClass = cls
                 }
@@ -141,7 +143,8 @@ shortName p
     | "ValueNotConservedUTxO" `Text.isInfixOf` p = "ValueNotConservedUTxO"
     | "MissingVKeyWitnesses" `Text.isInfixOf` p = "MissingVKeyWitnesses"
     | "BadInputsUTxO" `Text.isInfixOf` p = "BadInputsUTxO"
-    | "OutsideValidityIntervalUTxO" `Text.isInfixOf` p = "OutsideValidityInterval"
+    | "OutsideValidityIntervalUTxO" `Text.isInfixOf` p =
+        "OutsideValidityInterval"
     | otherwise = Text.take 60 p
 
 extractKeyHashes :: Text -> [Text]
@@ -158,7 +161,7 @@ extractKeyHashes =
     isHashLike t =
         Text.length t == 56 && Text.all isHex t
     isHex c =
-        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+        isDigit c || (c >= 'a' && c <= 'f')
 
 -- ---------------------------------------------------------------- --
 -- Helpers

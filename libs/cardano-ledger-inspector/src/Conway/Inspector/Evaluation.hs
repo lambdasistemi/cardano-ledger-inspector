@@ -1,16 +1,15 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications #-}
 
 {- | Conway phase-2 script evaluation.
 
   This module uses upstream ledger script evaluation over explicit context.
   It never mutates the candidate transaction or returns patched CBOR.
 -}
-module Conway.Inspector.Evaluation (
-    evaluateScriptsJson,
-) where
+module Conway.Inspector.Evaluation
+    ( evaluateScriptsJson
+    ) where
 
 import qualified Cardano.Ledger.Alonzo.Plutus.Evaluate as Evaluate
 import qualified Cardano.Ledger.Api as L
@@ -25,30 +24,30 @@ import qualified Cardano.Ledger.Shelley.LedgerState as ShelleyState
 import qualified Cardano.Ledger.TxIn as TxIn
 import qualified Cardano.Slotting.EpochInfo as EpochInfo
 import qualified Cardano.Slotting.Time as SlottingTime
-import Conway.Inspector.Common (
-    argsObject,
-    lookupObjectValue,
-    lookupValue,
-    safeHashHex,
-    txIdHex,
-    txInIndex,
-    txInKey,
-    txInTxIdHex,
-    txOutJson,
- )
-import Conway.Inspector.Context (
-    ProducerContext (..),
-    ProducerTx (..),
-    decodedProducerTxCount,
-    inputPolicyFromArgs,
-    missingContextTxIns,
-    producerContextFromArgs,
-    producerContextSupplied,
-    producerOutputAt,
-    producerTxErrors,
-    producerTxLookup,
-    producerTxOutput,
- )
+import Conway.Inspector.Common
+    ( argsObject
+    , lookupObjectValue
+    , lookupValue
+    , safeHashHex
+    , txIdHex
+    , txInIndex
+    , txInKey
+    , txInTxIdHex
+    , txOutJson
+    )
+import Conway.Inspector.Context
+    ( ProducerContext (..)
+    , ProducerTx (..)
+    , decodedProducerTxCount
+    , inputPolicyFromArgs
+    , missingContextTxIns
+    , producerContextFromArgs
+    , producerContextSupplied
+    , producerOutputAt
+    , producerTxErrors
+    , producerTxLookup
+    , producerTxOutput
+    )
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
@@ -74,10 +73,10 @@ data EvaluationRun
     = EvaluationNotRun T.Text
     | EvaluationReport RedeemerReport
 
-evaluateScriptsJson ::
-    Aeson.Value ->
-    L.Tx TopTx Conway.ConwayEra ->
-    Aeson.Value
+evaluateScriptsJson
+    :: Aeson.Value
+    -> L.Tx TopTx Conway.ConwayEra
+    -> Aeson.Value
 evaluateScriptsJson args tx =
     let body = tx ^. L.bodyTxL
         wits = tx ^. Core.witsTxL
@@ -194,7 +193,7 @@ evaluateScriptsJson args tx =
             totalEvaluatedExUnits evaluationRun
         warnings =
             evaluationWarnings status
-     in Aeson.object
+    in  Aeson.object
             [ "status" .= status
             , "scripts_evaluate_for_supplied_context"
                 .= scriptsEvaluateForSuppliedContext
@@ -215,7 +214,11 @@ evaluateScriptsJson args tx =
                     inputs
             , "resolved_reference_inputs"
                 .= zipWith
-                    (evaluationResolvedTxInJson "reference_input" "reference_inputs" context)
+                    ( evaluationResolvedTxInJson
+                        "reference_input"
+                        "reference_inputs"
+                        context
+                    )
                     [0 :: Int ..]
                     referenceInputs
             , "context"
@@ -235,17 +238,17 @@ evaluateScriptsJson args tx =
             , "errors" .= contextErrors
             ]
 
-runScriptEvaluation ::
-    [Aeson.Value] ->
-    [Aeson.Value] ->
-    Maybe Word64 ->
-    Maybe Word64 ->
-    Maybe (Core.PParams Conway.ConwayEra) ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    L.Tx TopTx Conway.ConwayEra ->
-    EvaluationRun
+runScriptEvaluation
+    :: [Aeson.Value]
+    -> [Aeson.Value]
+    -> Maybe Word64
+    -> Maybe Word64
+    -> Maybe (Core.PParams Conway.ConwayEra)
+    -> ProducerContext
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> L.Tx TopTx Conway.ConwayEra
+    -> EvaluationRun
 runScriptEvaluation contextErrors missingContext slot _epoch pparams context inputs referenceInputs tx
     | not (null contextErrors) =
         EvaluationNotRun
@@ -277,10 +280,10 @@ evaluationSystemStart :: SlottingTime.SystemStart
 evaluationSystemStart =
     SlottingTime.SystemStart (posixSecondsToUTCTime 0)
 
-evaluationSourceUTxO ::
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    ShelleyState.UTxO Conway.ConwayEra
+evaluationSourceUTxO
+    :: ProducerContext
+    -> [TxIn.TxIn]
+    -> ShelleyState.UTxO Conway.ConwayEra
 evaluationSourceUTxO context txIns =
     ShelleyState.UTxO $
         Map.fromList
@@ -289,12 +292,12 @@ evaluationSourceUTxO context txIns =
             , Just txOut <- [producerTxOutput context txIn]
             ]
 
-evaluationStatus ::
-    Bool ->
-    [Aeson.Value] ->
-    [Aeson.Value] ->
-    EvaluationRun ->
-    T.Text
+evaluationStatus
+    :: Bool
+    -> [Aeson.Value]
+    -> [Aeson.Value]
+    -> EvaluationRun
+    -> T.Text
 evaluationStatus noRedeemers contextErrors missingContext evaluationRun
     | noRedeemers = "not_applicable"
     | not (null contextErrors) = "rejected"
@@ -309,13 +312,13 @@ evaluationStatus noRedeemers contextErrors missingContext evaluationRun
     isEvaluationFailure (Left _) = True
     isEvaluationFailure (Right _) = False
 
-redeemerEvaluationJson ::
-    EvaluationRun ->
-    [Aeson.Value] ->
-    ( L.PlutusPurpose L.AsIx Conway.ConwayEra
-    , (PData.Data Conway.ConwayEra, ExUnits.ExUnits)
-    ) ->
-    Aeson.Value
+redeemerEvaluationJson
+    :: EvaluationRun
+    -> [Aeson.Value]
+    -> ( L.PlutusPurpose L.AsIx Conway.ConwayEra
+       , (PData.Data Conway.ConwayEra, ExUnits.ExUnits)
+       )
+    -> Aeson.Value
 redeemerEvaluationJson evaluationRun missingContext (purpose, (redeemerData, budget)) =
     let maybeResult =
             case evaluationRun of
@@ -331,7 +334,7 @@ redeemerEvaluationJson evaluationRun missingContext (purpose, (redeemerData, bud
             , "budget_ex_units" .= exUnitsJson budget
             , "warnings" .= ([] :: [T.Text])
             ]
-     in case maybeResult of
+    in  case maybeResult of
             Just (Right (logs, evaluated)) ->
                 Aeson.object $
                     baseFields
@@ -363,10 +366,10 @@ evaluationFailures (EvaluationReport report) =
     ]
 evaluationFailures (EvaluationNotRun _) = []
 
-evaluationFailureJson ::
-    L.PlutusPurpose L.AsIx Conway.ConwayEra ->
-    Evaluate.TransactionScriptFailure Conway.ConwayEra ->
-    Aeson.Value
+evaluationFailureJson
+    :: L.PlutusPurpose L.AsIx Conway.ConwayEra
+    -> Evaluate.TransactionScriptFailure Conway.ConwayEra
+    -> Aeson.Value
 evaluationFailureJson purpose failure =
     Aeson.object
         [ "code" .= evaluationFailureCode failure
@@ -377,9 +380,9 @@ evaluationFailureJson purpose failure =
         , "path" .= purposePath purpose
         ]
 
-evaluationFailureCode ::
-    Evaluate.TransactionScriptFailure Conway.ConwayEra ->
-    T.Text
+evaluationFailureCode
+    :: Evaluate.TransactionScriptFailure Conway.ConwayEra
+    -> T.Text
 evaluationFailureCode = \case
     Evaluate.RedeemerPointsToUnknownScriptHash _ -> "redeemer_unknown_script"
     Evaluate.MissingScript _ _ -> "missing_script"
@@ -391,16 +394,17 @@ evaluationFailureCode = \case
     Evaluate.NoCostModelInLedgerState _ -> "missing_cost_model"
     Evaluate.ContextError _ -> "context_translation_error"
 
-evaluationFailureMessage ::
-    Evaluate.TransactionScriptFailure Conway.ConwayEra ->
-    T.Text
+evaluationFailureMessage
+    :: Evaluate.TransactionScriptFailure Conway.ConwayEra
+    -> T.Text
 evaluationFailureMessage = \case
     Evaluate.RedeemerPointsToUnknownScriptHash purpose ->
         "Redeemer points to an unknown script hash: " <> T.pack (show purpose)
     Evaluate.MissingScript purpose _ ->
         "Missing Plutus script for redeemer: " <> T.pack (show purpose)
     Evaluate.MissingDatum dataHash ->
-        "Missing datum required by script evaluation: " <> T.pack (show dataHash)
+        "Missing datum required by script evaluation: "
+            <> T.pack (show dataHash)
     Evaluate.ValidationFailure _ err logs _ ->
         "Plutus script evaluation failed: "
             <> T.pack (show err)
@@ -436,10 +440,10 @@ totalEvaluatedExUnits evaluationRun =
                             [ exUnits
                             | Right (_logs, exUnits) <- results
                             ]
-                     in (mconcat successes, any isLeft results)
+                    in  (mconcat successes, any isLeft results)
                 EvaluationNotRun _ ->
                     (mempty, True)
-     in exUnitsTotalJson total partial
+    in  exUnitsTotalJson total partial
   where
     isLeft (Left _) = True
     isLeft (Right _) = False
@@ -502,7 +506,7 @@ missingKindsFor key missingContext =
     | Aeson.Object item <- missingContext
     , Just (Aeson.Array requiredFor) <-
         [KeyMap.lookup "required_for" item]
-    , any (== Aeson.String key) requiredFor
+    , Aeson.String key `elem` requiredFor
     , Just (Aeson.String kind) <- [KeyMap.lookup "kind" item]
     ]
 
@@ -516,13 +520,13 @@ evaluationWarnings "not_applicable" =
 evaluationWarnings _ =
     []
 
-requiredContextField ::
-    T.Text ->
-    T.Text ->
-    T.Text ->
-    (Aeson.Value -> Either T.Text a) ->
-    Maybe Aeson.Value ->
-    (Maybe a, [Aeson.Value], [Aeson.Value])
+requiredContextField
+    :: T.Text
+    -> T.Text
+    -> T.Text
+    -> (Aeson.Value -> Either T.Text a)
+    -> Maybe Aeson.Value
+    -> (Maybe a, [Aeson.Value], [Aeson.Value])
 requiredContextField field kind message parse maybeContext =
     case maybeContext >>= lookupValue (AesonKey.fromText field) of
         Nothing ->
@@ -572,9 +576,9 @@ parseWord64Value field (Aeson.String value) =
 parseWord64Value field _ =
     Left ("Expected " <> field <> " as an unsigned integer.")
 
-parseProtocolParametersValue ::
-    Aeson.Value ->
-    Either T.Text (Core.PParams Conway.ConwayEra)
+parseProtocolParametersValue
+    :: Aeson.Value
+    -> Either T.Text (Core.PParams Conway.ConwayEra)
 parseProtocolParametersValue value =
     case Aeson.fromJSON value of
         Aeson.Success pparams -> Right pparams
@@ -630,12 +634,12 @@ producerTxIdContextErrors context =
     , declaredTxId /= actualTxId
     ]
 
-producerOutputIndexContextErrors ::
-    T.Text ->
-    T.Text ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [Aeson.Value]
+producerOutputIndexContextErrors
+    :: T.Text
+    -> T.Text
+    -> ProducerContext
+    -> [TxIn.TxIn]
+    -> [Aeson.Value]
 producerOutputIndexContextErrors inputKind collection context txIns =
     [ contextErrorJson
         "producer_output_index_missing"
@@ -654,18 +658,18 @@ producerOutputIndexContextErrors inputKind collection context txIns =
     , isNothing (producerOutputAt txIn producer)
     ]
 
-missingSourceOutputContextJson ::
-    T.Text ->
-    T.Text ->
-    Int ->
-    TxIn.TxIn ->
-    Aeson.Value
+missingSourceOutputContextJson
+    :: T.Text
+    -> T.Text
+    -> Int
+    -> TxIn.TxIn
+    -> Aeson.Value
 missingSourceOutputContextJson inputKind collection ix txIn =
     Aeson.object
         [ "kind" .= ("source_output" :: T.Text)
         , "message"
-            .= ( "Supply producer transaction CBOR for the referenced transaction input." ::
-                    T.Text
+            .= ( "Supply producer transaction CBOR for the referenced transaction input."
+                    :: T.Text
                )
         , "path" .= (["body", collection, "#" <> T.pack (show ix)] :: [T.Text])
         , "tx_id" .= txInTxIdHex txIn
@@ -674,12 +678,12 @@ missingSourceOutputContextJson inputKind collection ix txIn =
         , "required_for" .= (["script.evaluate"] :: [T.Text])
         ]
 
-missingContextJson ::
-    T.Text ->
-    T.Text ->
-    [T.Text] ->
-    [T.Text] ->
-    Aeson.Value
+missingContextJson
+    :: T.Text
+    -> T.Text
+    -> [T.Text]
+    -> [T.Text]
+    -> Aeson.Value
 missingContextJson kind message path requiredFor =
     Aeson.object
         [ "kind" .= kind
@@ -688,12 +692,12 @@ missingContextJson kind message path requiredFor =
         , "required_for" .= requiredFor
         ]
 
-contextErrorJson ::
-    T.Text ->
-    T.Text ->
-    [T.Text] ->
-    Aeson.Value ->
-    Aeson.Value
+contextErrorJson
+    :: T.Text
+    -> T.Text
+    -> [T.Text]
+    -> Aeson.Value
+    -> Aeson.Value
 contextErrorJson code message path details =
     Aeson.object
         [ "code" .= code
@@ -702,13 +706,13 @@ contextErrorJson code message path details =
         , "details" .= details
         ]
 
-evaluationResolvedTxInJson ::
-    T.Text ->
-    T.Text ->
-    ProducerContext ->
-    Int ->
-    TxIn.TxIn ->
-    Aeson.Value
+evaluationResolvedTxInJson
+    :: T.Text
+    -> T.Text
+    -> ProducerContext
+    -> Int
+    -> TxIn.TxIn
+    -> Aeson.Value
 evaluationResolvedTxInJson inputKind collection context ix txIn =
     let key = txInKey txIn
         baseFields =
@@ -718,7 +722,7 @@ evaluationResolvedTxInJson inputKind collection context ix txIn =
             , "kind" .= inputKind
             , "path" .= (["body", collection, "#" <> T.pack (show ix)] :: [T.Text])
             ]
-     in case producerTxLookup context txIn of
+    in  case producerTxLookup context txIn of
             Nothing ->
                 Aeson.object $
                     baseFields
@@ -749,19 +753,19 @@ evaluationResolvedTxInJson inputKind collection context ix txIn =
                                    , "tx_out" .= txOutJson txOut
                                    ]
 
-evaluationContextSummaryJson ::
-    T.Text ->
-    ProducerContext ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    [TxIn.TxIn] ->
-    Maybe Word64 ->
-    Maybe Word64 ->
-    Bool ->
-    Int ->
-    Int ->
-    Aeson.Value
+evaluationContextSummaryJson
+    :: T.Text
+    -> ProducerContext
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> [TxIn.TxIn]
+    -> Maybe Word64
+    -> Maybe Word64
+    -> Bool
+    -> Int
+    -> Int
+    -> Aeson.Value
 evaluationContextSummaryJson
     inputPolicy
     context
@@ -781,7 +785,7 @@ evaluationContextSummaryJson
             optionalFields =
                 maybeWord64Field "slot" slot
                     <> maybeWord64Field "epoch" epoch
-         in Aeson.object $
+        in  Aeson.object $
                 [ "input_policy" .= inputPolicy
                 , "producer_tx_count" .= Map.size (pcProducerTxs context)
                 , "decoded_producer_tx_count" .= decodedProducerTxCount context
@@ -801,6 +805,7 @@ evaluationContextSummaryJson
                 ]
                     <> optionalFields
 
-maybeWord64Field :: AesonKey.Key -> Maybe Word64 -> [(AesonKey.Key, Aeson.Value)]
+maybeWord64Field
+    :: AesonKey.Key -> Maybe Word64 -> [(AesonKey.Key, Aeson.Value)]
 maybeWord64Field key =
     maybe [] (\value -> [key .= T.pack (show value)])
