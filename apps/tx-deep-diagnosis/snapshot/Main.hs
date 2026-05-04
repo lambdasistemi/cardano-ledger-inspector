@@ -23,7 +23,6 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.IO as TIO
 import qualified Paths_tx_deep_diagnosis as Paths
 import System.Directory (doesDirectoryExist, doesFileExist, listDirectory)
 import System.Environment (getArgs)
@@ -33,36 +32,7 @@ import System.IO (hPutStrLn, stderr)
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry, loadRegistries)
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc, parseDiagnosisDoc)
-import TxDeepDiagnosisHost.Render.Failures (renderFailuresMermaid)
-import TxDeepDiagnosisHost.Render.Parties (renderPartiesMermaid)
-import TxDeepDiagnosisHost.Render.Single (renderSingleMarkdown)
-import TxDeepDiagnosisHost.Render.Summary (
-    EmittedFiles (..),
-    renderSummaryMarkdown,
- )
-import TxDeepDiagnosisHost.Render.Topology (renderTopologyMermaid)
-import TxDeepDiagnosisHost.Render.ValueFlow (renderValueFlowTsv)
-
-{- | All artifacts the harness can produce, in emit order. Failures
-and summary are conditional on doc state and produce 'Maybe'
-output.
--}
-data Artifact
-    = Always !FilePath !(ProtocolRegistry -> DiagnosisDoc -> Text)
-    | Conditional !FilePath !(ProtocolRegistry -> DiagnosisDoc -> Maybe Text)
-    | -- | Summary depends on which other files were emitted, so it
-      -- runs last and receives the cumulative 'EmittedFiles'.
-      SummaryArtifact !FilePath
-
-renderers :: [Artifact]
-renderers =
-    [ Always "parties.mmd" renderPartiesMermaid
-    , Always "value-flow.tsv" renderValueFlowTsv
-    , Always "topology.mmd" renderTopologyMermaid
-    , Conditional "failures.mmd" renderFailuresMermaid
-    , SummaryArtifact "summary.md"
-    , Always "explain.md" renderSingleMarkdown
-    ]
+import TxDeepDiagnosisHost.Render.Emit (emitExplain, renderExplainArtifacts)
 
 main :: IO ()
 main = do
@@ -129,89 +99,26 @@ runCase mode reg root name = do
             Left e -> do
                 hPutStrLn stderr ("parse " <> inputPath <> ": " <> e)
                 pure (name, False)
-            Right doc -> do
-                let initial = noEmittedFilesLocal
-                (outcomes, _emitted) <-
-                    foldArtifacts mode reg root name doc initial renderers
-                pure (name, and outcomes)
+            Right doc -> case mode of
+                WriteMode -> do
+                    let expectedDir = root </> name </> "expected"
+                    written <- emitExplain expectedDir reg doc
+                    mapM_ (\file -> putStrLn ("wrote " <> expectedDir </> file)) written
+                    pure (name, True)
+                CompareMode -> do
+                    outcomes <-
+                        mapM
+                            (\(file, actual) -> handleCompare root name file actual)
+                            (renderExplainArtifacts reg doc)
+                    pure (name, and outcomes)
 
-noEmittedFilesLocal :: EmittedFiles
-noEmittedFilesLocal =
-    EmittedFiles
-        { efParties = Nothing
-        , efValueFlow = Nothing
-        , efTopology = Nothing
-        , efFailures = Nothing
-        }
-
-{- | Apply each artifact in order, threading 'EmittedFiles' so the
-summary can link only to files that were actually written.
--}
-foldArtifacts ::
-    Mode ->
-    ProtocolRegistry ->
-    FilePath ->
-    FilePath ->
-    DiagnosisDoc ->
-    EmittedFiles ->
-    [Artifact] ->
-    IO ([Bool], EmittedFiles)
-foldArtifacts _ _ _ _ _ acc [] = pure ([], acc)
-foldArtifacts mode reg root name doc acc (a : as) = do
-    (ok, acc') <- handleArtifact mode reg root name doc acc a
-    (rest, accFinal) <- foldArtifacts mode reg root name doc acc' as
-    pure (ok : rest, accFinal)
-
-handleArtifact ::
-    Mode ->
-    ProtocolRegistry ->
-    FilePath ->
-    FilePath ->
-    DiagnosisDoc ->
-    EmittedFiles ->
-    Artifact ->
-    IO (Bool, EmittedFiles)
-handleArtifact mode reg root name doc files art = case art of
-    Always file render -> do
-        let actual = render reg doc
-        ok <- handle mode reg root name file actual
-        pure (ok, recordFile file files)
-    Conditional file render -> case render reg doc of
-        Nothing ->
-            -- Skipped on purpose; tolerate any leftover expected file.
-            pure (True, files)
-        Just actual -> do
-            ok <- handle mode reg root name file actual
-            pure (ok, recordFile file files)
-    SummaryArtifact file -> do
-        let actual = renderSummaryMarkdown reg doc files
-        ok <- handle mode reg root name file actual
-        pure (ok, recordFile file files)
-
-recordFile :: FilePath -> EmittedFiles -> EmittedFiles
-recordFile "parties.mmd" f = f{efParties = Just "parties.mmd"}
-recordFile "value-flow.tsv" f = f{efValueFlow = Just "value-flow.tsv"}
-recordFile "topology.mmd" f = f{efTopology = Just "topology.mmd"}
-recordFile "failures.mmd" f = f{efFailures = Just "failures.mmd"}
-recordFile _ f = f
-
-handle ::
-    Mode ->
-    ProtocolRegistry ->
+handleCompare ::
     FilePath ->
     FilePath ->
     FilePath ->
     Text ->
     IO Bool
-handle WriteMode _reg root name file actual = do
-    let expectedDir = root </> name </> "expected"
-        expectedPath = expectedDir </> file
-    exists <- doesDirectoryExist expectedDir
-    unless exists $ die ("missing expected dir: " <> expectedDir)
-    TIO.writeFile expectedPath actual
-    putStrLn ("wrote " <> expectedPath)
-    pure True
-handle CompareMode _reg root name file actual = do
+handleCompare root name file actual = do
     let expectedPath = root </> name </> "expected" </> file
     expectedExists <- doesFileExist expectedPath
     if not expectedExists
@@ -224,9 +131,10 @@ handle CompareMode _reg root name file actual = do
                     <> Text.unpack actual
                     <> "--- end ---"
                 )
-            pure False
+            pure
+                False
         else do
-            expected <- TIO.readFile expectedPath
+            expected <- readText expectedPath
             if expected == actual
                 then pure True
                 else do
@@ -243,6 +151,9 @@ handle CompareMode _reg root name file actual = do
                             <> "--- end ---"
                         )
                     pure False
+
+readText :: FilePath -> IO Text
+readText = fmap Text.pack . readFile
 
 die :: String -> IO a
 die msg = do

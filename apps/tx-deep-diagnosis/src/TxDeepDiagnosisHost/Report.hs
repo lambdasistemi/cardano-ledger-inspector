@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module TxDeepDiagnosisHost.Report (
+    buildReportValue,
     renderReport,
 ) where
 
@@ -12,6 +13,21 @@ import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
 
 import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
+
+buildReportValue ::
+    Text ->
+    Value ->
+    Value ->
+    Value
+buildReportValue summary intent validate =
+    A.object
+        [ "tx-deep-diagnosis"
+            .= A.object
+                [ "summary" .= summary
+                , "intent" .= intent
+                , "validate" .= validate
+                ]
+        ]
 
 {- | Render the diagnosis as one valid JSON document so the output
 pipes cleanly into jq, can be saved as a fixture, etc.
@@ -28,13 +44,6 @@ renderReport ::
     ProtocolRegistry ->
     Text
 renderReport summary intent validate _reg =
-    let doc =
-            A.object
-                [ "tx-deep-diagnosis"
-                    .= A.object
-                        [ "summary" .= summary
-                        , "intent" .= intent
-                        , "validate" .= validate
-                        ]
-                ]
-     in TE.decodeUtf8 (BSL.toStrict (APretty.encodePretty doc)) <> "\n"
+    TE.decodeUtf8
+        (BSL.toStrict (APretty.encodePretty (buildReportValue summary intent validate)))
+        <> "\n"

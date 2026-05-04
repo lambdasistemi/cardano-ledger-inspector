@@ -26,6 +26,7 @@ library
     TxDeepDiagnosisHost.Diagnosis
     TxDeepDiagnosisHost.Registry
     TxDeepDiagnosisHost.Render.Doc
+    TxDeepDiagnosisHost.Render.Emit
     TxDeepDiagnosisHost.Render.Failures
     TxDeepDiagnosisHost.Render.Names
     TxDeepDiagnosisHost.Render.Parties
