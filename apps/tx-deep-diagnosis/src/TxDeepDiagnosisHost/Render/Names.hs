@@ -14,6 +14,7 @@ module TxDeepDiagnosisHost.Render.Names (
     PartySource (..),
     resolveScript,
     resolveAddress,
+    paymentScriptHash,
     truncateHash,
 ) where
 
@@ -113,6 +114,19 @@ resolveAddress reg addrHex
                             { pnLabel = "key " <> hashTail paymentHex
                             , pnSource = TruncatedHex
                             }
+
+{- | Extract the payment script hash from an address-hex when the
+header indicates a script payment credential. Returns 'Nothing' when
+the payment is key-credential or the address is too short.
+-}
+paymentScriptHash :: Text -> Maybe Text
+paymentScriptHash addrHex
+    | Text.length addrHex < 58 = Nothing
+    | otherwise =
+        let header = Text.take 2 addrHex
+         in if headerHasScriptPayment header
+                then Just (Text.take 56 (Text.drop 2 addrHex))
+                else Nothing
 
 {- | The header byte of a Shelley address encodes the type in the high
 nibble. Bits 0x40 and 0x10 of that nibble select script payment
