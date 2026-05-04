@@ -67,6 +67,10 @@
       "type": "array",
       "items": { "$ref": "#/$defs/effect" }
     },
+    "scripts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/intentScript" }
+    },
     "withdrawals": {
       "type": "array",
       "items": { "$ref": "#/$defs/withdrawal" }
@@ -229,6 +233,39 @@
         "network": { "type": "string", "enum": ["mainnet", "testnet"] },
         "credential": { "$ref": "#/$defs/credential" },
         "amount_lovelace": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "txInRef": {
+      "type": "object",
+      "required": ["tx_id", "index"],
+      "properties": {
+        "tx_id": { "type": "string" },
+        "index": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "exUnitsCommitted": {
+      "type": "object",
+      "required": ["memory", "steps"],
+      "properties": {
+        "memory": { "type": "string" },
+        "steps": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "intentScript": {
+      "type": "object",
+      "required": ["purpose", "index", "redeemer_cbor_hex", "ex_units_committed"],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "enum": ["spending", "minting", "certifying", "rewarding", "voting", "proposing"]
+        },
+        "index": { "type": "integer", "minimum": 0 },
+        "input": { "$ref": "#/$defs/txInRef" },
+        "redeemer_cbor_hex": { "type": "string" },
+        "ex_units_committed": { "$ref": "#/$defs/exUnitsCommitted" }
       },
       "additionalProperties": true
     },
