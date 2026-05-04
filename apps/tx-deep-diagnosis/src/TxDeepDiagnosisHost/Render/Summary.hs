@@ -33,11 +33,23 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Vector as V
 
-import TxDeepDiagnosisHost.Registry (ProtocolRegistry)
+import TxDeepDiagnosisHost.Registry (
+    AikenSource (..),
+    DatumSchema (..),
+    FieldType (..),
+    ProtocolRegistry,
+    SchemaConstructor (..),
+    SchemaField (..),
+    SchemaSource (..),
+    TupleField (..),
+    aikenSourceUrl,
+    datumSchemaForHash,
+ )
 import TxDeepDiagnosisHost.Render.Doc (DiagnosisDoc (..))
 import TxDeepDiagnosisHost.Render.Names (
     PartyName (..),
     PartySource (..),
+    paymentScriptHash,
     resolveAddress,
  )
 
@@ -681,12 +693,15 @@ mapMaybeDecoded reg = mapMaybe step
                     Just (String s) -> Just s
                     _ -> Nothing
                 ast <- KeyMap.lookup "decoded" d
+                let scriptHash = paymentScriptHash addr
+                    schema = scriptHash >>= datumSchemaForHash reg
                 Just
                     DecodedDatum
                         { ddIndex = idx
                         , ddDestination = pnLabel (resolveAddress reg addr)
                         , ddCbor = cbor
                         , ddAst = ast
+                        , ddSchema = schema
                         }
             _ -> Nothing
     step _ = Nothing
@@ -696,6 +711,7 @@ data DecodedDatum = DecodedDatum
     , ddDestination :: !Text
     , ddCbor :: !Text
     , ddAst :: !Value
+    , ddSchema :: !(Maybe DatumSchema)
     }
 
 groupByCbor :: [DecodedDatum] -> [(DecodedDatum, [Int])]
@@ -724,13 +740,210 @@ renderDatumGroup (rep, indices) =
                     <> " ("
                     <> Text.pack (show (length xs))
                     <> " identical)"
+        body = case ddSchema rep of
+            Just schema ->
+                provenanceLine schema
+                    <> "\n```\n"
+                    <> prettySchemaBound schema (ddAst rep)
+                    <> "```\n"
+            Nothing ->
+                "_Untyped — no datum schema registered for this script hash._\n\n"
+                    <> "```\n"
+                    <> prettyPlutusData 0 (ddAst rep)
+                    <> "```\n"
      in "<details><summary>"
             <> escapeTable title
             <> "</summary>\n\n"
-            <> "```\n"
-            <> prettyPlutusData 0 (ddAst rep)
-            <> "```\n\n"
-            <> "</details>\n\n"
+            <> body
+            <> "\n</details>\n\n"
+
+{- | The provenance disclaimer shown above every typed datum body.
+The renderer will not emit typed names without one — every
+'SchemaSource' constructor produces a non-empty line.
+-}
+provenanceLine :: DatumSchema -> Text
+provenanceLine schema =
+    let prefix = "_Field names "
+     in case dsSource schema of
+            SourcePlutusJson ->
+                prefix <> "from the contract's CIP-57 plutus.json blueprint._\n"
+            SourceAiken src ->
+                prefix
+                    <> "interpreted from the upstream Aiken source: ["
+                    <> asRepo src
+                    <> "@"
+                    <> Text.take 10 (asCommit src)
+                    <> "]("
+                    <> aikenSourceUrl src
+                    <> ")"
+                    <> maybe "" (\n -> " — " <> n) (asNote src)
+                    <> "._\n"
+            SourceManual note ->
+                prefix
+                    <> "interpreted from manual analysis (no upstream typed source): "
+                    <> note
+                    <> "._\n"
+
+{- | Walk the AST against a 'DatumSchema' and produce typed prose. The
+top-level Constr index selects a constructor from 'dsConstructors';
+fields are named per the schema. When the AST shape disagrees with
+the schema (e.g. the Constr index is unknown), the whole body falls
+back to the untyped pretty-printer with a one-line note so the
+discrepancy is visible.
+-}
+prettySchemaBound :: DatumSchema -> Value -> Text
+prettySchemaBound schema ast =
+    case ast of
+        Object o
+            | Just (String "constr") <- KeyMap.lookup "kind" o
+            , Just (Number n) <- KeyMap.lookup "index" o
+            , let ix = floor n :: Integer
+            , Just sc <- findConstructor ix (dsConstructors schema)
+            , Just (Array fs) <- KeyMap.lookup "fields" o ->
+                dsName schema
+                    <> " (= "
+                    <> scName sc
+                    <> ")\n"
+                    <> renderFields 1 sc (V.toList fs)
+        _ ->
+            "_AST shape disagrees with schema; rendering untyped._\n\n"
+                <> prettyPlutusData 0 ast
+
+findConstructor :: Integer -> [SchemaConstructor] -> Maybe SchemaConstructor
+findConstructor ix = foldr step Nothing
+  where
+    step c acc = if scIndex c == ix then Just c else acc
+
+renderFields :: Int -> SchemaConstructor -> [Value] -> Text
+renderFields lvl sc values =
+    let pad = Text.replicate (lvl * 2) " "
+        fields = scFields sc
+        zipped = zip fields (values <> repeat Null)
+        usedFieldCount = length fields
+        extras = drop usedFieldCount values
+     in Text.concat (map (renderTypedField lvl pad) zipped)
+            <> if null extras
+                then ""
+                else
+                    pad
+                        <> "_("
+                        <> Text.pack (show (length extras))
+                        <> " extra fields beyond schema, rendering untyped:)_\n"
+                        <> Text.concat
+                            (map (prettyPlutusData (lvl + 1)) extras)
+
+renderTypedField :: Int -> Text -> (SchemaField, Value) -> Text
+renderTypedField lvl pad (SchemaField name ty, v) =
+    pad <> sfBullet name <> renderTyped (lvl + 1) ty v
+
+sfBullet :: Text -> Text
+sfBullet name = name <> ": "
+
+{- | Render a Plutus AST node bound to a 'FieldType'. Recurses through
+'FtList', 'FtConstr', 'FtSum'. 'FtData' falls through to the untyped
+pretty-printer so opaque @extensions@ fields stay visible.
+-}
+renderTyped :: Int -> FieldType -> Value -> Text
+renderTyped lvl ty v = case (ty, v) of
+    (FtBytes hint, Object o)
+        | Just (String "bytes") <- KeyMap.lookup "kind" o ->
+            renderBytes hint o
+    (FtInt hint, Object o)
+        | Just (String "int") <- KeyMap.lookup "value" o ->
+            renderInt hint o
+        | Just (String "int") <- KeyMap.lookup "kind" o ->
+            renderInt hint o
+    (FtList elemTy, Object o)
+        | Just (String "list") <- KeyMap.lookup "kind" o
+        , Just (Array xs) <- KeyMap.lookup "items" o ->
+            "List "
+                <> Text.pack (show (V.length xs))
+                <> "\n"
+                <> Text.concat
+                    [ Text.replicate (lvl * 2) " "
+                        <> "- "
+                        <> renderTyped (lvl + 1) elemTy x
+                    | x <- V.toList xs
+                    ]
+    (FtTuple slots, Object o)
+        | Just (String "list") <- KeyMap.lookup "kind" o
+        , Just (Array xs) <- KeyMap.lookup "items" o ->
+            let pad = Text.replicate (lvl * 2) " "
+                pairs =
+                    take
+                        (length slots)
+                        (zip slots (V.toList xs <> repeat Null))
+             in "(\n"
+                    <> Text.concat
+                        [ pad
+                            <> tfName slot
+                            <> ": "
+                            <> renderTyped (lvl + 1) (tfType slot) val
+                        | (slot, val) <- pairs
+                        ]
+                    <> Text.replicate (max 0 (lvl - 1) * 2) " "
+                    <> ")\n"
+    (FtConstr sc, Object o)
+        | Just (String "constr") <- KeyMap.lookup "kind" o
+        , Just (Number n) <- KeyMap.lookup "index" o
+        , floor n == scIndex sc
+        , Just (Array fs) <- KeyMap.lookup "fields" o ->
+            scName sc
+                <> "\n"
+                <> renderFields lvl sc (V.toList fs)
+    (FtSum variants, Object o)
+        | Just (String "constr") <- KeyMap.lookup "kind" o
+        , Just (Number n) <- KeyMap.lookup "index" o
+        , let ix = floor n :: Integer
+        , Just sc <- findConstructor ix variants
+        , Just (Array fs) <- KeyMap.lookup "fields" o ->
+            scName sc
+                <> "\n"
+                <> renderFields lvl sc (V.toList fs)
+    (FtData, _) ->
+        "_(Data, untyped)_\n"
+            <> prettyPlutusData lvl v
+    _ ->
+        "_(schema/AST mismatch, untyped)_\n"
+            <> prettyPlutusData lvl v
+
+renderBytes :: Maybe Text -> KeyMap.KeyMap Value -> Text
+renderBytes hint o =
+    let hex = case KeyMap.lookup "hex" o of
+            Just (String s) -> s
+            _ -> ""
+        len = case KeyMap.lookup "len" o of
+            Just (Number n) -> floor n :: Int
+            _ -> 0
+        utf = case KeyMap.lookup "utf8" o of
+            Just (String s) -> Just s
+            _ -> Nothing
+        hexShort
+            | Text.length hex <= 32 = hex
+            | otherwise = Text.take 16 hex <> "…" <> Text.takeEnd 8 hex
+        utfTail = case utf of
+            Just s -> "  // \"" <> s <> "\""
+            Nothing -> ""
+        hintTail = case hint of
+            Just h -> "  // " <> h
+            Nothing -> ""
+     in "Bytes "
+            <> Text.pack (show len)
+            <> "B "
+            <> hexShort
+            <> hintTail
+            <> utfTail
+            <> "\n"
+
+renderInt :: Maybe Text -> KeyMap.KeyMap Value -> Text
+renderInt hint o =
+    let s = case KeyMap.lookup "value" o of
+            Just (String x) -> x
+            _ -> "?"
+        hintTail = case hint of
+            Just h -> "  // " <> h
+            Nothing -> ""
+     in "Int " <> s <> hintTail <> "\n"
 
 sortedIndices :: [Int] -> [Int]
 sortedIndices = foldr insertSorted []

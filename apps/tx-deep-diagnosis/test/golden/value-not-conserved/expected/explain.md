@@ -160,6 +160,8 @@ Inputs that also receive outputs (same payment credential on both sides):
 
 <details><summary>Outputs #0, #1, #2, #3, #4, #5, #6, #7, #8 — SundaeSwap V3 order (9 identical)</summary>
 
+_Untyped — no datum schema registered for this script hash._
+
 ```
 Constr 0
   Constr 0
@@ -199,6 +201,8 @@ Constr 0
 </details>
 
 <details><summary>Output #9 — SundaeSwap V3 order</summary>
+
+_Untyped — no datum schema registered for this script hash._
 
 ```
 Constr 0
