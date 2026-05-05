@@ -109,7 +109,7 @@ Swagger UI: <https://lambdasistemi.github.io/cardano-ledger-inspector/swagger/>
 
 Transaction inspector: <https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>
 
-Pull-request previews are published to Surge by the `PR preview` workflow.
+Pull requests build the preview bundle and smoke-test it on localhost in CI.
 
 ## Releases
 
