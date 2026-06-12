@@ -155,9 +155,11 @@ flowchart TD
    problem), so for this release data comes from **Koios/Blockfrost**,
    constrained to exactly two request shapes: **TxIn→TxOut input
    resolution** and **network/protocol parameters**. Resolve inputs by
-   fetching the producing transaction by id and verifying `hash(tx) = txid`
-   locally — turning a trusted lookup into a checkable one — not by trusting
-   a resolved-UTxO endpoint. Keeping the surface this narrow is deliberate:
+   fetching the producing transaction by id and verifying
+   `blake2b-256(txbody) = txid` locally (via the in-wasm ledger txid — the
+   commitment is over the body, not the witnessed tx) — turning a trusted
+   lookup into a checkable one, for free, since the input had to be fetched
+   anyway — not by trusting a resolved-UTxO endpoint. Keeping the surface this narrow is deliberate:
    it is exactly what a future **CSMT-UTxO** proof-carrying provider
    replaces, swapping trusted input resolution for proofs verified against
    an external root. (See [#45](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/45)
@@ -182,8 +184,11 @@ acceptance criterion in the child specs.
   swappable: only (a) TxIn→TxOut input resolution and (b) network/protocol
   parameters.** Input resolution prefers the *verifiable* path — fetch the
   producing transaction by id (`/txs/{hash}/cbor`, Koios `/tx_cbor`), check
-  `hash(tx) = txid`, derive `output[ix]` locally — over a trusted
-  resolved-UTxO endpoint. This narrow surface is the clean swap-in point
+  `blake2b-256(txbody) = txid` (the txid commits to the **body**, not the
+  full witnessed tx — verify via the in-wasm ledger txid, not a hand-rolled
+  hash), derive `output[ix]` locally — over a trusted resolved-UTxO
+  endpoint. The resolution is trustless **at no extra cost**: a TxIn must be
+  fetched regardless, and its txid half is already the commitment. This narrow surface is the clean swap-in point
   for a future **CSMT-UTxO** provider returning membership proofs verifiable
   against an external root (trustless input resolution); network parameters
   stay provider-trusted until separately committed. **Not this release —
