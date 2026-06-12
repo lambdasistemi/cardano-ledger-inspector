@@ -23,6 +23,13 @@ packages:
   libs/cardano-ledger-inspector
   apps/tx-deep-diagnosis
 
+source-repository-package
+  type: git
+  location: https://github.com/lambdasistemi/cardano-ledger-wasm
+  tag: 5897e8da1c043eb53cdafa6ada9782b56c74b18e
+  subdir: cardano-ledger-wasm
+  --sha256: 1x107phcsmn2g1zw0lm39nm064rpdw7ni9jim047s825f6b53rzx
+
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 

@@ -22,9 +22,9 @@ library wasm-extism-spike-lib
     , aeson
     , base               >=4.19 && <5
     , bytestring
+    , cardano-ledger-wasm
     , extism-pdk
     , text
-    , cardano-ledger-inspector
 
   default-language: Haskell2010
   ghc-options:      -Wall
