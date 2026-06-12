@@ -148,13 +148,20 @@ flowchart TD
    `query()`/`validate()` into the Halogen layer as the **lens runner**
    and the **conformance gate**.
 
-4. **Context without Blockfrost.** A tx body needs its consumed inputs
-   resolved for full context (value flow, datums). `amaru-treasury-tx`
-   gets this from a local chain-sync indexer, *not* Blockfrost. The
-   browser cannot run an indexer, so resolved context becomes **local
-   input**: pasted alongside the tx, carried in a **context book**, or
-   pulled from a user-pointed local provider. No SaaS in the trust path
-   (cf. issue [#45](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/45)).
+4. **Provider data layer (Koios/Blockfrost — minimal & verifiable).** A tx
+   body needs its consumed inputs resolved (value flow, datums) and the
+   network parameters. The browser can't run an indexer, and a user's local
+   node isn't reachable from the page (transport/CORS/N2C — an unsolved
+   problem), so for this release data comes from **Koios/Blockfrost**,
+   constrained to exactly two request shapes: **TxIn→TxOut input
+   resolution** and **network/protocol parameters**. Resolve inputs by
+   fetching the producing transaction by id and verifying `hash(tx) = txid`
+   locally — turning a trusted lookup into a checkable one — not by trusting
+   a resolved-UTxO endpoint. Keeping the surface this narrow is deliberate:
+   it is exactly what a future **CSMT-UTxO** proof-carrying provider
+   replaces, swapping trusted input resolution for proofs verified against
+   an external root. (See [#45](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/45)
+   — surface provider errors rather than swallow them.)
 
 ## Spec-level invariants (acceptance)
 
@@ -168,10 +175,19 @@ acceptance criterion in the child specs.
   `cardano:fromTxOutRef`) with the body graph. No bespoke join logic.
 - **I3 — Open-world composability.** Two independently authored books merge
   without coordination; neither needs to know the other exists.
-- **I4 — No network in the trust path.** Emit, merge, query, and validate
-  execute in wasm in the page. The only permitted network is *fetching the
-  tx/context the user asked for*, and that must be a user-chosen source,
-  never a hardwired SaaS.
+- **I4 — Trust boundary at the data layer, not the logic.** Emit, merge,
+  query, and validate execute in wasm in the page — never trusted to a
+  server. Chain data comes from Koios/Blockfrost (the providers everyone
+  already keys), but the request surface is **deliberately minimal and
+  swappable: only (a) TxIn→TxOut input resolution and (b) network/protocol
+  parameters.** Input resolution prefers the *verifiable* path — fetch the
+  producing transaction by id (`/txs/{hash}/cbor`, Koios `/tx_cbor`), check
+  `hash(tx) = txid`, derive `output[ix]` locally — over a trusted
+  resolved-UTxO endpoint. This narrow surface is the clean swap-in point
+  for a future **CSMT-UTxO** provider returning membership proofs verifiable
+  against an external root (trustless input resolution); network parameters
+  stay provider-trusted until separately committed. **Not this release —
+  this release is Koios + Blockfrost.**
 - **I5 — Selectivity.** The user chooses which books and which parts merge;
   an unselected book has zero effect on the graph or the rendered result.
 - **I6 — Engine fidelity.** Query is full SPARQL 1.1 (Oxigraph) and
@@ -194,8 +210,11 @@ Bisect-safe, each a `resolve-ticket` PR. Ordering reflects dependencies.
    `cq-rdf blueprint`. Converges with [#35](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/35)/[#36](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/36).
 5. **RDF-5 — SHACL shapes books**: `validate()` as the author gate /
    auditor classifier; render conformance.
-6. **RDF-6 — context without Blockfrost**: context book / local provider;
-   close the SaaS dependency ([#45](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/45)).
+6. **RDF-6 — provider data layer**: a minimal, verifiable Koios/Blockfrost
+   surface — TxIn→TxOut resolution via verifiable tx-fetch + network
+   parameters — built so a CSMT-UTxO proof provider drops in later
+   ([#45](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/45):
+   surface provider errors, don't swallow them).
 
 ## Open questions
 
@@ -213,3 +232,12 @@ Bisect-safe, each a `resolve-ticket` PR. Ordering reflects dependencies.
 - **Engine packaging.** Two wasm modules (WASI + wasm-bindgen) in one
   bundle: confirm size budget and that `nix/wasm` can vendor the
   `rdf-shapes-wasm` derivation as a flake input cleanly.
+- **Local node from the browser.** Reaching a user's local node for queries
+  is unsolved (transport/CORS/N2C). Until a CSMT-UTxO proof provider exists,
+  verifiable tx-fetch from Koios/Blockfrost is the floor — is that the right
+  interim, and how do we bound trust on network parameters (not covered by a
+  UTxO commitment)?
+- **CSMT-UTxO provider (future, not this release).** Shape of the
+  membership-proof interface and the external root it verifies against; how
+  it slots behind the same TxIn→TxOut resolution contract so the swap is a
+  provider change, not a UI change.
