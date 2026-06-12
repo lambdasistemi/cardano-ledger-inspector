@@ -125,8 +125,9 @@ producer transaction CBOR that could not be fetched.
   and evaluated execution units, and preserves missing-context diagnostics. It
   never mutates or returns transaction CBOR.
 
-The browser inspector now calls `tx.inspect`, `tx.identify`, `tx.intent`,
-`tx.witness.plan`, and `tx.validate` from the same selected transaction CBOR.
+The browser inspector now calls `tx.inspect`, `tx.browse`, `tx.identify`,
+`tx.intent`, `tx.witness.plan`, and `tx.validate` from the same selected
+transaction CBOR.
 When provider credentials are available, producer transaction CBOR fetched by
 transaction id is passed as explicit `args.context.producer_txs`, and provider
 tip/protocol-parameter data is passed as explicit validation context. Missing
