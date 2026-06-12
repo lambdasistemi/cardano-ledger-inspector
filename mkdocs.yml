@@ -28,11 +28,14 @@ theme:
 
 nav:
   - Overview: index.md
+  - Installation: installation.md
+  - User Manual:
+      - Functional Layer: functional-layer.md
+      - API Definition: api.md
+      - Swagger UI: swagger.md
   - Architecture: architecture.md
-  - Functional Layer: functional-layer.md
-  - API Definition: api.md
-  - Swagger UI: swagger.md
-  - Build and Artifacts: build.md
+  - Development:
+      - Build and Artifacts: build.md
   - Repository: https://github.com/lambdasistemi/cardano-ledger-inspector
 
 plugins:
