@@ -34,6 +34,16 @@
     ghc-wasm-meta = {
       url = "gitlab:haskell-wasm/ghc-wasm-meta?host=gitlab.haskell.org";
     };
+    cardanoLedgerWasm = {
+      url = "github:lambdasistemi/cardano-ledger-wasm/5897e8da1c043eb53cdafa6ada9782b56c74b18e";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.haskellNix.follows = "haskellNix";
+      inputs.hackageNix.follows = "hackageNix";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.iohkNix.follows = "iohkNix";
+      inputs.CHaP.follows = "CHaP";
+      inputs.ghc-wasm-meta.follows = "ghc-wasm-meta";
+    };
     purescript-overlay = {
       url = "github:paolino/purescript-overlay/fix/remove-nodePackages";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -53,6 +63,7 @@
     , iohkNix
     , CHaP
     , ghc-wasm-meta
+    , cardanoLedgerWasm
     , purescript-overlay
     , mkSpagoDerivation
     , ...
@@ -61,7 +72,7 @@
       systems = [ "x86_64-linux" "aarch64-darwin" ];
 
       flake = {
-        lib.wasm = import ./nix/wasm { lib = nixpkgs.lib; };
+        lib.wasm = cardanoLedgerWasm.lib.wasm;
       };
 
       perSystem =
@@ -101,6 +112,7 @@
             ghcWasmMeta = ghc-wasm-meta.packages.${system}.all_9_12;
             wasiSdk = ghc-wasm-meta.packages.${system}.wasi-sdk;
             chap = CHaP;
+            cardanoLedgerWasmSrc = cardanoLedgerWasm;
             smokeSrc = ./nix/wasm/smoke;
             ledgerSmokeSrc = ./nix/wasm/ledger-smoke;
             txInspectorSrc = ./libs/cardano-ledger-inspector;
@@ -115,6 +127,71 @@
           };
 
           ledgerFunctionalOpenapiSpec = import ./nix/ledger-functional-openapi.nix;
+
+          expectedCardanoLedgerWasm = {
+            rev = "5897e8da1c043eb53cdafa6ada9782b56c74b18e";
+            sha256 = "1x107phcsmn2g1zw0lm39nm064rpdw7ni9jim047s825f6b53rzx";
+          };
+
+          expectedPlutusPin = {
+            location = "https://github.com/lambdasistemi/plutus.git";
+            rev = "dec7b4980f5f171a1e46c67dd3347240da2266cf";
+          };
+
+          cardano-ledger-wasm-pin-check =
+            pkgs.runCommand "cardano-ledger-wasm-pin-check" { } ''
+              set -euo pipefail
+
+              fail=0
+
+              require_file_contains() {
+                local label="$1"
+                local needle="$2"
+                local file="$3"
+                if ! ${pkgs.gnugrep}/bin/grep -F -- "$needle" "$file" >/dev/null; then
+                  echo "missing $label: $needle" >&2
+                  fail=1
+                fi
+              }
+
+              require_equal() {
+                local label="$1"
+                local expected="$2"
+                local actual="$3"
+                if [ "$actual" != "$expected" ]; then
+                  echo "$label mismatch" >&2
+                  echo "  expected: $expected" >&2
+                  echo "  actual:   $actual" >&2
+                  fail=1
+                fi
+              }
+
+              require_file_contains "cardano-ledger-wasm SRP location" \
+                "location: https://github.com/lambdasistemi/cardano-ledger-wasm" \
+                ${./cabal.project}
+              require_file_contains "cardano-ledger-wasm SRP tag" \
+                "tag: ${expectedCardanoLedgerWasm.rev}" \
+                ${./cabal.project}
+              require_file_contains "cardano-ledger-wasm SRP sha256" \
+                "--sha256: ${expectedCardanoLedgerWasm.sha256}" \
+                ${./cabal.project}
+
+              require_equal "cardanoLedgerWasm flake input rev" \
+                "${expectedCardanoLedgerWasm.rev}" \
+                "${cardanoLedgerWasm.rev}"
+              require_equal "Plutus fork location" \
+                "${expectedPlutusPin.location}" \
+                "${cardanoLedgerWasm.lib.wasm.forks.pins.plutus.location}"
+              require_equal "Plutus fork rev" \
+                "${expectedPlutusPin.rev}" \
+                "${cardanoLedgerWasm.lib.wasm.forks.pins.plutus.rev}"
+
+              if [ "$fail" -ne 0 ]; then
+                exit "$fail"
+              fi
+
+              touch "$out"
+            '';
 
           ledgerFunctionalOpenapiSource = pkgs.writeText
             "cardano-ledger-functional.openapi.raw.json"
@@ -838,7 +915,8 @@
               tx-evaluate-scripts-smoke
               tx-extism-spike-smoke
               tx-explain-render-smoke
-              tx-deep-diagnosis-emit-explain-smoke;
+              tx-deep-diagnosis-emit-explain-smoke
+              cardano-ledger-wasm-pin-check;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 

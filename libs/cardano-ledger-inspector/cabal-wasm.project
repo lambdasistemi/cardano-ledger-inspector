@@ -1,7 +1,7 @@
--- WASM build configuration for the cardano-ledger-binary smoke target.
--- Exercises the full override set: plutus fork, hs-memory, cborg, foundation,
--- network, double-conversion, criterion, lmdb-mock + wasm32-built libsodium /
--- secp256k1 / libblst via pkg-config.
+-- WASM build configuration for the local wasm-tx-inspector executable wrapper.
+-- The Conway ledger kernel is supplied by the pinned external
+-- cardano-ledger-wasm package; fork package paths are supplied by the external
+-- mkCardanoLedgerWasm srpForks argument.
 
 repository cardano-haskell-packages
   url: https://chap.intersectmbo.org/
@@ -24,9 +24,10 @@ index-state:
   , hackage.haskell.org 2026-04-14T00:00:00Z
   , cardano-haskell-packages 2026-04-15T11:20:53Z
 
-packages: .
+packages:
+  .
+  external/cardano-ledger-wasm
 
--- Package flags mirrored from nix/wasm/forks.json.
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
@@ -41,58 +42,6 @@ package digest
 
 package plutus-core
   flags: +do-not-build-plutus-exec
-
--- SRP entries pre-fetched and rewritten by mkCardanoLedgerWasm at build time
--- via srpForks. Listed here so the solver's first pass has the versions; the
--- nix-store paths are spliced into `packages:` after the cabal cache bootstrap.
-source-repository-package
-  type: git
-  location: https://github.com/well-typed/cborg.git
-  tag: 72a0e736e24c864b5a9b95d90adb37a9e8e6d761
-  subdir: cborg
-
-source-repository-package
-  type: git
-  location: https://github.com/intersectmbo/plutus.git
-  tag: d1684df33d1b7226dfa5f2247aa67a46c2d5453b
-  subdir:
-    plutus-core
-    plutus-ledger-api
-    plutus-tx
-
-source-repository-package
-  type: git
-  location: https://github.com/haskell-wasm/hs-memory.git
-  tag: a198a76c584dc2cfdcde6b431968de92a5fed65e
-
-source-repository-package
-  type: git
-  location: https://github.com/Jimbo4350/foundation.git
-  tag: b3cb78484fe6f6ce1dfcef59e72ceccc530e86ac
-  subdir:
-    basement
-    foundation
-
-source-repository-package
-  type: git
-  location: https://github.com/haskell-wasm/network
-  tag: ab92e48e9fdf3abe214f85fdbe5301c1280e14e9
-
-source-repository-package
-  type: git
-  location: https://github.com/palas/double-conversion.git
-  tag: b2030245727ee56de76507fe305e3741f6ce3260
-
-source-repository-package
-  type: git
-  location: https://github.com/palas/criterion.git
-  tag: dd160d2b5f051e918e72fe1957d77905682b8d6c
-  subdir: criterion-measurement
-
-source-repository-package
-  type: git
-  location: https://github.com/palas/haskell-lmdb-mock.git
-  tag: c8d61e6eee03ee271e7768c0576110da885aec48
 
 tests: False
 benchmarks: False

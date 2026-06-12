@@ -6,35 +6,6 @@ author:        lambdasistemi
 license:       Apache-2.0
 build-type:    Simple
 
-library
-  exposed-modules:  Conway.Inspector
-  other-modules:    Conway.Inspector.Common
-                  , Conway.Inspector.Context
-                  , Conway.Inspector.Evaluation
-                  , Conway.Inspector.Validation
-  hs-source-dirs:   src
-  build-depends:    base                  >=4.19 && <5
-                  , aeson
-                  , base16-bytestring
-                  , bytestring
-                  , cardano-crypto-class
-                  , cardano-ledger-alonzo
-                  , cardano-ledger-api
-                  , cardano-ledger-binary
-                  , cardano-ledger-conway
-                  , cardano-ledger-core
-                  , cardano-ledger-mary
-                  , cardano-ledger-shelley
-                  , cardano-slotting
-                  , containers
-                  , data-default
-                  , microlens
-                  , plutus-ledger-api
-                  , text
-                  , time
-  default-language: Haskell2010
-  ghc-options:      -Wall
-
 executable wasm-tx-inspector
   main-is:          Main.hs
   hs-source-dirs:   app
@@ -42,6 +13,6 @@ executable wasm-tx-inspector
                   , aeson
                   , bytestring
                   , text
-                  , cardano-ledger-inspector
+                  , cardano-ledger-wasm
   default-language: Haskell2010
   ghc-options:      -Wall
