@@ -1,7 +1,7 @@
 # Design: RDF semantics composability (browser-local book merge)
 
 > Status: **design / proposal**. Tracks the epic
-> [#NNN](https://github.com/lambdasistemi/cardano-ledger-inspector/issues).
+> [#76](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/76).
 > This document is the architecture narrative; per-feature specs land under
 > `specs/0NN-*` as the work is sliced.
 
