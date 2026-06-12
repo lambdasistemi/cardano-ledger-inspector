@@ -9,8 +9,8 @@ ledger semantics in JavaScript or PureScript.
 
 The transaction inspector is the first published workbench built on this
 layer. It accepts transaction CBOR, runs the Haskell ledger WASI module in
-the browser, and renders identity, witness planning, validation diagnostics,
-and a browsable transaction result.
+the browser, and renders identity, signer intent, witness planning,
+validation diagnostics, and a browsable transaction result.
 
 [Open the inspector](inspector/){ .md-button .md-button--primary }
 
