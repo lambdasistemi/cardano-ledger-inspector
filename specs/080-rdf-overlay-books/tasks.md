@@ -14,12 +14,12 @@
 
 ## Slice 2 - Merge And Resolved Labels UX
 
-- [ ] T080-S2 Merge selected overlay Turtle with `tx.rdf` by RDF union only.
-- [ ] T080-S2 Add a named resolved-labels SPARQL lens through
+- [X] T080-S2 Merge selected overlay Turtle with `tx.rdf` by RDF union only.
+- [X] T080-S2 Add a named resolved-labels SPARQL lens through
   `rdf-shapes-wasm query()` and render label/role/entity rows.
-- [ ] T080-S2 Extend Playwright coverage for import, select, merge,
+- [X] T080-S2 Extend Playwright coverage for import, select, merge,
   resolved-label rendering, and deselect selectivity.
-- [ ] T080-S2 Run `nix develop --quiet -c just check-rdf`,
+- [X] T080-S2 Run `nix develop --quiet -c just check-rdf`,
   `nix develop --quiet -c just ui-check`,
   `nix develop --quiet -c just test-playwright`, and `./gate.sh`.
-- [ ] T080-S2 Commit as `feat: render resolved labels from rdf overlay books`.
+- [X] T080-S2 Commit as `feat: render resolved labels from rdf overlay books`.

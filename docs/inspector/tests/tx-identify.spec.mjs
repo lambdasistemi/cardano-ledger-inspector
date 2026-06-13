@@ -236,12 +236,32 @@ test("selects Amaru overlay book parts into deterministic Turtle", async ({
 
   const selectedTurtle = overlayPanel.getByLabel("Selected overlay Turtle");
   const coreDevelopment = overlayPanel.getByLabel("Core development");
+  const resolvedLabelsPanel = page.locator(".resolved-labels-panel");
   await coreDevelopment.check();
   await expect(selectedTurtle).toHaveValue(/Amaru Core Development treasury/);
   await expect(selectedTurtle).toHaveValue(/@prefix cardano:/);
+  await expect(
+    resolvedLabelsPanel.getByRole("heading", {
+      name: "SPARQL lens: resolved labels",
+    }),
+  ).toBeVisible();
+  await expect(
+    resolvedLabelsPanel.getByText("Amaru Core Development treasury", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(resolvedLabelsPanel.getByText("Treasury", { exact: true })).toBeVisible();
 
   await coreDevelopment.uncheck();
   await expect(selectedTurtle).not.toHaveValue(/Amaru Core Development treasury/);
+  await expect(
+    resolvedLabelsPanel.getByText("Amaru Core Development treasury", {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    resolvedLabelsPanel.getByText("No resolved labels.", { exact: true }),
+  ).toBeVisible();
 });
 
 test("exposes the vendored RDF query engine", async ({ page }) => {

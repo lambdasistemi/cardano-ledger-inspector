@@ -91,6 +91,7 @@ type State =
   , validation :: Maybe Json.Validation
   , rdf :: Maybe Json.RdfGraph
   , sparqlLens :: Maybe SparqlLens
+  , resolvedLabelsLens :: Maybe ResolvedLabelsLens
   , overlayInput :: String
   , overlayParts :: Array OverlayPart
   , selectedOverlayPartIds :: Array String
@@ -111,6 +112,11 @@ type BrowserNode =
 
 type SparqlLens =
   { rows :: Array RdfShapes.TransactionOutputRow
+  , error :: Maybe String
+  }
+
+type ResolvedLabelsLens =
+  { rows :: Array RdfShapes.ResolvedLabelRow
   , error :: Maybe String
   }
 
@@ -165,6 +171,7 @@ inspectorComponent initial =
         , validation: Nothing
         , rdf: Nothing
         , sparqlLens: Nothing
+        , resolvedLabelsLens: Nothing
         , overlayInput: ""
         , overlayParts: []
         , selectedOverlayPartIds: []
@@ -502,6 +509,7 @@ inspectorComponent initial =
       Just rdf ->
         if exitOk && rdf.valid then
           [ renderRdfGraph rdf, renderOverlayBooks state ]
+            <> renderResolvedLabelsLensMaybe state.resolvedLabelsLens
             <> renderSparqlLensMaybe state.sparqlLens
         else []
       Nothing -> []
@@ -749,10 +757,77 @@ inspectorComponent initial =
   selectedOverlayTurtle state =
     String.joinWith "\n" (map _.turtle (selectedOverlayParts state))
 
+  mergedRdfTurtle transactionGraphTurtle overlayTurtle =
+    transactionGraphTurtle <> overlayTurtle
+
   selectedOverlayParts state =
     Array.filter
       (\part -> Array.elem part.id state.selectedOverlayPartIds)
       state.overlayParts
+
+  renderResolvedLabelsLensMaybe lens =
+    case lens of
+      Just value -> [ renderResolvedLabelsLens value ]
+      Nothing -> []
+
+  renderResolvedLabelsLens lens =
+    HH.div
+      [ classNames [ "resolved-labels-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "SPARQL lens: resolved labels" ]
+              , HH.p_ [ HH.text "Fixed query over the transaction RDF graph plus selected overlays." ]
+              ]
+          ]
+      , case lens.error of
+          Just err ->
+            HH.div
+              [ classNames [ "sparql-lens-error" ] ]
+              [ HH.text ("Resolved-labels query failed: " <> err) ]
+          Nothing ->
+            if Array.null lens.rows then
+              HH.div
+                [ classNames [ "witness-empty" ] ]
+                [ HH.text "No resolved labels." ]
+            else
+              HH.div
+                [ classNames [ "sparql-lens-row-list" ] ]
+                (map renderResolvedLabelsRow lens.rows)
+      ]
+
+  renderResolvedLabelsRow row =
+    HH.div
+      [ classNames [ "sparql-lens-row", "resolved-labels-row" ] ]
+      [ HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Label" ]
+          , HH.strong_ [ HH.text row.label ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Role" ]
+          , HH.code_ [ HH.text row.role ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Entity" ]
+          , HH.code_ [ HH.text row.entity ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Matched" ]
+          , HH.code_ [ HH.text row.matched ]
+          ]
+      ]
 
   renderSparqlLensMaybe lens =
     case lens of
@@ -1134,6 +1209,32 @@ inspectorComponent initial =
         || StringCodeUnits.take 7 trimmed == "preprod"
         || StringCodeUnits.take 7 trimmed == "preview"
 
+  resolvedLabelsLensFromGraph graphTurtle = do
+    lensResult <- liftEffect (RdfShapes.queryResolvedLabels graphTurtle)
+    pure
+      ( Just
+          ( case lensResult of
+              Left err ->
+                { rows: []
+                , error: Just err
+                }
+              Right rows ->
+                { rows
+                , error: Nothing
+                }
+          )
+      )
+
+  resolvedLabelsLensForState st =
+    case st.rdf of
+      Just rdf ->
+        if rdf.valid then
+          resolvedLabelsLensFromGraph
+            (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
+        else
+          pure Nothing
+      Nothing -> pure Nothing
+
   handleAction = case _ of
     SetBlockfrostKey s -> do
       H.modify_ _ { blockfrostKey = s }
@@ -1175,12 +1276,16 @@ inspectorComponent initial =
       case parsed of
         Left err ->
           H.modify_ _ { overlayError = Just err }
-        Right book ->
+        Right book -> do
+          st <- H.get
+          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
+          resolvedLabelsLens <- resolvedLabelsLensForState nextState
           H.modify_
             _
               { overlayParts = book.parts
               , selectedOverlayPartIds = []
               , overlayError = Nothing
+              , resolvedLabelsLens = resolvedLabelsLens
               }
     LoadAmaruOverlayBook -> do
       let input = OverlayBook.bundledAmaruJournal
@@ -1188,19 +1293,29 @@ inspectorComponent initial =
       case parsed of
         Left err ->
           H.modify_ _ { overlayInput = input, overlayError = Just err }
-        Right book ->
+        Right book -> do
+          st <- H.get
+          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
+          resolvedLabelsLens <- resolvedLabelsLensForState nextState
           H.modify_
             _
               { overlayInput = input
               , overlayParts = book.parts
               , selectedOverlayPartIds = []
               , overlayError = Nothing
+              , resolvedLabelsLens = resolvedLabelsLens
               }
-    ToggleOverlayPart partId selected ->
-      H.modify_ \st ->
-        st
-          { selectedOverlayPartIds =
-              toggleOverlayPartId partId selected st.selectedOverlayPartIds
+    ToggleOverlayPart partId selected -> do
+      st <- H.get
+      let
+        selectedOverlayPartIds =
+          toggleOverlayPartId partId selected st.selectedOverlayPartIds
+        nextState = st { selectedOverlayPartIds = selectedOverlayPartIds }
+      resolvedLabelsLens <- resolvedLabelsLensForState nextState
+      H.modify_
+        _
+          { selectedOverlayPartIds = selectedOverlayPartIds
+          , resolvedLabelsLens = resolvedLabelsLens
           }
     Decode -> do
       st <- H.get
@@ -1217,6 +1332,7 @@ inspectorComponent initial =
           , validation = Nothing
           , rdf = Nothing
           , sparqlLens = Nothing
+          , resolvedLabelsLens = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -1299,6 +1415,12 @@ inspectorComponent initial =
                 )
             else
               pure Nothing
+          resolvedLabelsLens <-
+            if operationResult.exitOk && rdfResult.exitOk && rdf.valid then
+              resolvedLabelsLensFromGraph
+                (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
+            else
+              pure Nothing
           H.modify_
             _
               { running = false
@@ -1322,6 +1444,7 @@ inspectorComponent initial =
                   if operationResult.exitOk && rdfResult.exitOk && rdf.valid then Just rdf
                   else Nothing
               , sparqlLens = sparqlLens
+              , resolvedLabelsLens = resolvedLabelsLens
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
                   else []
