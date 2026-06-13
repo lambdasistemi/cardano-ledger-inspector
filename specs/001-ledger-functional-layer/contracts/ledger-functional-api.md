@@ -827,9 +827,37 @@ The result never includes `tx_cbor` and never mutates the transaction.
 
 Decode the supplied Conway transaction and return a deterministic RDF graph
 serialized as Turtle. `tx.graph` is an alias accepted by the WASI boundary; the
-response `op` matches the requested operation.
+response `op` matches the requested operation. When producer transaction CBOR is
+supplied in `args.context.producer_txs`, the WASM ledger code decodes each
+producer transaction, recomputes its transaction id, checks it against the
+referenced input tx id, and only then uses the referenced output index to add
+resolved input/value-flow triples.
 
-Arguments: none.
+Arguments:
+
+```json
+{
+  "context": {
+    "producer_txs": {
+      "<producer_tx_id>": {
+        "tx_cbor": "<hex-encoded producer transaction>",
+        "source": "blockfrost.txs.cbor"
+      }
+    }
+  },
+  "blueprints": []
+}
+```
+
+`context.producer_txs` follows the same explicit producer-transaction context
+shape used by validation and script evaluation. The map value may also be the
+producer transaction CBOR string directly. Provider adapters remain byte
+fetchers: they may fetch transaction CBOR by tx id, but MUST NOT pass
+provider-specific UTxO JSON as the ledger-facing RDF input.
+
+Malformed producer CBOR, producer transaction id mismatches, and missing
+producer output indexes are reported as `malformed_ledger_operation`
+diagnostics.
 
 Result:
 

@@ -348,6 +348,39 @@
               and (.result.rdf.turtle | contains("@prefix cardano:"))
               and (.result.rdf.turtle | contains("cardano:Transaction"))
             ' response-1.json
+            ${pkgs.jq}/bin/jq \
+              '.op = "tx.rdf"' \
+              ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > resolved-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < resolved-request.json > resolved-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.rdf"
+              and .result.rdf.format == "text/turtle"
+              and (.result.rdf.turtle | contains("cardano:resolvedTo"))
+              and (.result.rdf.turtle | contains("resolvedInput"))
+            ' resolved-response.json
+            ${pkgs.jq}/bin/jq \
+              --arg from "1ef2797c28a7679ca8e62693642513a44bed07bc37cdef73d4cd29956b4f83a5" \
+              --arg to "87daf43c764260d9ad00342fcb0d444c15752c9215f43c6b8e74189e7ba99397" \
+              '.op = "tx.rdf"
+                | .args.context.producer_txs[$from].tx_cbor =
+                    .args.context.producer_txs[$to].tx_cbor' \
+              ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > mismatched-producer-request.json
+            if ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < mismatched-producer-request.json \
+              > mismatched-producer-response.json \
+              2> mismatched-producer-stderr.txt; then
+              echo "mismatched producer CBOR unexpectedly succeeded" >&2
+              exit 1
+            fi
+            ${pkgs.gnugrep}/bin/grep -F \
+              "malformed_ledger_operation: producer_tx_id_mismatch" \
+              mismatched-producer-stderr.txt
             ${pkgs.jq}/bin/jq -n \
               --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
               --rawfile blueprint ${./docs/inspector/protocols/sundaeswap-v3/plutus.json} \
@@ -389,6 +422,8 @@
               and (.result.rdf.turtle | contains(":OrderDatum_max_protocol_fee 1280000") | not)
             ' sundae-no-blueprint-response.json
             cp request.json response-1.json response-2.json turtle-1.ttl turtle-2.ttl \
+              resolved-request.json resolved-response.json \
+              mismatched-producer-request.json mismatched-producer-stderr.txt \
               sundae-blueprint-request.json sundae-blueprint-response.json \
               sundae-no-blueprint-request.json sundae-no-blueprint-response.json \
               $out/

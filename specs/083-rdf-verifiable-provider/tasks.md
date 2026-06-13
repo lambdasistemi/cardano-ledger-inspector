@@ -2,16 +2,16 @@
 
 ## Slice 1 - WASM RDF Input Resolution
 
-- [ ] T083-S1 Parse `args.context.producer_txs` for `tx.rdf` / `tx.graph`.
-- [ ] T083-S1 Decode each producer transaction CBOR through the Haskell ledger
+- [X] T083-S1 Parse `args.context.producer_txs` for `tx.rdf` / `tx.graph`.
+- [X] T083-S1 Decode each producer transaction CBOR through the Haskell ledger
   path and recompute its transaction id in WASM.
-- [ ] T083-S1 Reject mismatched producer CBOR and missing producer output
+- [X] T083-S1 Reject mismatched producer CBOR and missing producer output
   indexes before adding entries to `TxGraph.ResolvedUTxO`.
-- [ ] T083-S1 Pass verified resolved inputs to `TxGraph.emit`.
-- [ ] T083-S1 Extend `tx-rdf-smoke` and public contracts for resolved input
+- [X] T083-S1 Pass verified resolved inputs to `TxGraph.emit`.
+- [X] T083-S1 Extend `tx-rdf-smoke` and public contracts for resolved input
   value-flow and producer txid mismatch diagnostics.
-- [ ] T083-S1 Run `just check-rdf`, `just build-wasm`, and `./gate.sh`.
-- [ ] T083-S1 Commit as `feat: verify rdf producer inputs in wasm`.
+- [X] T083-S1 Run `just check-rdf`, `just build-wasm`, and `./gate.sh`.
+- [X] T083-S1 Commit as `feat: verify rdf producer inputs in wasm`.
 
 ## Slice 2 - Browser Provider Surface and Error Surfacing
 
