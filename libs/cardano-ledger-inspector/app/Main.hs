@@ -6,26 +6,49 @@
 -}
 module Main (main) where
 
-import Cardano.Crypto.Hash (hashFromStringAsHex)
-import Cardano.Ledger.Hashes (ScriptHash (..))
+import Cardano.Crypto.Hash (hashFromStringAsHex, hashToBytes)
+import qualified Cardano.Crypto.Hash as Crypto
+import qualified Cardano.Ledger.Api as L
+import Cardano.Ledger.BaseTypes (TxIx (..))
+import Cardano.Ledger.Conway (ConwayEra)
+import qualified Cardano.Ledger.Core as Core
+import Cardano.Ledger.Hashes (ScriptHash (..), extractHash)
+import qualified Cardano.Ledger.TxIn as TxIn
 import qualified Cardano.Tx.Blueprint as Blueprint
 import qualified Cardano.Tx.Decode as TxDecode
 import qualified Cardano.Tx.Graph.Emit as TxGraph
 import qualified Conway.Inspector as Inspector
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
+import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TextEncoding
+import Lens.Micro ((^.))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr, stdout)
 
 data RdfRequest
-    = RdfRequest T.Text T.Text [(ScriptHash, Blueprint.Blueprint, T.Text)]
+    = RdfRequest
+        T.Text
+        T.Text
+        Aeson.Value
+        [(ScriptHash, Blueprint.Blueprint, T.Text)]
+
+data ProducerContext = ProducerContext
+    { pcProducerTxs :: !(Map.Map T.Text ProducerTx)
+    }
+
+data ProducerTx = ProducerTx
+    { ptSource :: !T.Text
+    , ptDecoded :: !(Either T.Text TxDecode.ConwayTx)
+    }
 
 main :: IO ()
 main = do
@@ -48,7 +71,17 @@ parseRdfRequest input =
                         Just $ case KeyMap.lookup "tx_cbor" value of
                             Just (Aeson.String txCbor) -> do
                                 blueprints <- parseBlueprints value
-                                Right (RdfRequest operation txCbor blueprints)
+                                let args =
+                                        case KeyMap.lookup "args" value of
+                                            Just raw -> raw
+                                            Nothing -> Aeson.object []
+                                Right
+                                    ( RdfRequest
+                                        operation
+                                        txCbor
+                                        args
+                                        blueprints
+                                    )
                             _ ->
                                 Left "tx_cbor must be a string"
                 _ ->
@@ -198,18 +231,199 @@ oneLine =
     unwords . words
 
 runRdfOperation :: RdfRequest -> IO ()
-runRdfOperation (RdfRequest operation txCbor blueprints) =
+runRdfOperation (RdfRequest operation txCbor args blueprints) =
     case TxDecode.decodeConwayTxInput (TextEncoding.encodeUtf8 txCbor) of
         Left (TxDecode.TxInputDecodeError err) ->
             die "malformed_cbor" (T.unpack err)
-        Right tx ->
-            case TxGraph.emit tx Map.empty [] blueprints of
+        Right tx -> case producerContextFromArgs args of
+            Left err ->
+                die "malformed_ledger_operation" err
+            Right producerContext -> case resolveRdfUtxo tx producerContext of
                 Left err ->
-                    die
-                        "malformed_ledger_operation"
-                        (TxGraph.renderEmitError err)
-                Right graph ->
-                    writeJson (rdfResponse operation graph)
+                    die "malformed_ledger_operation" err
+                Right resolvedUtxo -> emitRdfGraph operation tx resolvedUtxo blueprints
+
+emitRdfGraph
+    :: T.Text
+    -> TxDecode.ConwayTx
+    -> TxGraph.ResolvedUTxO
+    -> [(ScriptHash, Blueprint.Blueprint, T.Text)]
+    -> IO ()
+emitRdfGraph operation tx resolvedUtxo blueprints =
+    case TxGraph.emit tx resolvedUtxo [] blueprints of
+        Left err ->
+            die
+                "malformed_ledger_operation"
+                (TxGraph.renderEmitError err)
+        Right graph ->
+            writeJson (rdfResponse operation graph)
+
+producerContextFromArgs
+    :: Aeson.Value -> Either String ProducerContext
+producerContextFromArgs Aeson.Null =
+    Right (ProducerContext Map.empty)
+producerContextFromArgs (Aeson.Object args) =
+    case KeyMap.lookup "context" args of
+        Nothing ->
+            Right (ProducerContext Map.empty)
+        Just Aeson.Null ->
+            Right (ProducerContext Map.empty)
+        Just (Aeson.Object context) ->
+            case KeyMap.lookup "producer_txs" context of
+                Nothing ->
+                    Right (ProducerContext Map.empty)
+                Just Aeson.Null ->
+                    Right (ProducerContext Map.empty)
+                Just (Aeson.Object producerTxs) ->
+                    Right $
+                        ProducerContext $
+                            Map.fromList
+                                [ ( keyText
+                                  , producerTxFromValue value
+                                  )
+                                | (key, value) <- KeyMap.toList producerTxs
+                                , let keyText = AesonKey.toText key
+                                ]
+                _ ->
+                    Left "args.context.producer_txs must be an object"
+        _ ->
+            Left "args.context must be an object"
+producerContextFromArgs _ =
+    Left "args must be an object"
+
+producerTxFromValue :: Aeson.Value -> ProducerTx
+producerTxFromValue value =
+    let source =
+            case lookupValue "source" value of
+                Just (Aeson.String s) -> s
+                _ -> "context.producer_txs"
+    in  ProducerTx
+            { ptSource = source
+            , ptDecoded =
+                case producerTxCbor value of
+                    Nothing ->
+                        Left "producer transaction is missing tx_cbor"
+                    Just txCbor ->
+                        case TxDecode.decodeConwayTxInput
+                            (TextEncoding.encodeUtf8 txCbor) of
+                            Left (TxDecode.TxInputDecodeError err) ->
+                                Left err
+                            Right tx ->
+                                Right tx
+            }
+
+producerTxCbor :: Aeson.Value -> Maybe T.Text
+producerTxCbor (Aeson.String txCbor) =
+    Just txCbor
+producerTxCbor (Aeson.Object obj) =
+    case KeyMap.lookup "tx_cbor" obj of
+        Just (Aeson.String txCbor) -> Just txCbor
+        _ -> Nothing
+producerTxCbor _ =
+    Nothing
+
+lookupValue :: AesonKey.Key -> Aeson.Value -> Maybe Aeson.Value
+lookupValue key (Aeson.Object obj) =
+    KeyMap.lookup key obj
+lookupValue _ _ =
+    Nothing
+
+resolveRdfUtxo
+    :: TxDecode.ConwayTx
+    -> ProducerContext
+    -> Either String TxGraph.ResolvedUTxO
+resolveRdfUtxo tx context
+    | Map.null (pcProducerTxs context) =
+        Right Map.empty
+    | otherwise = do
+        Foldable.traverse_ checkProducer (Map.toList (pcProducerTxs context))
+        pairs <- traverse (resolveTxIn context) (currentTxIns tx)
+        Right (Map.fromList (catMaybes pairs))
+
+checkProducer :: (T.Text, ProducerTx) -> Either String ()
+checkProducer (declaredTxId, ProducerTx{ptDecoded = Left err}) =
+    Left $
+        "producer_tx_decode_failed: Producer transaction "
+            <> T.unpack declaredTxId
+            <> " could not be decoded: "
+            <> T.unpack err
+checkProducer (declaredTxId, ProducerTx{ptDecoded = Right producer}) =
+    let actualTxId = txIdHex (Core.txIdTx producer)
+    in  if declaredTxId == actualTxId
+            then Right ()
+            else
+                Left $
+                    "producer_tx_id_mismatch: declared "
+                        <> T.unpack declaredTxId
+                        <> " actual "
+                        <> T.unpack actualTxId
+
+resolveTxIn
+    :: ProducerContext
+    -> TxIn.TxIn
+    -> Either String (Maybe (TxIn.TxIn, L.TxOut ConwayEra))
+resolveTxIn context txIn =
+    case Map.lookup (txInTxIdHex txIn) (pcProducerTxs context) of
+        Nothing ->
+            Right Nothing
+        Just ProducerTx{ptDecoded = Left err} ->
+            Left $
+                "producer_tx_decode_failed: Producer transaction "
+                    <> T.unpack (txInTxIdHex txIn)
+                    <> " could not be decoded: "
+                    <> T.unpack err
+        Just ProducerTx{ptSource = source, ptDecoded = Right producer} ->
+            case producerOutputAt txIn producer of
+                Nothing ->
+                    Left $
+                        "producer_output_index_missing: "
+                            <> T.unpack (txInKey txIn)
+                            <> " not found in "
+                            <> T.unpack source
+                Just txOut ->
+                    Right (Just (txIn, txOut))
+
+currentTxIns :: TxDecode.ConwayTx -> [TxIn.TxIn]
+currentTxIns tx =
+    Foldable.toList (body ^. L.inputsTxBodyL)
+        <> Foldable.toList (body ^. L.collateralInputsTxBodyL)
+  where
+    body = tx ^. L.bodyTxL
+
+producerOutputAt
+    :: TxIn.TxIn
+    -> TxDecode.ConwayTx
+    -> Maybe (L.TxOut ConwayEra)
+producerOutputAt txIn producer =
+    listAt (txInIndex txIn) $
+        Foldable.toList (producer ^. (L.bodyTxL . L.outputsTxBodyL))
+
+listAt :: Int -> [a] -> Maybe a
+listAt index xs
+    | index < 0 = Nothing
+    | otherwise = case drop index xs of
+        value : _ -> Just value
+        [] -> Nothing
+
+txInKey :: TxIn.TxIn -> T.Text
+txInKey txIn =
+    txInTxIdHex txIn <> "#" <> T.pack (show (txInIndex txIn))
+
+txInTxIdHex :: TxIn.TxIn -> T.Text
+txInTxIdHex (TxIn.TxIn txId _) =
+    txIdHex txId
+
+txInIndex :: TxIn.TxIn -> Int
+txInIndex (TxIn.TxIn _ (TxIx ix)) =
+    fromEnum ix
+
+txIdHex :: TxIn.TxId -> T.Text
+txIdHex (TxIn.TxId safeHash) =
+    hashHex (extractHash safeHash)
+
+hashHex :: Crypto.Hash h a -> T.Text
+hashHex =
+    TextEncoding.decodeUtf8 . B16.encode . hashToBytes
 
 rdfResponse :: T.Text -> TxGraph.EmittedGraph -> Aeson.Value
 rdfResponse operation graph =

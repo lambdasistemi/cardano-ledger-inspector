@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-rdf-result.schema.json",
   "title": "Cardano Ledger WASI tx.rdf Result",
+  "description": "Deterministic Turtle serialization of the transaction graph. When args.context.producer_txs was supplied and verified, the Turtle may include resolved input/value-flow triples.",
   "type": "object",
   "required": ["rdf"],
   "properties": {
