@@ -226,13 +226,13 @@
                 ${./cabal.project}
               require_file_contains "tx-rdf-core SRP location" \
                 "location: ${expectedTxRdfCore.location}" \
-                ${./cabal.project}
+                ${./libs/cardano-ledger-inspector/cabal-wasm.project}
               require_file_contains "tx-rdf-core SRP tag" \
                 "tag: ${expectedTxRdfCore.rev}" \
-                ${./cabal.project}
+                ${./libs/cardano-ledger-inspector/cabal-wasm.project}
               require_file_contains "tx-rdf-core SRP sha256" \
                 "--sha256: ${expectedTxRdfCore.sha256}" \
-                ${./cabal.project}
+                ${./libs/cardano-ledger-inspector/cabal-wasm.project}
               require_file_contains "tx-rdf-core WASI package path" \
                 "external/tx-rdf-core" \
                 ${./libs/cardano-ledger-inspector/cabal-wasm.project}
