@@ -348,7 +348,50 @@
               and (.result.rdf.turtle | contains("@prefix cardano:"))
               and (.result.rdf.turtle | contains("cardano:Transaction"))
             ' response-1.json
-            cp request.json response-1.json response-2.json turtle-1.ttl turtle-2.ttl $out/
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
+              --rawfile blueprint ${./docs/inspector/protocols/sundaeswap-v3/plutus.json} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.rdf",
+                args: {
+                  blueprints: [
+                    {
+                      id: "sundaeswap-v3",
+                      plutus_json: $blueprint
+                    }
+                  ]
+                }
+              }' > sundae-blueprint-request.json
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.rdf",
+                args: {}
+              }' > sundae-no-blueprint-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < sundae-blueprint-request.json > sundae-blueprint-response.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < sundae-no-blueprint-request.json > sundae-no-blueprint-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.rdf"
+              and (.result.rdf.turtle | contains(":OrderDatum_max_protocol_fee 1280000"))
+            ' sundae-blueprint-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.rdf"
+              and (.result.rdf.turtle | contains(":OrderDatum_max_protocol_fee 1280000") | not)
+            ' sundae-no-blueprint-response.json
+            cp request.json response-1.json response-2.json turtle-1.ttl turtle-2.ttl \
+              sundae-blueprint-request.json sundae-blueprint-response.json \
+              sundae-no-blueprint-request.json sundae-no-blueprint-response.json \
+              $out/
           '';
 
           tx-witness-plan-smoke = pkgs.runCommand "tx-witness-plan-smoke" { } ''
