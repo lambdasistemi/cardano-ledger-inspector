@@ -1,13 +1,13 @@
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 cardano:TransactionShape
   a sh:NodeShape ;
   sh:targetClass cardano:Transaction ;
-  sh:property [
+  sh:property cardano:TransactionIdShape .
+
+cardano:TransactionIdShape
     sh:path cardano:hasTxId ;
     sh:minCount 1 ;
-    sh:datatype xsd:string ;
-    sh:message "Cardano transactions must include a transaction id." ;
-  ] .
+    sh:class cardano:Identifier ;
+    sh:message "Cardano transactions must reference a transaction id identifier." .

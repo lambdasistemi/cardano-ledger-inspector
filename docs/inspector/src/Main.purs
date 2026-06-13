@@ -42,6 +42,22 @@ providerKey = "provider"
 persistKeysStorageKey :: String
 persistKeysStorageKey = "persist_api_keys"
 
+cardanoShaclShapes :: String
+cardanoShaclShapes =
+  "@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .\n"
+    <> "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+    <> "\n"
+    <> "cardano:TransactionShape\n"
+    <> "  a sh:NodeShape ;\n"
+    <> "  sh:targetClass cardano:Transaction ;\n"
+    <> "  sh:property cardano:TransactionIdShape .\n"
+    <> "\n"
+    <> "cardano:TransactionIdShape\n"
+    <> "  sh:path cardano:hasTxId ;\n"
+    <> "  sh:minCount 1 ;\n"
+    <> "  sh:class cardano:Identifier ;\n"
+    <> "  sh:message \"Cardano transactions must reference a transaction id identifier.\" .\n"
+
 main :: Effect Unit
 main = HA.runHalogenAff do
   body    <- HA.awaitBody
@@ -93,6 +109,7 @@ type State =
   , sparqlLens :: Maybe SparqlLens
   , resolvedLabelsLens :: Maybe ResolvedLabelsLens
   , typedFieldsLens :: Maybe TypedFieldsLens
+  , shaclConformance :: Maybe ShaclConformance
   , overlayInput :: String
   , overlayParts :: Array OverlayPart
   , selectedOverlayPartIds :: Array String
@@ -123,6 +140,12 @@ type ResolvedLabelsLens =
 
 type TypedFieldsLens =
   { rows :: Array RdfShapes.TypedFieldRow
+  , error :: Maybe String
+  }
+
+type ShaclConformance =
+  { shapeLabels :: Array String
+  , report :: Maybe RdfShapes.ShaclReport
   , error :: Maybe String
   }
 
@@ -182,6 +205,7 @@ inspectorComponent initial =
         , sparqlLens: Nothing
         , resolvedLabelsLens: Nothing
         , typedFieldsLens: Nothing
+        , shaclConformance: Nothing
         , overlayInput: ""
         , overlayParts: []
         , selectedOverlayPartIds: []
@@ -519,6 +543,7 @@ inspectorComponent initial =
       Just rdf ->
         if exitOk && rdf.valid then
           [ renderRdfGraph rdf, renderOverlayBooks state ]
+            <> renderShaclConformanceMaybe state.shaclConformance
             <> renderResolvedLabelsLensMaybe state.resolvedLabelsLens
             <> renderTypedFieldsLensMaybe state.typedFieldsLens
             <> renderSparqlLensMaybe state.sparqlLens
@@ -796,8 +821,120 @@ inspectorComponent initial =
       (\part -> part.kind == "blueprint" && Array.elem part.id state.selectedOverlayPartIds)
       state.overlayParts
 
+  selectedShaclParts state =
+    Array.filter
+      (\part -> part.kind == "shacl" && Array.elem part.id state.selectedOverlayPartIds)
+      state.overlayParts
+
+  selectedShaclTurtle state =
+    String.joinWith "\n" (map _.turtle (selectedShaclParts state))
+
+  selectedShaclLabels state =
+    map _.label (selectedShaclParts state)
+
   selectedBlueprintArgs state =
     OverlayBook.blueprintArgs (selectedBlueprintParts state)
+
+  renderShaclConformanceMaybe conformance =
+    case conformance of
+      Just value -> [ renderShaclConformance value ]
+      Nothing -> []
+
+  renderShaclConformance conformance =
+    HH.div
+      [ classNames [ "shacl-conformance-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "RDF SHACL conformance" ]
+              , HH.p_ [ HH.text "Selected SHACL shapes validate the composed RDF graph." ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "witness-section" ] ]
+          [ HH.div
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Selected shapes" ]
+          , HH.div
+              [ classNames [ "witness-row-list" ] ]
+              (map renderSelectedShape conformance.shapeLabels)
+          ]
+      , case conformance.error of
+          Just err ->
+            HH.div
+              [ classNames [ "sparql-lens-error" ] ]
+              [ HH.text ("SHACL validation failed: " <> err) ]
+          Nothing ->
+            case conformance.report of
+              Just report ->
+                HH.div_
+                  [ HH.div
+                      [ classNames [ "metric-grid" ] ]
+                      [ renderMetric
+                          { label: "Author gate"
+                          , value: if report.conforms then "pass" else "fail"
+                          }
+                      , renderMetric
+                          { label: "Auditor classifier"
+                          , value:
+                              if report.conforms then
+                                "canonical-pipeline match"
+                              else
+                                "foreign/off-spec"
+                          }
+                      ]
+                  , renderShaclViolations report
+                  ]
+              Nothing ->
+                HH.div
+                  [ classNames [ "witness-empty" ] ]
+                  [ HH.text "No SHACL report." ]
+      ]
+
+  renderSelectedShape label =
+    HH.div
+      [ classNames [ "identity-row", "witness-row" ] ]
+      [ HH.span
+          [ classNames [ "identity-label" ] ]
+          [ HH.text "Shape book" ]
+      , HH.code_ [ HH.text label ]
+      ]
+
+  renderShaclViolations report =
+    if Array.null report.violations then
+      HH.div
+        [ classNames [ "witness-empty" ] ]
+        [ HH.text "No SHACL violations." ]
+    else
+      HH.div
+        [ classNames [ "witness-section" ] ]
+        [ HH.div
+            [ classNames [ "identity-section-title" ] ]
+            [ HH.text "SHACL violations" ]
+        , HH.div
+            [ classNames [ "sparql-lens-row-list" ] ]
+            (map renderShaclViolationRow report.violations)
+        ]
+
+  renderShaclViolationRow violation =
+    HH.div
+      [ classNames [ "sparql-lens-row", "shacl-violation-row" ] ]
+      [ renderShaclViolationCell "Focus node" violation.focusNode
+      , renderShaclViolationCell "Path" violation.path
+      , renderShaclViolationCell "Source shape" violation.sourceShape
+      , renderShaclViolationCell "Message" violation.message
+      , renderShaclViolationCell "Constraint" violation.sourceConstraintComponent
+      , renderShaclViolationCell "Severity" violation.severity
+      ]
+
+  renderShaclViolationCell label value =
+    HH.div
+      [ classNames [ "sparql-lens-cell" ] ]
+      [ HH.span
+          [ classNames [ "identity-section-title" ] ]
+          [ HH.text label ]
+      , HH.code_ [ HH.text value ]
+      ]
 
   renderResolvedLabelsLensMaybe lens =
     case lens of
@@ -1344,20 +1481,44 @@ inspectorComponent initial =
               Right rows ->
                 { rows
                 , error: Nothing
-                }
+              }
           )
       )
 
+  shaclConformanceFromGraph graphTurtle st =
+    let
+      shapeParts = selectedShaclParts st
+    in
+      if Array.null shapeParts then
+        pure Nothing
+      else do
+        reportResult <- liftEffect (RdfShapes.validate graphTurtle (selectedShaclTurtle st))
+        pure
+          ( Just
+              { shapeLabels: selectedShaclLabels st
+              , report:
+                  case reportResult of
+                    Right report -> Just report
+                    Left _       -> Nothing
+              , error:
+                  case reportResult of
+                    Right _  -> Nothing
+                    Left err -> Just err
+              }
+          )
+
   rdfLensesForState st rdf = do
     sparqlLens <- sparqlLensFromGraph rdf.turtle
+    let graphTurtle = mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st)
     resolvedLabelsLens <-
-      resolvedLabelsLensFromGraph
-        (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
+      resolvedLabelsLensFromGraph graphTurtle
     typedFieldsLens <- typedFieldsLensFromGraph rdf.turtle
+    shaclConformance <- shaclConformanceFromGraph graphTurtle st
     pure
       { sparqlLens
       , resolvedLabelsLens
       , typedFieldsLens
+      , shaclConformance
       }
 
   resolvedLabelsLensForState st =
@@ -1366,6 +1527,17 @@ inspectorComponent initial =
         if rdf.valid then
           resolvedLabelsLensFromGraph
             (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
+        else
+          pure Nothing
+      Nothing -> pure Nothing
+
+  shaclConformanceForState st =
+    case st.rdf of
+      Just rdf ->
+        if rdf.valid then
+          shaclConformanceFromGraph
+            (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
+            st
         else
           pure Nothing
       Nothing -> pure Nothing
@@ -1415,12 +1587,14 @@ inspectorComponent initial =
           st <- H.get
           let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
           resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          shaclConformance <- shaclConformanceForState nextState
           H.modify_
             _
               { overlayParts = book.parts
               , selectedOverlayPartIds = []
               , overlayError = Nothing
               , resolvedLabelsLens = resolvedLabelsLens
+              , shaclConformance = shaclConformance
               }
     LoadAmaruOverlayBook -> do
       let input = OverlayBook.bundledAmaruJournal
@@ -1432,6 +1606,7 @@ inspectorComponent initial =
           st <- H.get
           let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
           resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          shaclConformance <- shaclConformanceForState nextState
           H.modify_
             _
               { overlayInput = input
@@ -1439,6 +1614,7 @@ inspectorComponent initial =
               , selectedOverlayPartIds = []
               , overlayError = Nothing
               , resolvedLabelsLens = resolvedLabelsLens
+              , shaclConformance = shaclConformance
               }
     LoadSundaeSwapBlueprintBook -> do
       let input = OverlayBook.bundledSundaeSwapBlueprint
@@ -1450,6 +1626,7 @@ inspectorComponent initial =
           st <- H.get
           let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
           resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          shaclConformance <- shaclConformanceForState nextState
           H.modify_
             _
               { overlayInput = input
@@ -1457,25 +1634,32 @@ inspectorComponent initial =
               , selectedOverlayPartIds = []
               , overlayError = Nothing
               , resolvedLabelsLens = resolvedLabelsLens
+              , shaclConformance = shaclConformance
               }
     LoadShaclShapesBook -> do
-      let input = OverlayBook.bundledCardanoShaclShapes
-      parsed <- liftEffect (OverlayBook.parse input)
-      case parsed of
-        Left err ->
-          H.modify_ _ { overlayInput = input, overlayError = Just err }
-        Right book -> do
-          st <- H.get
-          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
-          resolvedLabelsLens <- resolvedLabelsLensForState nextState
-          H.modify_
-            _
-              { overlayInput = input
-              , overlayParts = book.parts
-              , selectedOverlayPartIds = []
-              , overlayError = Nothing
-              , resolvedLabelsLens = resolvedLabelsLens
-              }
+      st <- H.get
+      let
+        input = cardanoShaclShapes
+        parts =
+          [ { id: "cardano-rdf-shacl-shapes"
+            , label: "Cardano transaction SHACL shapes"
+            , kind: "shacl"
+            , turtle: input
+            , plutusJson: ""
+            }
+          ]
+        nextState = st { overlayParts = parts, selectedOverlayPartIds = [] }
+      resolvedLabelsLens <- resolvedLabelsLensForState nextState
+      shaclConformance <- shaclConformanceForState nextState
+      H.modify_
+        _
+          { overlayInput = input
+          , overlayParts = parts
+          , selectedOverlayPartIds = []
+          , overlayError = Nothing
+          , resolvedLabelsLens = resolvedLabelsLens
+          , shaclConformance = shaclConformance
+          }
     ToggleOverlayPart partId selected -> do
       st <- H.get
       let
@@ -1483,17 +1667,25 @@ inspectorComponent initial =
           toggleOverlayPartId partId selected st.selectedOverlayPartIds
         nextState = st { selectedOverlayPartIds = selectedOverlayPartIds }
       resolvedLabelsLens <- resolvedLabelsLensForState nextState
+      shaclConformance <- shaclConformanceForState nextState
       H.modify_
         _
           { selectedOverlayPartIds = selectedOverlayPartIds
           , resolvedLabelsLens = resolvedLabelsLens
+          , shaclConformance = shaclConformance
           }
     ApplySelectedBooks -> do
       st <- H.get
       case st.txCbor of
         Nothing -> do
           resolvedLabelsLens <- resolvedLabelsLensForState st
-          H.modify_ _ { resolvedLabelsLens = resolvedLabelsLens, overlayError = Nothing }
+          shaclConformance <- shaclConformanceForState st
+          H.modify_
+            _
+              { resolvedLabelsLens = resolvedLabelsLens
+              , shaclConformance = shaclConformance
+              , overlayError = Nothing
+              }
         Just txCbor -> do
           H.modify_ _ { running = true, fetchError = Nothing, overlayError = Nothing }
           rdfResult <- H.liftAff (runLedgerOperation txCbor "tx.rdf" (selectedBlueprintArgs st))
@@ -1507,6 +1699,7 @@ inspectorComponent initial =
                 , sparqlLens = lenses.sparqlLens
                 , resolvedLabelsLens = lenses.resolvedLabelsLens
                 , typedFieldsLens = lenses.typedFieldsLens
+                , shaclConformance = lenses.shaclConformance
                 , fetchError = Nothing
                 }
           else
@@ -1517,6 +1710,7 @@ inspectorComponent initial =
                 , sparqlLens = Nothing
                 , resolvedLabelsLens = Nothing
                 , typedFieldsLens = Nothing
+                , shaclConformance = Nothing
                 , fetchError =
                     Just
                       ( if rdfResult.stderr == "" then
@@ -1542,6 +1736,7 @@ inspectorComponent initial =
           , sparqlLens = Nothing
           , resolvedLabelsLens = Nothing
           , typedFieldsLens = Nothing
+          , shaclConformance = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -1614,6 +1809,7 @@ inspectorComponent initial =
                 { sparqlLens: Nothing
                 , resolvedLabelsLens: Nothing
                 , typedFieldsLens: Nothing
+                , shaclConformance: Nothing
                 }
           H.modify_
             _
@@ -1640,6 +1836,7 @@ inspectorComponent initial =
               , sparqlLens = lenses.sparqlLens
               , resolvedLabelsLens = lenses.resolvedLabelsLens
               , typedFieldsLens = lenses.typedFieldsLens
+              , shaclConformance = lenses.shaclConformance
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
                   else []
