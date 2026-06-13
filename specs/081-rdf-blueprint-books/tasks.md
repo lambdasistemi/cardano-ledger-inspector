@@ -17,18 +17,18 @@
 
 ## Slice 2 - Browser Books UX And Typed Lens
 
-- [ ] T081-S2 Extend the RDF-3 Books import model so pasted/bundled CIP-57
+- [x] T081-S2 Extend the RDF-3 Books import model so pasted/bundled CIP-57
   `plutus.json` imports as selectable blueprint parts while overlay Turtle
   behavior remains unchanged.
-- [ ] T081-S2 Add a bundled SundaeSwap V3 blueprint book action sourced from
+- [x] T081-S2 Add a bundled SundaeSwap V3 blueprint book action sourced from
   `docs/inspector/protocols/sundaeswap-v3/plutus.json`.
-- [ ] T081-S2 Send selected blueprint parts to `tx.rdf`, expose an apply/re-run
+- [x] T081-S2 Send selected blueprint parts to `tx.rdf`, expose an apply/re-run
   state transition for current transaction CBOR, and preserve selectivity for
   unselected blueprints.
-- [ ] T081-S2 Add a named SPARQL typed-fields lens and render decoded contract
+- [x] T081-S2 Add a named SPARQL typed-fields lens and render decoded contract
   field rows from the returned Turtle.
-- [ ] T081-S2 Extend Playwright coverage for import/select/apply, typed field
+- [x] T081-S2 Extend Playwright coverage for import/select/apply, typed field
   rendering/queryability, and deselect/reapply removal.
-- [ ] T081-S2 Run `nix develop --quiet -c just ui-check`,
+- [x] T081-S2 Run `nix develop --quiet -c just ui-check`,
   `nix develop --quiet -c just test-playwright`, and `./gate.sh`.
-- [ ] T081-S2 Commit as `feat: render rdf blueprint book fields`.
+- [x] T081-S2 Commit as `feat: render rdf blueprint book fields`.
