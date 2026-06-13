@@ -204,6 +204,26 @@ test("renders the transaction RDF graph after decode", async ({ page }) => {
   await expect(turtle).toContainText("cardano:Transaction");
 });
 
+test("exposes the vendored RDF query engine", async ({ page }) => {
+  await page.goto("/");
+
+  const result = await page.evaluate(() => {
+    const graph = `
+      @prefix ex: <https://example.test/> .
+      ex:tx ex:label "demo transaction" .
+    `;
+    const query = `
+      PREFIX ex: <https://example.test/>
+      SELECT ?label WHERE { ex:tx ex:label ?label }
+    `;
+
+    return globalThis.rdfShapes.query(graph, query);
+  });
+
+  expect(result.kind).toBe("solutions");
+  expect(result.json.results.bindings[0].label.value).toBe("demo transaction");
+});
+
 test("keeps signer-critical intent visible in the first viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await decodeFixture(page, signingIntentFixturePath);

@@ -5,9 +5,17 @@
 
 import { WASI, File, OpenFile, ConsoleStdout }
   from "@bjorn3/browser_wasi_shim";
+import * as rdfShapes from "./assets/rdf_shapes_wasm.js";
 import wasmBytes from "./assets/inspector.wasm";
+import rdfShapesWasmBytes from "./assets/rdf_shapes_wasm_bg.wasm";
 
 const compiledModulePromise = WebAssembly.compile(wasmBytes);
+
+rdfShapes.initSync({
+  module: new WebAssembly.Module(rdfShapesWasmBytes),
+});
+
+globalThis.rdfShapes = rdfShapes;
 
 globalThis.runInspector = async (stdinText) => {
   const stdin = new OpenFile(

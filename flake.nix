@@ -44,6 +44,11 @@
       inputs.CHaP.follows = "CHaP";
       inputs.ghc-wasm-meta.follows = "ghc-wasm-meta";
     };
+    rdf-shapes-wasm = {
+      url = "github:lambdasistemi/rdf-shapes-wasm/1240e4e58061836264d955b70c49c7195480f3b4";
+      inputs.purescript-overlay.follows = "purescript-overlay";
+      inputs.mkSpagoDerivation.follows = "mkSpagoDerivation";
+    };
     purescript-overlay = {
       url = "github:paolino/purescript-overlay/fix/remove-nodePackages";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -64,6 +69,7 @@
     , CHaP
     , ghc-wasm-meta
     , cardanoLedgerWasm
+    , rdf-shapes-wasm
     , purescript-overlay
     , mkSpagoDerivation
     , ...
@@ -166,6 +172,7 @@
             inherit system nixpkgs purescript-overlay mkSpagoDerivation;
             wasmArtifact = wasmTargets.wasm-tx-inspector;
             wasmArtifactName = "wasm-tx-inspector";
+            rdfShapesWasmPkg = rdf-shapes-wasm.packages.${system}.wasm-pkg;
             src = ./docs/inspector;
           };
 
