@@ -1,9 +1,11 @@
 module FFI.RdfShapes
   ( Json
   , ResolvedLabelRow
+  , TypedFieldRow
   , TransactionOutputRow
   , query
   , queryResolvedLabels
+  , queryTypedFields
   , queryTransactionOutputs
   ) where
 
@@ -26,6 +28,12 @@ type ResolvedLabelRow =
   , matched :: String
   }
 
+type TypedFieldRow =
+  { subject :: String
+  , field :: String
+  , value :: String
+  }
+
 foreign import queryImpl
   :: (String -> Either String Json)
   -> (Json -> Either String Json)
@@ -45,6 +53,12 @@ foreign import queryResolvedLabelsImpl
   -> String
   -> Effect (Either String (Array ResolvedLabelRow))
 
+foreign import queryTypedFieldsImpl
+  :: (String -> Either String (Array TypedFieldRow))
+  -> (Array TypedFieldRow -> Either String (Array TypedFieldRow))
+  -> String
+  -> Effect (Either String (Array TypedFieldRow))
+
 query :: String -> String -> Effect (Either String Json)
 query = queryImpl Left Right
 
@@ -53,3 +67,6 @@ queryTransactionOutputs = queryTransactionOutputsImpl Left Right
 
 queryResolvedLabels :: String -> Effect (Either String (Array ResolvedLabelRow))
 queryResolvedLabels = queryResolvedLabelsImpl Left Right
+
+queryTypedFields :: String -> Effect (Either String (Array TypedFieldRow))
+queryTypedFields = queryTypedFieldsImpl Left Right

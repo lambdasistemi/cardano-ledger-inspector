@@ -92,6 +92,7 @@ type State =
   , rdf :: Maybe Json.RdfGraph
   , sparqlLens :: Maybe SparqlLens
   , resolvedLabelsLens :: Maybe ResolvedLabelsLens
+  , typedFieldsLens :: Maybe TypedFieldsLens
   , overlayInput :: String
   , overlayParts :: Array OverlayPart
   , selectedOverlayPartIds :: Array String
@@ -120,6 +121,11 @@ type ResolvedLabelsLens =
   , error :: Maybe String
   }
 
+type TypedFieldsLens =
+  { rows :: Array RdfShapes.TypedFieldRow
+  , error :: Maybe String
+  }
+
 type InitialKeys =
   { bf :: String
   , koios :: String
@@ -139,7 +145,9 @@ data Action
   | SetOverlayInput String
   | ImportOverlayBook
   | LoadAmaruOverlayBook
+  | LoadSundaeSwapBlueprintBook
   | ToggleOverlayPart String Boolean
+  | ApplySelectedBooks
   | Decode
   | Copy
   | CopyValue String String
@@ -172,6 +180,7 @@ inspectorComponent initial =
         , rdf: Nothing
         , sparqlLens: Nothing
         , resolvedLabelsLens: Nothing
+        , typedFieldsLens: Nothing
         , overlayInput: ""
         , overlayParts: []
         , selectedOverlayPartIds: []
@@ -510,6 +519,7 @@ inspectorComponent initial =
         if exitOk && rdf.valid then
           [ renderRdfGraph rdf, renderOverlayBooks state ]
             <> renderResolvedLabelsLensMaybe state.resolvedLabelsLens
+            <> renderTypedFieldsLensMaybe state.typedFieldsLens
             <> renderSparqlLensMaybe state.sparqlLens
         else []
       Nothing -> []
@@ -672,7 +682,7 @@ inspectorComponent initial =
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
               [ HH.h3_ [ HH.text "Overlay books" ]
-              , HH.p_ [ HH.text "Import optional RDF overlay parts for later graph union." ]
+              , HH.p_ [ HH.text "Import optional RDF overlay or blueprint parts." ]
               ]
           ]
       , HH.div
@@ -697,10 +707,20 @@ inspectorComponent initial =
                   ]
                   [ HH.text "Load Amaru overlay book" ]
               , HH.button
+                  [ classNames [ "secondary-action" ]
+                  , HE.onClick (\_ -> LoadSundaeSwapBlueprintBook)
+                  ]
+                  [ HH.text "Load SundaeSwap V3 blueprint" ]
+              , HH.button
                   [ classNames [ "primary-action" ]
                   , HE.onClick (\_ -> ImportOverlayBook)
                   ]
                   [ HH.text "Import overlay book" ]
+              , HH.button
+                  [ classNames [ "primary-action" ]
+                  , HE.onClick (\_ -> ApplySelectedBooks)
+                  ]
+                  [ HH.text "Apply selected books" ]
               ]
           ]
       , case state.overlayError of
@@ -762,8 +782,16 @@ inspectorComponent initial =
 
   selectedOverlayParts state =
     Array.filter
-      (\part -> Array.elem part.id state.selectedOverlayPartIds)
+      (\part -> part.kind == "overlay" && Array.elem part.id state.selectedOverlayPartIds)
       state.overlayParts
+
+  selectedBlueprintParts state =
+    Array.filter
+      (\part -> part.kind == "blueprint" && Array.elem part.id state.selectedOverlayPartIds)
+      state.overlayParts
+
+  selectedBlueprintArgs state =
+    OverlayBook.blueprintArgs (selectedBlueprintParts state)
 
   renderResolvedLabelsLensMaybe lens =
     case lens of
@@ -826,6 +854,63 @@ inspectorComponent initial =
               [ classNames [ "identity-section-title" ] ]
               [ HH.text "Matched" ]
           , HH.code_ [ HH.text row.matched ]
+          ]
+      ]
+
+  renderTypedFieldsLensMaybe lens =
+    case lens of
+      Just value -> [ renderTypedFieldsLens value ]
+      Nothing -> []
+
+  renderTypedFieldsLens lens =
+    HH.div
+      [ classNames [ "sparql-lens-panel", "typed-fields-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "SPARQL lens: typed contract fields" ]
+              , HH.p_ [ HH.text "Fixed query over decoded blueprint predicates." ]
+              ]
+          ]
+      , case lens.error of
+          Just err ->
+            HH.div
+              [ classNames [ "sparql-lens-error" ] ]
+              [ HH.text ("Typed-fields query failed: " <> err) ]
+          Nothing ->
+            if Array.null lens.rows then
+              HH.div
+                [ classNames [ "witness-empty" ] ]
+                [ HH.text "No typed contract fields." ]
+            else
+              HH.div
+                [ classNames [ "sparql-lens-row-list" ] ]
+                (map renderTypedFieldRow lens.rows)
+      ]
+
+  renderTypedFieldRow row =
+    HH.div
+      [ classNames [ "sparql-lens-row" ] ]
+      [ HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Subject" ]
+          , HH.code_ [ HH.text row.subject ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Field" ]
+          , HH.strong_ [ HH.text row.field ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell", "sparql-lens-count" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Value" ]
+          , HH.strong_ [ HH.text row.value ]
           ]
       ]
 
@@ -1225,6 +1310,50 @@ inspectorComponent initial =
           )
       )
 
+  sparqlLensFromGraph graphTurtle = do
+    lensResult <- liftEffect (RdfShapes.queryTransactionOutputs graphTurtle)
+    pure
+      ( Just
+          ( case lensResult of
+              Left err ->
+                { rows: []
+                , error: Just err
+                }
+              Right rows ->
+                { rows
+                , error: Nothing
+                }
+          )
+      )
+
+  typedFieldsLensFromGraph graphTurtle = do
+    lensResult <- liftEffect (RdfShapes.queryTypedFields graphTurtle)
+    pure
+      ( Just
+          ( case lensResult of
+              Left err ->
+                { rows: []
+                , error: Just err
+                }
+              Right rows ->
+                { rows
+                , error: Nothing
+                }
+          )
+      )
+
+  rdfLensesForState st rdf = do
+    sparqlLens <- sparqlLensFromGraph rdf.turtle
+    resolvedLabelsLens <-
+      resolvedLabelsLensFromGraph
+        (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
+    typedFieldsLens <- typedFieldsLensFromGraph rdf.turtle
+    pure
+      { sparqlLens
+      , resolvedLabelsLens
+      , typedFieldsLens
+      }
+
   resolvedLabelsLensForState st =
     case st.rdf of
       Just rdf ->
@@ -1305,6 +1434,24 @@ inspectorComponent initial =
               , overlayError = Nothing
               , resolvedLabelsLens = resolvedLabelsLens
               }
+    LoadSundaeSwapBlueprintBook -> do
+      let input = OverlayBook.bundledSundaeSwapBlueprint
+      parsed <- liftEffect (OverlayBook.parse input)
+      case parsed of
+        Left err ->
+          H.modify_ _ { overlayInput = input, overlayError = Just err }
+        Right book -> do
+          st <- H.get
+          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
+          resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          H.modify_
+            _
+              { overlayInput = input
+              , overlayParts = book.parts
+              , selectedOverlayPartIds = []
+              , overlayError = Nothing
+              , resolvedLabelsLens = resolvedLabelsLens
+              }
     ToggleOverlayPart partId selected -> do
       st <- H.get
       let
@@ -1317,6 +1464,43 @@ inspectorComponent initial =
           { selectedOverlayPartIds = selectedOverlayPartIds
           , resolvedLabelsLens = resolvedLabelsLens
           }
+    ApplySelectedBooks -> do
+      st <- H.get
+      case st.txCbor of
+        Nothing -> do
+          resolvedLabelsLens <- resolvedLabelsLensForState st
+          H.modify_ _ { resolvedLabelsLens = resolvedLabelsLens, overlayError = Nothing }
+        Just txCbor -> do
+          H.modify_ _ { running = true, fetchError = Nothing, overlayError = Nothing }
+          rdfResult <- H.liftAff (runLedgerOperation txCbor "tx.rdf" (selectedBlueprintArgs st))
+          let rdf = Json.operationRdfGraph rdfResult.stdout
+          if rdfResult.exitOk && rdf.valid then do
+            lenses <- rdfLensesForState st rdf
+            H.modify_
+              _
+                { running = false
+                , rdf = Just rdf
+                , sparqlLens = lenses.sparqlLens
+                , resolvedLabelsLens = lenses.resolvedLabelsLens
+                , typedFieldsLens = lenses.typedFieldsLens
+                , fetchError = Nothing
+                }
+          else
+            H.modify_
+              _
+                { running = false
+                , rdf = Nothing
+                , sparqlLens = Nothing
+                , resolvedLabelsLens = Nothing
+                , typedFieldsLens = Nothing
+                , fetchError =
+                    Just
+                      ( if rdfResult.stderr == "" then
+                          "Haskell ledger operation tx.rdf failed."
+                        else
+                          rdfResult.stderr
+                      )
+                }
     Decode -> do
       st <- H.get
       H.modify_
@@ -1333,6 +1517,7 @@ inspectorComponent initial =
           , rdf = Nothing
           , sparqlLens = Nothing
           , resolvedLabelsLens = Nothing
+          , typedFieldsLens = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -1388,7 +1573,7 @@ inspectorComponent initial =
           intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
           validationResult <- H.liftAff (runLedgerOperation h "tx.validate" inputContextArgs)
-          rdfResult <- H.liftAff (runLedgerOperation h "tx.rdf" "{}")
+          rdfResult <- H.liftAff (runLedgerOperation h "tx.rdf" (selectedBlueprintArgs st))
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
@@ -1397,30 +1582,15 @@ inspectorComponent initial =
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
             validation = Json.operationValidation validationResult.stdout
             rdf = Json.operationRdfGraph rdfResult.stdout
-          sparqlLens <-
-            if operationResult.exitOk && rdfResult.exitOk && rdf.valid then do
-              lensResult <- liftEffect (RdfShapes.queryTransactionOutputs rdf.turtle)
-              pure
-                ( Just
-                    ( case lensResult of
-                        Left err ->
-                          { rows: []
-                          , error: Just err
-                          }
-                        Right rows ->
-                          { rows
-                          , error: Nothing
-                          }
-                    )
-                )
-            else
-              pure Nothing
-          resolvedLabelsLens <-
+          lenses <-
             if operationResult.exitOk && rdfResult.exitOk && rdf.valid then
-              resolvedLabelsLensFromGraph
-                (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
+              rdfLensesForState st rdf
             else
-              pure Nothing
+              pure
+                { sparqlLens: Nothing
+                , resolvedLabelsLens: Nothing
+                , typedFieldsLens: Nothing
+                }
           H.modify_
             _
               { running = false
@@ -1443,8 +1613,9 @@ inspectorComponent initial =
               , rdf =
                   if operationResult.exitOk && rdfResult.exitOk && rdf.valid then Just rdf
                   else Nothing
-              , sparqlLens = sparqlLens
-              , resolvedLabelsLens = resolvedLabelsLens
+              , sparqlLens = lenses.sparqlLens
+              , resolvedLabelsLens = lenses.resolvedLabelsLens
+              , typedFieldsLens = lenses.typedFieldsLens
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
                   else []
