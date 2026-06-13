@@ -27,6 +27,20 @@ const sundaeBlueprintFixturePath = path.join(
   repoRoot,
   "docs/inspector/protocols/sundaeswap-v3/plutus.json",
 );
+const violatingShaclShapes = `
+@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+cardano:TransactionShape
+  a sh:NodeShape ;
+  sh:targetClass cardano:Transaction ;
+  sh:property cardano:RequiresSentinelShape .
+
+cardano:RequiresSentinelShape
+  sh:path cardano:requiresSentinel ;
+  sh:minCount 1 ;
+  sh:message "Transactions must include sentinel off-spec marker." .
+`;
 
 async function loadValidationContext() {
   const request = JSON.parse(await readFile(validationFixturePath, "utf8"));
@@ -364,6 +378,75 @@ test("imports bundled SHACL shapes as selectable parts", async ({ page }) => {
   await shapesPart.check();
   await expect(shapesPart).toBeChecked();
   await expect(overlayPanel.getByLabel("Selected overlay Turtle")).toHaveValue("");
+});
+
+test("renders conforming SHACL conformance for bundled Cardano RDF shapes", async ({
+  page,
+}) => {
+  await decodeFixture(page);
+
+  const overlayPanel = page.locator(".overlay-book-panel");
+  await overlayPanel
+    .getByRole("button", { name: "Load Cardano RDF SHACL shapes" })
+    .click();
+  await overlayPanel.getByLabel("Cardano transaction SHACL shapes").check();
+  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+
+  const conformancePanel = page.locator(".shacl-conformance-panel");
+  await expect(
+    conformancePanel.getByRole("heading", { name: "RDF SHACL conformance" }),
+  ).toBeVisible();
+  await expect(conformancePanel.getByText("Cardano transaction SHACL shapes")).toBeVisible();
+  await expect(
+    conformancePanel
+      .locator(".metric-card", { hasText: "Author gate" })
+      .getByText("pass", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    conformancePanel
+      .locator(".metric-card", { hasText: "Auditor classifier" })
+      .getByText("canonical-pipeline match", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    conformancePanel.getByText("No SHACL violations.", { exact: true }),
+  ).toBeVisible();
+});
+
+test("renders non-conforming SHACL violations for pasted shapes", async ({
+  page,
+}) => {
+  await decodeFixture(page);
+
+  const overlayPanel = page.locator(".overlay-book-panel");
+  await overlayPanel.getByLabel(/Overlay Turtle.*JSON/).fill(violatingShaclShapes);
+  await overlayPanel.getByRole("button", { name: /Import .*book/ }).click();
+  await overlayPanel.getByLabel("Pasted SHACL shapes").check();
+  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+
+  const conformancePanel = page.locator(".shacl-conformance-panel");
+  await expect(
+    conformancePanel.getByRole("heading", { name: "RDF SHACL conformance" }),
+  ).toBeVisible();
+  await expect(
+    conformancePanel
+      .locator(".metric-card", { hasText: "Author gate" })
+      .getByText("fail", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    conformancePanel
+      .locator(".metric-card", { hasText: "Auditor classifier" })
+      .getByText("foreign/off-spec", { exact: true }),
+  ).toBeVisible();
+
+  const violationRow = conformancePanel.locator(".shacl-violation-row").filter({
+    hasText: "Transactions must include sentinel off-spec marker.",
+  });
+  await expect(violationRow).toBeVisible();
+  await expect(violationRow.getByText("Focus node", { exact: true })).toBeVisible();
+  await expect(violationRow.getByText("Path", { exact: true })).toBeVisible();
+  await expect(violationRow.getByText("Source shape", { exact: true })).toBeVisible();
+  await expect(violationRow).toContainText("requiresSentinel");
+  await expect(violationRow).toContainText("RequiresSentinelShape");
 });
 
 test("keeps signer-critical intent visible in the first viewport", async ({ page }) => {

@@ -41,6 +41,7 @@ type ShaclViolation =
   { focusNode :: String
   , path :: String
   , value :: String
+  , sourceShape :: String
   , sourceConstraintComponent :: String
   , message :: String
   , severity :: String

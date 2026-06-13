@@ -18,13 +18,13 @@
 
 ## Slice 2 - Conformance UX
 
-- [ ] T082-S2 Validate the composed graph (`rdf.turtle` plus selected overlay
+- [X] T082-S2 Validate the composed graph (`rdf.turtle` plus selected overlay
   Turtle) against selected shapes and keep unselected shapes effect-free.
-- [ ] T082-S2 Render pass/fail from the normalized SHACL report as both author
+- [X] T082-S2 Render pass/fail from the normalized SHACL report as both author
   gate and auditor classifier views.
-- [ ] T082-S2 Render SHACL violation rows with focus node, path, message, and
+- [X] T082-S2 Render SHACL violation rows with focus node, path, message, and
   source shape details when present.
-- [ ] T082-S2 Extend Playwright coverage for a conforming fixture and a
+- [X] T082-S2 Extend Playwright coverage for a conforming fixture and a
   deliberately violating shapes book that shows violation rows.
-- [ ] T082-S2 Run `./gate.sh`.
-- [ ] T082-S2 Commit as `feat: render rdf shacl conformance`.
+- [X] T082-S2 Run `./gate.sh`.
+- [X] T082-S2 Commit as `feat: render rdf shacl conformance`.

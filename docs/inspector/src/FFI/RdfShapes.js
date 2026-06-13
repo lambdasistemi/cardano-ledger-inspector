@@ -146,16 +146,58 @@ const normalizeTypedFieldRows = (result) => {
 const reportText = (value) =>
   value === null || value === undefined ? "" : String(value);
 
-const normalizeViolation = (violation) => ({
-  focusNode: reportText(violation?.focus_node),
-  path: reportText(violation?.path),
-  value: reportText(violation?.value),
-  sourceConstraintComponent: reportText(violation?.source_constraint_component),
-  message: reportText(violation?.message),
-  severity: reportText(violation?.severity),
-});
+const shapeMetadataByPath = (shapesTtl) => {
+  const query = `
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+SELECT ?sourceShape ?path ?message
+WHERE {
+  ?sourceShape sh:path ?path .
+  OPTIONAL { ?sourceShape sh:message ?message . }
+}
+`;
+  const metadata = new Map();
 
-const normalizeValidationReport = (result) => {
+  try {
+    const result = globalThis.rdfShapes.query(shapesTtl, query);
+    const bindings = result?.json?.results?.bindings;
+    if (!Array.isArray(bindings)) return metadata;
+
+    for (const binding of bindings) {
+      const path = bindingValue(binding.path);
+      if (path === "" || metadata.has(path)) continue;
+      metadata.set(path, {
+        sourceShape: bindingValue(binding.sourceShape),
+        message: bindingValue(binding.message),
+      });
+    }
+  } catch (_) {
+    return metadata;
+  }
+
+  return metadata;
+};
+
+const normalizeViolation = (violation, shapeMetadata) => {
+  const path = reportText(violation?.path);
+  const metadata = shapeMetadata.get(path) || {};
+  const sourceShape =
+    reportText(violation?.source_shape ?? violation?.sourceShape) ||
+    metadata.sourceShape ||
+    "";
+  const message = metadata.message || reportText(violation?.message);
+
+  return {
+    focusNode: reportText(violation?.focus_node),
+    path,
+    value: reportText(violation?.value),
+    sourceShape,
+    sourceConstraintComponent: reportText(violation?.source_constraint_component),
+    message,
+    severity: reportText(violation?.severity),
+  };
+};
+
+const normalizeValidationReport = (result, shapesTtl) => {
   if (!result || typeof result !== "object") {
     throw new Error("validate did not return an object");
   }
@@ -163,10 +205,14 @@ const normalizeValidationReport = (result) => {
     throw new Error("validate result missing conforms boolean");
   }
 
+  const shapeMetadata = shapeMetadataByPath(shapesTtl);
+
   return {
     conforms: result.conforms,
     violations: Array.isArray(result.violations)
-      ? result.violations.map(normalizeViolation)
+      ? result.violations.map((violation) =>
+          normalizeViolation(violation, shapeMetadata),
+        )
       : [],
   };
 };
@@ -208,7 +254,12 @@ export const queryTypedFieldsImpl = (left) => (right) => (graphTtl) => () => {
 
 export const validateImpl = (left) => (right) => (dataTtl) => (shapesTtl) => () => {
   try {
-    return right(normalizeValidationReport(globalThis.rdfShapes.validate(dataTtl, shapesTtl)));
+    return right(
+      normalizeValidationReport(
+        globalThis.rdfShapes.validate(dataTtl, shapesTtl),
+        shapesTtl,
+      ),
+    );
   } catch (err) {
     return left(errText(err));
   }
