@@ -2,18 +2,18 @@
 
 ## Slice 1 - WASI Blueprint Decode
 
-- [ ] T081-S1 Extend `tx.rdf`/`tx.graph` request parsing to accept optional
+- [x] T081-S1 Extend `tx.rdf`/`tx.graph` request parsing to accept optional
   selected blueprint book JSON in `args.blueprints[]`.
-- [ ] T081-S1 Parse CIP-57 JSON through `Cardano.Tx.Blueprint`, derive the
+- [x] T081-S1 Parse CIP-57 JSON through `Cardano.Tx.Blueprint`, derive the
   script-hash blueprint index from validator `hash` fields, and pass it to
   `Cardano.Tx.Graph.Emit.emit`.
-- [ ] T081-S1 Preserve existing no-blueprint RDF output and malformed-blueprint
+- [x] T081-S1 Preserve existing no-blueprint RDF output and malformed-blueprint
   failures as `malformed_ledger_operation` diagnostics.
-- [ ] T081-S1 Extend the RDF result schema and `tx-rdf-smoke` with
-  no-blueprint selectivity and bundled SundaeSwap blueprint typed-field
-  assertions.
-- [ ] T081-S1 Run `just check-rdf` and `./gate.sh`.
-- [ ] T081-S1 Commit as `feat: decode rdf blueprint books in wasi`.
+- [x] T081-S1 Confirm the RDF result schema remains unchanged for this
+  request-only extension, and extend `tx-rdf-smoke` with no-blueprint
+  selectivity and bundled SundaeSwap blueprint typed-field assertions.
+- [x] T081-S1 Run `just check-rdf` and `./gate.sh`.
+- [x] T081-S1 Commit as `feat: decode rdf blueprint books in wasi`.
 
 ## Slice 2 - Browser Books UX And Typed Lens
 
@@ -32,4 +32,3 @@
 - [ ] T081-S2 Run `nix develop --quiet -c just ui-check`,
   `nix develop --quiet -c just test-playwright`, and `./gate.sh`.
 - [ ] T081-S2 Commit as `feat: render rdf blueprint book fields`.
-
