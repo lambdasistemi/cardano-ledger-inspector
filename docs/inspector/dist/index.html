@@ -444,6 +444,7 @@
       .intent-panel,
       .rdf-panel,
       .overlay-book-panel,
+      .resolved-labels-panel,
       .sparql-lens-panel {
         display: grid;
         gap: 12px;
@@ -581,6 +582,10 @@
         min-width: 0;
       }
 
+      .resolved-labels-panel {
+        min-width: 0;
+      }
+
       .overlay-import-grid,
       .overlay-selection-grid {
         display: grid;
@@ -639,6 +644,10 @@
         border-radius: 8px;
         background: var(--surface-soft);
         padding: 0.64rem 0.7rem;
+      }
+
+      .resolved-labels-row {
+        grid-template-columns: minmax(0, 1.1fr) minmax(7rem, 0.42fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
       }
 
       .sparql-lens-cell {
