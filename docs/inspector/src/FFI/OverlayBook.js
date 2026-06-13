@@ -131,6 +131,7 @@ const AMARU_JOURNAL = {
 };
 
 export const bundledAmaruJournal = JSON.stringify(AMARU_JOURNAL, null, 2);
+export const bundledSundaeSwapBlueprint = globalThis.sundaeSwapV3BlueprintJson || "";
 
 const text = (value) =>
   value === null || value === undefined ? "" : String(value);
@@ -231,7 +232,9 @@ ${scriptBlock(slug, "registry_script", treasury.registry_script)}`;
   return {
     id: `amaru-treasury-${safeSlug}`,
     label,
+    kind: "overlay",
     turtle: `${turtle.trim()}\n`,
+    plutusJson: "",
   };
 };
 
@@ -270,13 +273,55 @@ const pastedTurtleBook = (raw) => {
   const part = {
     id: `pasted-turtle-${hashText(turtle)}`,
     label: "Pasted Turtle",
+    kind: "overlay",
     turtle,
+    plutusJson: "",
   };
   return {
     title: "Pasted overlay Turtle",
     source: "paste",
     parts: [part],
     turtle,
+  };
+};
+
+const isBlueprintJson = (value) =>
+  value &&
+  typeof value === "object" &&
+  value.preamble &&
+  typeof value.preamble === "object" &&
+  Array.isArray(value.validators);
+
+const blueprintId = (blueprint, raw) => {
+  const title = text(blueprint?.preamble?.title).toLowerCase();
+  if (title.includes("sundae")) return "sundaeswap-v3";
+  const slug = localName(text(blueprint?.preamble?.title || "blueprint"))
+    .toLowerCase()
+    .replace(/^-+|-+$/g, "");
+  return slug === "" ? `blueprint-${hashText(raw)}` : `blueprint-${slug}`;
+};
+
+const blueprintLabel = (blueprint) => {
+  const title = text(blueprint?.preamble?.title).toLowerCase();
+  if (title.includes("sundae")) return "SundaeSwap V3 blueprint";
+  const rawTitle = text(blueprint?.preamble?.title);
+  return rawTitle === "" ? "CIP-57 blueprint" : `${titleLabel(rawTitle)} blueprint`;
+};
+
+const buildBlueprintBook = (blueprint, raw) => {
+  const label = blueprintLabel(blueprint);
+  const part = {
+    id: blueprintId(blueprint, raw),
+    label,
+    kind: "blueprint",
+    turtle: "",
+    plutusJson: raw,
+  };
+  return {
+    title: label,
+    source: "CIP-57 plutus.json",
+    parts: [part],
+    turtle: "",
   };
 };
 
@@ -288,6 +333,9 @@ const parseBook = (input) => {
 
   if (raw.startsWith("{")) {
     const parsed = JSON.parse(raw);
+    if (isBlueprintJson(parsed)) {
+      return buildBlueprintBook(parsed, raw);
+    }
     return buildAmaruBook(parsed);
   }
 
@@ -303,4 +351,15 @@ export const parseImpl = (left) => (right) => (input) => () => {
   } catch (err) {
     return left(errText(err));
   }
+};
+
+export const blueprintArgs = (parts) => {
+  const blueprints = (Array.isArray(parts) ? parts : [])
+    .filter((part) => part && part.kind === "blueprint" && text(part.plutusJson) !== "")
+    .map((part) => ({
+      id: text(part.id),
+      plutus_json: text(part.plutusJson),
+    }));
+
+  return blueprints.length === 0 ? "{}" : JSON.stringify({ blueprints });
 };

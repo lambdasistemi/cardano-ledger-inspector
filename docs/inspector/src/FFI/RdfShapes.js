@@ -38,6 +38,18 @@ WHERE {
 ORDER BY ?label ?entity
 `;
 
+const typedFieldsQuery = `
+SELECT ?subject ?field ?value
+WHERE {
+  ?subject ?predicate ?value .
+  FILTER(STRSTARTS(STR(?predicate), "https://lambdasistemi.github.io/cardano-rdf/fixtures/tx-rdf#"))
+  BIND(STRAFTER(STR(?predicate), "https://lambdasistemi.github.io/cardano-rdf/fixtures/tx-rdf#") AS ?field)
+  FILTER(CONTAINS(STR(?field), "_"))
+  FILTER(!REGEX(STR(?field), "^_[0-9]+_"))
+}
+ORDER BY ?subject ?field ?value
+`;
+
 const bindingValue = (binding) =>
   binding && binding.value !== undefined && binding.value !== null
     ? String(binding.value)
@@ -114,6 +126,23 @@ const normalizeResolvedLabelRows = (result) => {
   }));
 };
 
+const normalizeTypedFieldRows = (result) => {
+  if (!result || result.kind !== "solutions") {
+    throw new Error("query did not return solution rows");
+  }
+
+  const bindings = result.json?.results?.bindings;
+  if (!Array.isArray(bindings)) {
+    throw new Error("query result missing bindings");
+  }
+
+  return bindings.map((binding) => ({
+    subject: bindingValue(binding.subject),
+    field: bindingValue(binding.field),
+    value: bindingValue(binding.value),
+  }));
+};
+
 export const queryImpl = (left) => (right) => (graphTtl) => (sparql) => () => {
   try {
     return right(globalThis.rdfShapes.query(graphTtl, sparql));
@@ -135,6 +164,15 @@ export const queryTransactionOutputsImpl = (left) => (right) => (graphTtl) => ()
   try {
     const result = globalThis.rdfShapes.query(graphTtl, transactionOutputsQuery);
     return right(normalizeTransactionOutputRows(result));
+  } catch (err) {
+    return left(errText(err));
+  }
+};
+
+export const queryTypedFieldsImpl = (left) => (right) => (graphTtl) => () => {
+  try {
+    const result = globalThis.rdfShapes.query(graphTtl, typedFieldsQuery);
+    return right(normalizeTypedFieldRows(result));
   } catch (err) {
     return left(errText(err));
   }

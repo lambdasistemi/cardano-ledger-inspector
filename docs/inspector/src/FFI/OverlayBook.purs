@@ -1,7 +1,9 @@
 module FFI.OverlayBook
   ( OverlayBook
   , OverlayPart
+  , blueprintArgs
   , bundledAmaruJournal
+  , bundledSundaeSwapBlueprint
   , parse
   ) where
 
@@ -11,7 +13,9 @@ import Effect (Effect)
 type OverlayPart =
   { id :: String
   , label :: String
+  , kind :: String
   , turtle :: String
+  , plutusJson :: String
   }
 
 type OverlayBook =
@@ -22,6 +26,10 @@ type OverlayBook =
   }
 
 foreign import bundledAmaruJournal :: String
+
+foreign import bundledSundaeSwapBlueprint :: String
+
+foreign import blueprintArgs :: Array OverlayPart -> String
 
 foreign import parseImpl
   :: (String -> Either String OverlayBook)

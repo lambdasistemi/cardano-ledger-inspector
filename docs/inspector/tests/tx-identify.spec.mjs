@@ -23,6 +23,10 @@ const amaruJournalFixturePath = path.join(
   repoRoot,
   "docs/inspector/protocols/amaru-treasury/journal-2026.json",
 );
+const sundaeBlueprintFixturePath = path.join(
+  repoRoot,
+  "docs/inspector/protocols/sundaeswap-v3/plutus.json",
+);
 
 async function loadValidationContext() {
   const request = JSON.parse(await readFile(validationFixturePath, "utf8"));
@@ -262,6 +266,66 @@ test("selects Amaru overlay book parts into deterministic Turtle", async ({
   await expect(
     resolvedLabelsPanel.getByText("No resolved labels.", { exact: true }),
   ).toBeVisible();
+});
+
+test("imports a SundaeSwap blueprint book and applies typed RDF fields", async ({
+  page,
+}) => {
+  const blueprintJson = await readFile(sundaeBlueprintFixturePath, "utf8");
+  await decodeFixture(page, signingIntentFixturePath);
+
+  const rdfPanel = page.locator(".rdf-panel");
+  const turtle = rdfPanel.locator(".rdf-turtle");
+  const typedFieldsPanel = page.locator(".typed-fields-panel");
+  await expect(turtle).not.toContainText(":OrderDatum_max_protocol_fee 1280000");
+  await expect(
+    typedFieldsPanel.getByText("OrderDatum_max_protocol_fee", { exact: true }),
+  ).toHaveCount(0);
+  await expect(typedFieldsPanel.getByText("1280000", { exact: true })).toHaveCount(0);
+
+  const overlayPanel = page.locator(".overlay-book-panel");
+  await overlayPanel.getByLabel(/Overlay Turtle.*JSON/).fill(blueprintJson);
+  await overlayPanel.getByRole("button", { name: /Import .*book/ }).click();
+
+  const sundaeBlueprint = overlayPanel.getByLabel("SundaeSwap V3 blueprint");
+  await expect(sundaeBlueprint).toBeVisible();
+  await sundaeBlueprint.check();
+  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+
+  await expect(turtle).toContainText(":OrderDatum_max_protocol_fee 1280000");
+  await expect(
+    typedFieldsPanel.getByRole("heading", {
+      name: "SPARQL lens: typed contract fields",
+    }),
+  ).toBeVisible();
+
+  const typedRow = typedFieldsPanel
+    .locator(".sparql-lens-row")
+    .filter({ hasText: "OrderDatum_max_protocol_fee" })
+    .filter({ hasText: "1280000" });
+  await expect(typedRow.first()).toBeVisible();
+
+  const turtleText = await turtle.innerText();
+  const queryResult = await page.evaluate((graph) => {
+    const query = `
+      PREFIX : <https://lambdasistemi.github.io/cardano-rdf/fixtures/tx-rdf#>
+      SELECT ?subject ?value WHERE {
+        ?subject :OrderDatum_max_protocol_fee ?value .
+      }
+    `;
+
+    return globalThis.rdfShapes.query(graph, query);
+  }, turtleText);
+  expect(queryResult.kind).toBe("solutions");
+  expect(
+    queryResult.json.results.bindings.map((binding) => binding.value.value),
+  ).toContain("1280000");
+
+  await sundaeBlueprint.uncheck();
+  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+
+  await expect(turtle).not.toContainText(":OrderDatum_max_protocol_fee 1280000");
+  await expect(typedRow).toHaveCount(0);
 });
 
 test("exposes the vendored RDF query engine", async ({ page }) => {
