@@ -19,6 +19,7 @@
 , mkSpagoDerivation
 , wasmArtifact        # derivation whose $out/<name>.wasm is the embedded binary
 , wasmArtifactName    # e.g. "wasm-ledger-smoke"  (used to pick <name>.wasm)
+, rdfShapesWasmPkg    # wasm-bindgen web bundle from lambdasistemi/rdf-shapes-wasm
 , src                 # PS project tree (./docs/inspector relative to flake root)
 }:
 
@@ -58,6 +59,8 @@ pkgs.mkSpagoDerivation {
     # can embed it at bundle time.
     mkdir -p src/assets
     cp ${wasmArtifact}/${wasmArtifactName}.wasm src/assets/inspector.wasm
+    cp ${rdfShapesWasmPkg}/rdf_shapes_wasm.js src/assets/rdf_shapes_wasm.js
+    cp ${rdfShapesWasmPkg}/rdf_shapes_wasm_bg.wasm src/assets/rdf_shapes_wasm_bg.wasm
     chmod -R u+w src/assets
 
     # 1. npm deps + WASM bytes → dist/deps.js (IIFE)
