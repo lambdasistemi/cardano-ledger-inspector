@@ -41,8 +41,8 @@ data RdfRequest
         Aeson.Value
         [(ScriptHash, Blueprint.Blueprint, T.Text)]
 
-data ProducerContext = ProducerContext
-    { pcProducerTxs :: !(Map.Map T.Text ProducerTx)
+newtype ProducerContext = ProducerContext
+    { pcProducerTxs :: Map.Map T.Text ProducerTx
     }
 
 data ProducerTx = ProducerTx
