@@ -11,3 +11,5 @@ nix develop --quiet -c just build-smokes
 nix develop --quiet -c just build-extism-host
 nix develop --quiet -c just build-extism-spike
 nix develop --quiet -c just test
+nix develop --quiet -c just ui-check
+nix develop --quiet -c just check-rdf
