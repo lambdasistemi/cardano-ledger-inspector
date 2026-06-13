@@ -2,19 +2,19 @@
 
 ## Slice 1 - Shapes Engine And Book Model
 
-- [ ] T082-S1 Extend `FFI.RdfShapes` with a typed `validate` wrapper over the
+- [X] T082-S1 Extend `FFI.RdfShapes` with a typed `validate` wrapper over the
   vendored `globalThis.rdfShapes.validate(data_ttl, shapes_ttl)` API.
-- [ ] T082-S1 Add a bundled example SHACL shapes book under
+- [X] T082-S1 Add a bundled example SHACL shapes book under
   `docs/inspector/protocols/` and expose it through the browser bundle without
   runtime network fetches.
-- [ ] T082-S1 Extend the existing book parser/model so shapes Turtle imports as
+- [X] T082-S1 Extend the existing book parser/model so shapes Turtle imports as
   selectable `kind = "shacl"` parts while overlay Turtle and blueprint JSON
   behavior remains unchanged.
-- [ ] T082-S1 Add focused Playwright coverage proving the vendored validate
+- [X] T082-S1 Add focused Playwright coverage proving the vendored validate
   engine is callable and the bundled shapes book imports as a selectable part.
-- [ ] T082-S1 Run `nix develop --quiet -c just ui-check` and
+- [X] T082-S1 Run `nix develop --quiet -c just ui-check` and
   `nix develop --quiet -c just test-playwright`.
-- [ ] T082-S1 Commit as `feat: import rdf shacl shapes books`.
+- [X] T082-S1 Commit as `feat: import rdf shacl shapes books`.
 
 ## Slice 2 - Conformance UX
 
