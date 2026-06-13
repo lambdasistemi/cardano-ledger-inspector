@@ -202,6 +202,16 @@ test("renders the transaction RDF graph after decode", async ({ page }) => {
   const turtle = rdfPanel.locator(".rdf-turtle");
   await expect(turtle).toContainText("@prefix cardano:");
   await expect(turtle).toContainText("cardano:Transaction");
+
+  const lensPanel = page.locator(".sparql-lens-panel");
+  await expect(
+    lensPanel.getByRole("heading", {
+      name: "SPARQL lens: transaction outputs",
+    }),
+  ).toBeVisible();
+  await expect(lensPanel.locator(".sparql-lens-row").first()).toBeVisible();
+  await expect(lensPanel.getByText("5", { exact: true })).toBeVisible();
+  await expect(lensPanel.getByText(/urn:cardano:tx:/)).toBeVisible();
 });
 
 test("exposes the vendored RDF query engine", async ({ page }) => {

@@ -442,7 +442,8 @@
 
       .identity-panel,
       .intent-panel,
-      .rdf-panel {
+      .rdf-panel,
+      .sparql-lens-panel {
         display: grid;
         gap: 12px;
         border: 1px solid var(--border);
@@ -585,6 +586,45 @@
       .rdf-turtle {
         max-width: 100%;
         white-space: pre;
+      }
+
+      .sparql-lens-row-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .sparql-lens-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(5rem, 0.32fr);
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface-soft);
+        padding: 0.64rem 0.7rem;
+      }
+
+      .sparql-lens-cell {
+        display: grid;
+        gap: 0.35rem;
+        min-width: 0;
+      }
+
+      .sparql-lens-cell code,
+      .sparql-lens-cell strong {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .sparql-lens-count strong {
+        font-size: 1.05rem;
+      }
+
+      .sparql-lens-error {
+        border: 1px solid #efb2ac;
+        border-radius: 8px;
+        background: var(--danger-soft);
+        color: var(--danger);
+        padding: 0.7rem 0.78rem;
       }
 
       .witness-section {
@@ -931,7 +971,8 @@
         }
 
         .browser-heading,
-        .browser-row {
+        .browser-row,
+        .sparql-lens-row {
           grid-template-columns: 1fr;
         }
 
