@@ -443,6 +443,7 @@
       .identity-panel,
       .intent-panel,
       .rdf-panel,
+      .overlay-book-panel,
       .sparql-lens-panel {
         display: grid;
         gap: 12px;
@@ -574,6 +575,43 @@
 
       .rdf-panel {
         min-width: 0;
+      }
+
+      .overlay-book-panel {
+        min-width: 0;
+      }
+
+      .overlay-import-grid,
+      .overlay-selection-grid {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .overlay-selection-grid {
+        grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 1.2fr);
+        align-items: start;
+      }
+
+      .overlay-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .overlay-part-list {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .overlay-part-list .choice-option {
+        min-height: 38px;
+        background: #ffffff;
+      }
+
+      .overlay-selection-grid textarea {
+        min-height: 240px;
       }
 
       .rdf-meta {
@@ -972,6 +1010,7 @@
 
         .browser-heading,
         .browser-row,
+        .overlay-selection-grid,
         .sparql-lens-row {
           grid-template-columns: 1fr;
         }
@@ -997,6 +1036,10 @@
         .primary-action,
         .secondary-action {
           width: 100%;
+        }
+
+        .overlay-actions {
+          display: grid;
         }
 
         .field-label {

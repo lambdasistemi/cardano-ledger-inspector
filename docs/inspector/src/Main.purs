@@ -5,7 +5,7 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.String (Pattern(..), Replacement(..), replaceAll, trim) as String
+import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, trim) as String
 import Data.String.CodeUnits as StringCodeUnits
 import Effect (Effect)
 import Effect.Aff (attempt)
@@ -16,6 +16,8 @@ import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
 import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty) as Json
+import FFI.OverlayBook (OverlayPart)
+import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
 import Provider (Provider(..))
@@ -89,6 +91,10 @@ type State =
   , validation :: Maybe Json.Validation
   , rdf :: Maybe Json.RdfGraph
   , sparqlLens :: Maybe SparqlLens
+  , overlayInput :: String
+  , overlayParts :: Array OverlayPart
+  , selectedOverlayPartIds :: Array String
+  , overlayError :: Maybe String
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , running :: Boolean
@@ -124,6 +130,10 @@ data Action
   | SelectNetwork Network
   | SetTxHash String
   | SetTxHex String
+  | SetOverlayInput String
+  | ImportOverlayBook
+  | LoadAmaruOverlayBook
+  | ToggleOverlayPart String Boolean
   | Decode
   | Copy
   | CopyValue String String
@@ -155,6 +165,10 @@ inspectorComponent initial =
         , validation: Nothing
         , rdf: Nothing
         , sparqlLens: Nothing
+        , overlayInput: ""
+        , overlayParts: []
+        , selectedOverlayPartIds: []
+        , overlayError: Nothing
         , browserNodes: []
         , expandedPaths: []
         , running: false
@@ -486,7 +500,9 @@ inspectorComponent initial =
   renderRdfMaybe state exitOk =
     case state.rdf of
       Just rdf ->
-        if exitOk && rdf.valid then [ renderRdfGraph rdf ] <> renderSparqlLensMaybe state.sparqlLens
+        if exitOk && rdf.valid then
+          [ renderRdfGraph rdf, renderOverlayBooks state ]
+            <> renderSparqlLensMaybe state.sparqlLens
         else []
       Nothing -> []
 
@@ -640,6 +656,103 @@ inspectorComponent initial =
           [ classNames [ "rdf-turtle" ] ]
           [ HH.text rdf.turtle ]
       ]
+
+  renderOverlayBooks state =
+    HH.div
+      [ classNames [ "overlay-book-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "Overlay books" ]
+              , HH.p_ [ HH.text "Import optional RDF overlay parts for later graph union." ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "overlay-import-grid" ] ]
+          [ HH.label
+              [ classNames [ "field-stack" ] ]
+              [ HH.span
+                  [ classNames [ "field-label" ] ]
+                  [ HH.text "Overlay Turtle or Amaru journal JSON" ]
+              , HH.textarea
+                  [ HP.value state.overlayInput
+                  , HP.rows 8
+                  , HH.attr (HH.AttrName "aria-label") "Overlay Turtle or Amaru journal JSON"
+                  , HE.onValueInput SetOverlayInput
+                  ]
+              ]
+          , HH.div
+              [ classNames [ "overlay-actions" ] ]
+              [ HH.button
+                  [ classNames [ "secondary-action" ]
+                  , HE.onClick (\_ -> LoadAmaruOverlayBook)
+                  ]
+                  [ HH.text "Load Amaru overlay book" ]
+              , HH.button
+                  [ classNames [ "primary-action" ]
+                  , HE.onClick (\_ -> ImportOverlayBook)
+                  ]
+                  [ HH.text "Import overlay book" ]
+              ]
+          ]
+      , case state.overlayError of
+          Just err ->
+            HH.div
+              [ classNames [ "sparql-lens-error" ] ]
+              [ HH.text ("Overlay import failed: " <> err) ]
+          Nothing -> HH.text ""
+      , HH.div
+          [ classNames [ "overlay-selection-grid" ] ]
+          [ HH.div
+              [ classNames [ "overlay-part-list" ] ]
+              (renderOverlayPartList state)
+          , HH.label
+              [ classNames [ "field-stack" ] ]
+              [ HH.span
+                  [ classNames [ "field-label" ] ]
+                  [ HH.text "Selected overlay Turtle" ]
+              , HH.textarea
+                  [ HP.value (selectedOverlayTurtle state)
+                  , HP.rows 10
+                  , HH.attr (HH.AttrName "aria-label") "Selected overlay Turtle"
+                  , HH.attr (HH.AttrName "readonly") "readonly"
+                  ]
+              ]
+          ]
+      ]
+
+  renderOverlayPartList state =
+    if Array.null state.overlayParts then
+      [ HH.div
+          [ classNames [ "witness-empty" ] ]
+          [ HH.text "No overlay parts imported." ]
+      ]
+    else
+      map (renderOverlayPart state) state.overlayParts
+
+  renderOverlayPart state part =
+    let
+      selected = Array.elem part.id state.selectedOverlayPartIds
+    in
+      HH.label
+        [ choiceClass selected ]
+        [ HH.input
+            [ HP.type_ HP.InputCheckbox
+            , HP.checked selected
+            , HE.onChecked (ToggleOverlayPart part.id)
+            ]
+        , HH.span
+            [ classNames [ "choice-title" ] ]
+            [ HH.text part.label ]
+        ]
+
+  selectedOverlayTurtle state =
+    String.joinWith "\n" (map _.turtle (selectedOverlayParts state))
+
+  selectedOverlayParts state =
+    Array.filter
+      (\part -> Array.elem part.id state.selectedOverlayPartIds)
+      state.overlayParts
 
   renderSparqlLensMaybe lens =
     case lens of
@@ -1055,6 +1168,40 @@ inspectorComponent initial =
     SelectNetwork n -> H.modify_ _ { network = n, fetchError = Nothing, copiedPath = Nothing }
     SetTxHash s -> H.modify_ _ { txHash = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
     SetTxHex s -> H.modify_ _ { txHex = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
+    SetOverlayInput s -> H.modify_ _ { overlayInput = s, overlayError = Nothing }
+    ImportOverlayBook -> do
+      input <- H.gets _.overlayInput
+      parsed <- liftEffect (OverlayBook.parse input)
+      case parsed of
+        Left err ->
+          H.modify_ _ { overlayError = Just err }
+        Right book ->
+          H.modify_
+            _
+              { overlayParts = book.parts
+              , selectedOverlayPartIds = []
+              , overlayError = Nothing
+              }
+    LoadAmaruOverlayBook -> do
+      let input = OverlayBook.bundledAmaruJournal
+      parsed <- liftEffect (OverlayBook.parse input)
+      case parsed of
+        Left err ->
+          H.modify_ _ { overlayInput = input, overlayError = Just err }
+        Right book ->
+          H.modify_
+            _
+              { overlayInput = input
+              , overlayParts = book.parts
+              , selectedOverlayPartIds = []
+              , overlayError = Nothing
+              }
+    ToggleOverlayPart partId selected ->
+      H.modify_ \st ->
+        st
+          { selectedOverlayPartIds =
+              toggleOverlayPartId partId selected st.selectedOverlayPartIds
+          }
     Decode -> do
       st <- H.get
       H.modify_
@@ -1221,3 +1368,10 @@ inspectorComponent initial =
                     if operationResult.exitOk && browser.valid then Nothing
                     else Just (if operationResult.stderr == "" then "Haskell ledger operation browse failed." else operationResult.stderr)
                 }
+
+  toggleOverlayPartId partId selected ids =
+    if selected then
+      if Array.elem partId ids then ids
+      else Array.snoc ids partId
+    else
+      Array.filter (_ /= partId) ids

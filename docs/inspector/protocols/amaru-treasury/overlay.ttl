@@ -1,0 +1,248 @@
+@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-inspector/overlay/amaru-treasury#> .
+
+overlay:OverlayPart
+  a rdfs:Class ;
+  rdfs:label "Overlay part" .
+
+overlay:Treasury
+  a rdfs:Class ;
+  rdfs:label "Budget treasury" .
+
+overlay:Address
+  a rdfs:Class ;
+  rdfs:label "Cardano address" .
+
+overlay:CardanoScript
+  a rdfs:Class ;
+  rdfs:label "Cardano script" .
+
+overlay:Owner
+  a rdfs:Class ;
+  rdfs:label "Owner key" .
+
+overlay:ScopeOwners
+  a rdfs:Class ;
+  rdfs:label "Scope owners reference" .
+
+overlay:slug a rdf:Property ; rdfs:label "Slug" .
+overlay:budgetAda a rdf:Property ; rdfs:label "Budget in ADA" .
+overlay:address a rdf:Property ; rdfs:label "Treasury address" .
+overlay:owner a rdf:Property ; rdfs:label "Treasury owner" .
+overlay:scopeOwners a rdf:Property ; rdfs:label "Scope owners" .
+overlay:treasuryScript a rdf:Property ; rdfs:label "Treasury script" .
+overlay:permissionsScript a rdf:Property ; rdfs:label "Permissions script" .
+overlay:registryScript a rdf:Property ; rdfs:label "Registry script" .
+overlay:scriptRole a rdf:Property ; rdfs:label "Script role" .
+
+overlay:amaruScopeOwners
+  a overlay:ScopeOwners ;
+  rdfs:label "Amaru treasury scope owners" ;
+  cardano:fromTxOutRef "11ace24a7b0caad4a68a38ef2fff18185dc9ea604e84425dab487cae94e4cf54#00" .
+
+overlay:amaruAddress-contingency
+  a overlay:Address ;
+  rdfs:label "Amaru Contingency treasury address" ;
+  cardano:bech32 "addr1x8ndhlcfy30t38z0tql64fpg8ply93r37xrgvdagfpsz5nhxm0lsjfz7hzwy7kpl42jzswr7gtz8ruvxscm6sjrq9f8qruq0ae" .
+
+overlay:amaruTreasury-contingency
+  a overlay:Treasury ;
+  rdfs:label "Amaru Contingency treasury" ;
+  overlay:slug "contingency" ;
+  overlay:budgetAda 4057000 ;
+  overlay:address overlay:amaruAddress-contingency ;
+  overlay:scopeOwners overlay:amaruScopeOwners ;
+  overlay:treasuryScript <urn:cardano:id:script:e6dbff09245eb89c4f583faaa428387e42c471f1868637a848602a4e> ;
+  overlay:permissionsScript <urn:cardano:id:script:2810b46b73cb27292cd8511274b6930188eee61b7d8635af6b1b626a> ;
+  overlay:registryScript <urn:cardano:id:script:7d275cf8c09fd91e73879993ef13cb73915196478d5e3777992f988> .
+
+<urn:cardano:id:script:e6dbff09245eb89c4f583faaa428387e42c471f1868637a848602a4e>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Contingency treasury script" ;
+  overlay:scriptRole "treasury_script" ;
+  cardano:fromTxOutRef "b25328336bbba240d5906952534e84bb8edf1a690f86a4160c38703396853c90#00" ;
+  overlay:slug "contingency-treasury_script" .
+
+<urn:cardano:id:script:2810b46b73cb27292cd8511274b6930188eee61b7d8635af6b1b626a>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Contingency permissions script" ;
+  overlay:scriptRole "permissions_script" ;
+  cardano:fromTxOutRef "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095#04" ;
+  overlay:slug "contingency-permissions_script" .
+
+<urn:cardano:id:script:7d275cf8c09fd91e73879993ef13cb73915196478d5e3777992f988>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Contingency registry script" ;
+  overlay:scriptRole "registry_script" ;
+  cardano:fromTxOutRef "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c#04" ;
+  overlay:slug "contingency-registry_script" .
+
+overlay:amaruAddress-core_development
+  a overlay:Address ;
+  rdfs:label "Amaru Core Development treasury address" ;
+  cardano:bech32 "addr1x90mk0jjjhppr36ethwj8kewpgyrxyc7q6qucl4gqru96dzlhvl999wzz8r4jhway0djuzsgxvf3up5pe3l2sq8ct56qtjz6ah" .
+
+<urn:cardano:id:key:7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb>
+  a overlay:Owner ;
+  rdfs:label "Amaru Core Development owner key" .
+
+overlay:amaruTreasury-core_development
+  a overlay:Treasury ;
+  rdfs:label "Amaru Core Development treasury" ;
+  overlay:slug "core_development" ;
+  overlay:budgetAda 2575000 ;
+  overlay:address overlay:amaruAddress-core_development ;
+  overlay:owner <urn:cardano:id:key:7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb> ;
+  overlay:scopeOwners overlay:amaruScopeOwners ;
+  overlay:treasuryScript <urn:cardano:id:script:5fbb3e5295c211c7595ddd23db2e0a0833131e0681cc7ea800f85d34> ;
+  overlay:permissionsScript <urn:cardano:id:script:03ee9cf951e89fb82c47edbff562ee90be17de85b2c24b451c7e8e39> ;
+  overlay:registryScript <urn:cardano:id:script:1e1ee91b8e2bddc9d583d92fd1ba5ea47b8a3e62c1eacb0ec799b99b> .
+
+<urn:cardano:id:script:5fbb3e5295c211c7595ddd23db2e0a0833131e0681cc7ea800f85d34>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Core Development treasury script" ;
+  overlay:scriptRole "treasury_script" ;
+  cardano:fromTxOutRef "87ee53271fb41021efa13c2dbe2998c18ead07d32a6ab6dda184853ed7e39aae#00" ;
+  overlay:slug "core_development-treasury_script" .
+
+<urn:cardano:id:script:03ee9cf951e89fb82c47edbff562ee90be17de85b2c24b451c7e8e39>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Core Development permissions script" ;
+  overlay:scriptRole "permissions_script" ;
+  cardano:fromTxOutRef "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095#00" ;
+  overlay:slug "core_development-permissions_script" .
+
+<urn:cardano:id:script:1e1ee91b8e2bddc9d583d92fd1ba5ea47b8a3e62c1eacb0ec799b99b>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Core Development registry script" ;
+  overlay:scriptRole "registry_script" ;
+  cardano:fromTxOutRef "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c#00" ;
+  overlay:slug "core_development-registry_script" .
+
+overlay:amaruAddress-middleware
+  a overlay:Address ;
+  rdfs:label "Amaru Middleware treasury address" ;
+  cardano:bech32 "addr1x8a5gxtm0ynzw80f80rsps3a5dwem43swsekpnctd0wuwxhmgsvhk7fxyuw7jw78qrprmg6anhtrqapnvr8sk67acudqhnwrjp" .
+
+<urn:cardano:id:key:97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2>
+  a overlay:Owner ;
+  rdfs:label "Amaru Middleware owner key" .
+
+overlay:amaruTreasury-middleware
+  a overlay:Treasury ;
+  rdfs:label "Amaru Middleware treasury" ;
+  overlay:slug "middleware" ;
+  overlay:budgetAda 900000 ;
+  overlay:address overlay:amaruAddress-middleware ;
+  overlay:owner <urn:cardano:id:key:97e0f6d6c86dbebf15cc8fdf0981f939b2f2b70928a46511edd49df2> ;
+  overlay:scopeOwners overlay:amaruScopeOwners ;
+  overlay:treasuryScript <urn:cardano:id:script:fb44197b7926271de93bc700c23da35d9dd630743360cf0b6bddc71a> ;
+  overlay:permissionsScript <urn:cardano:id:script:212e6b9a723138a5b3fe0e55aa4badd9bbae54e3f6309000e30fae3c> ;
+  overlay:registryScript <urn:cardano:id:script:def2913d56acc4c81de20b7b5039e10ceb261c79ed968dc526596638> .
+
+<urn:cardano:id:script:fb44197b7926271de93bc700c23da35d9dd630743360cf0b6bddc71a>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Middleware treasury script" ;
+  overlay:scriptRole "treasury_script" ;
+  cardano:fromTxOutRef "ec31219173fd4eb3cc3c2123e53425654c1122354ceafc247e7c32d278dad223#00" ;
+  overlay:slug "middleware-treasury_script" .
+
+<urn:cardano:id:script:212e6b9a723138a5b3fe0e55aa4badd9bbae54e3f6309000e30fae3c>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Middleware permissions script" ;
+  overlay:scriptRole "permissions_script" ;
+  cardano:fromTxOutRef "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095#03" ;
+  overlay:slug "middleware-permissions_script" .
+
+<urn:cardano:id:script:def2913d56acc4c81de20b7b5039e10ceb261c79ed968dc526596638>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Middleware registry script" ;
+  overlay:scriptRole "registry_script" ;
+  cardano:fromTxOutRef "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c#03" ;
+  overlay:slug "middleware-registry_script" .
+
+overlay:amaruAddress-network_compliance
+  a overlay:Address ;
+  rdfs:label "Amaru Network Compliance treasury address" ;
+  cardano:bech32 "addr1xyezq8wpaqnssdjvd3p220uf7e6nzjae44w6yu625y965rfjyqwur6p8pqmycmzz55lcnan4x99mnt2a5fe54ggt4gxs8thzgk" .
+
+<urn:cardano:id:key:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1>
+  a overlay:Owner ;
+  rdfs:label "Amaru Network Compliance owner key" .
+
+overlay:amaruTreasury-network_compliance
+  a overlay:Treasury ;
+  rdfs:label "Amaru Network Compliance treasury" ;
+  overlay:slug "network_compliance" ;
+  overlay:budgetAda 1450000 ;
+  overlay:address overlay:amaruAddress-network_compliance ;
+  overlay:owner <urn:cardano:id:key:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> ;
+  overlay:scopeOwners overlay:amaruScopeOwners ;
+  overlay:treasuryScript <urn:cardano:id:script:32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d> ;
+  overlay:permissionsScript <urn:cardano:id:script:a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094> ;
+  overlay:registryScript <urn:cardano:id:script:38c627d45835744a2d6c727124f2b5852e5564aeab3f608e0e84ea6d> .
+
+<urn:cardano:id:script:32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Network Compliance treasury script" ;
+  overlay:scriptRole "treasury_script" ;
+  cardano:fromTxOutRef "810bfcbde85ae72f27d7e8cd154c03c802de15d3fa0dd83a32a4b0fdba330b3c#00" ;
+  overlay:slug "network_compliance-treasury_script" .
+
+<urn:cardano:id:script:a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Network Compliance permissions script" ;
+  overlay:scriptRole "permissions_script" ;
+  cardano:fromTxOutRef "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095#02" ;
+  overlay:slug "network_compliance-permissions_script" .
+
+<urn:cardano:id:script:38c627d45835744a2d6c727124f2b5852e5564aeab3f608e0e84ea6d>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Network Compliance registry script" ;
+  overlay:scriptRole "registry_script" ;
+  cardano:fromTxOutRef "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c#02" ;
+  overlay:slug "network_compliance-registry_script" .
+
+overlay:amaruAddress-ops_and_use_cases
+  a overlay:Address ;
+  rdfs:label "Amaru Ops And Use Cases treasury address" ;
+  cardano:bech32 "addr1x9r8gmryz5wrwvlxm6g4s4u9ssdz656z95hwjnk9rgamedzxw3kxg9guxue7dh53tptctpq694f5ytfwa98v2x3mhj6qe3kxep" .
+
+<urn:cardano:id:key:f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e>
+  a overlay:Owner ;
+  rdfs:label "Amaru Ops And Use Cases owner key" .
+
+overlay:amaruTreasury-ops_and_use_cases
+  a overlay:Treasury ;
+  rdfs:label "Amaru Ops And Use Cases treasury" ;
+  overlay:slug "ops_and_use_cases" ;
+  overlay:budgetAda 1160000 ;
+  overlay:address overlay:amaruAddress-ops_and_use_cases ;
+  overlay:owner <urn:cardano:id:key:f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e> ;
+  overlay:scopeOwners overlay:amaruScopeOwners ;
+  overlay:treasuryScript <urn:cardano:id:script:46746c64151c3733e6de91585785841a2d53422d2ee94ec51a3bbcb4> ;
+  overlay:permissionsScript <urn:cardano:id:script:cf9a4136d781e65d6885ee574480d29f1d1a342fe15f215ee6bf0cbb> ;
+  overlay:registryScript <urn:cardano:id:script:bd7d70eff456af39f86e708fb634b7b69edf5c2aafae7a422f905f5c> .
+
+<urn:cardano:id:script:46746c64151c3733e6de91585785841a2d53422d2ee94ec51a3bbcb4>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Ops And Use Cases treasury script" ;
+  overlay:scriptRole "treasury_script" ;
+  cardano:fromTxOutRef "660c0729b68bce67f62d4f1f3ae38082217e55915bb3e0d9222a67b2f9fd821c#00" ;
+  overlay:slug "ops_and_use_cases-treasury_script" .
+
+<urn:cardano:id:script:cf9a4136d781e65d6885ee574480d29f1d1a342fe15f215ee6bf0cbb>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Ops And Use Cases permissions script" ;
+  overlay:scriptRole "permissions_script" ;
+  cardano:fromTxOutRef "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095#01" ;
+  overlay:slug "ops_and_use_cases-permissions_script" .
+
+<urn:cardano:id:script:bd7d70eff456af39f86e708fb634b7b69edf5c2aafae7a422f905f5c>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Ops And Use Cases registry script" ;
+  overlay:scriptRole "registry_script" ;
+  cardano:fromTxOutRef "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c#01" ;
+  overlay:slug "ops_and_use_cases-registry_script" .
