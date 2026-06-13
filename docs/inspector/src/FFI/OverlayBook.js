@@ -39,6 +39,21 @@ overlay:registryScript a rdf:Property ; rdfs:label "Registry script" .
 overlay:scriptRole a rdf:Property ; rdfs:label "Script role" .
 `;
 
+const CARDANO_SHACL_SHAPES = `@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+cardano:TransactionShape
+  a sh:NodeShape ;
+  sh:targetClass cardano:Transaction ;
+  sh:property [
+    sh:path cardano:hasTxId ;
+    sh:minCount 1 ;
+    sh:datatype xsd:string ;
+    sh:message "Cardano transactions must include a transaction id." ;
+  ] .
+`;
+
 const AMARU_JOURNAL = {
   scope_owners: "11ace24a7b0caad4a68a38ef2fff18185dc9ea604e84425dab487cae94e4cf54#00",
   treasuries: {
@@ -131,6 +146,7 @@ const AMARU_JOURNAL = {
 };
 
 export const bundledAmaruJournal = JSON.stringify(AMARU_JOURNAL, null, 2);
+export const bundledCardanoShaclShapes = CARDANO_SHACL_SHAPES;
 export const bundledSundaeSwapBlueprint = globalThis.sundaeSwapV3BlueprintJson || "";
 
 const text = (value) =>
@@ -268,6 +284,28 @@ const hashText = (raw) => {
   return (hash >>> 0).toString(36);
 };
 
+const isShaclTurtle = (raw) =>
+  /(^|\s)sh:(NodeShape|targetClass|property|path|minCount|datatype)\b/.test(raw) ||
+  raw.includes("http://www.w3.org/ns/shacl#");
+
+const shaclTurtleBook = (raw) => {
+  const turtle = `${raw.trim()}\n`;
+  const isBundled = turtle.trim() === bundledCardanoShaclShapes.trim();
+  const part = {
+    id: isBundled ? "cardano-rdf-shacl-shapes" : `pasted-shacl-${hashText(turtle)}`,
+    label: isBundled ? "Cardano transaction SHACL shapes" : "Pasted SHACL shapes",
+    kind: "shacl",
+    turtle,
+    plutusJson: "",
+  };
+  return {
+    title: isBundled ? "Cardano RDF SHACL shapes" : "Pasted SHACL shapes",
+    source: isBundled ? "docs/inspector/protocols/cardano-rdf/shapes.ttl" : "paste",
+    parts: [part],
+    turtle,
+  };
+};
+
 const pastedTurtleBook = (raw) => {
   const turtle = `${raw.trim()}\n`;
   const part = {
@@ -337,6 +375,10 @@ const parseBook = (input) => {
       return buildBlueprintBook(parsed, raw);
     }
     return buildAmaruBook(parsed);
+  }
+
+  if (isShaclTurtle(raw)) {
+    return shaclTurtleBook(raw);
   }
 
   return pastedTurtleBook(raw);

@@ -3,6 +3,7 @@ module FFI.OverlayBook
   , OverlayPart
   , blueprintArgs
   , bundledAmaruJournal
+  , bundledCardanoShaclShapes
   , bundledSundaeSwapBlueprint
   , parse
   ) where
@@ -26,6 +27,8 @@ type OverlayBook =
   }
 
 foreign import bundledAmaruJournal :: String
+
+foreign import bundledCardanoShaclShapes :: String
 
 foreign import bundledSundaeSwapBlueprint :: String
 

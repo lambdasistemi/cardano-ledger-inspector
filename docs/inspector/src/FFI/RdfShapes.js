@@ -143,6 +143,34 @@ const normalizeTypedFieldRows = (result) => {
   }));
 };
 
+const reportText = (value) =>
+  value === null || value === undefined ? "" : String(value);
+
+const normalizeViolation = (violation) => ({
+  focusNode: reportText(violation?.focus_node),
+  path: reportText(violation?.path),
+  value: reportText(violation?.value),
+  sourceConstraintComponent: reportText(violation?.source_constraint_component),
+  message: reportText(violation?.message),
+  severity: reportText(violation?.severity),
+});
+
+const normalizeValidationReport = (result) => {
+  if (!result || typeof result !== "object") {
+    throw new Error("validate did not return an object");
+  }
+  if (typeof result.conforms !== "boolean") {
+    throw new Error("validate result missing conforms boolean");
+  }
+
+  return {
+    conforms: result.conforms,
+    violations: Array.isArray(result.violations)
+      ? result.violations.map(normalizeViolation)
+      : [],
+  };
+};
+
 export const queryImpl = (left) => (right) => (graphTtl) => (sparql) => () => {
   try {
     return right(globalThis.rdfShapes.query(graphTtl, sparql));
@@ -173,6 +201,14 @@ export const queryTypedFieldsImpl = (left) => (right) => (graphTtl) => () => {
   try {
     const result = globalThis.rdfShapes.query(graphTtl, typedFieldsQuery);
     return right(normalizeTypedFieldRows(result));
+  } catch (err) {
+    return left(errText(err));
+  }
+};
+
+export const validateImpl = (left) => (right) => (dataTtl) => (shapesTtl) => () => {
+  try {
+    return right(normalizeValidationReport(globalThis.rdfShapes.validate(dataTtl, shapesTtl)));
   } catch (err) {
     return left(errText(err));
   }

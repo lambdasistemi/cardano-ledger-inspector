@@ -146,6 +146,7 @@ data Action
   | ImportOverlayBook
   | LoadAmaruOverlayBook
   | LoadSundaeSwapBlueprintBook
+  | LoadShaclShapesBook
   | ToggleOverlayPart String Boolean
   | ApplySelectedBooks
   | Decode
@@ -711,6 +712,11 @@ inspectorComponent initial =
                   , HE.onClick (\_ -> LoadSundaeSwapBlueprintBook)
                   ]
                   [ HH.text "Load SundaeSwap V3 blueprint" ]
+              , HH.button
+                  [ classNames [ "secondary-action" ]
+                  , HE.onClick (\_ -> LoadShaclShapesBook)
+                  ]
+                  [ HH.text "Load Cardano RDF SHACL shapes" ]
               , HH.button
                   [ classNames [ "primary-action" ]
                   , HE.onClick (\_ -> ImportOverlayBook)
@@ -1436,6 +1442,24 @@ inspectorComponent initial =
               }
     LoadSundaeSwapBlueprintBook -> do
       let input = OverlayBook.bundledSundaeSwapBlueprint
+      parsed <- liftEffect (OverlayBook.parse input)
+      case parsed of
+        Left err ->
+          H.modify_ _ { overlayInput = input, overlayError = Just err }
+        Right book -> do
+          st <- H.get
+          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
+          resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          H.modify_
+            _
+              { overlayInput = input
+              , overlayParts = book.parts
+              , selectedOverlayPartIds = []
+              , overlayError = Nothing
+              , resolvedLabelsLens = resolvedLabelsLens
+              }
+    LoadShaclShapesBook -> do
+      let input = OverlayBook.bundledCardanoShaclShapes
       parsed <- liftEffect (OverlayBook.parse input)
       case parsed of
         Left err ->

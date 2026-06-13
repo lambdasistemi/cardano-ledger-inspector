@@ -348,6 +348,24 @@ test("exposes the vendored RDF query engine", async ({ page }) => {
   expect(result.json.results.bindings[0].label.value).toBe("demo transaction");
 });
 
+test("imports bundled SHACL shapes as selectable parts", async ({ page }) => {
+  await decodeFixture(page);
+
+  const validateType = await page.evaluate(() => typeof globalThis.rdfShapes.validate);
+  expect(validateType).toBe("function");
+
+  const overlayPanel = page.locator(".overlay-book-panel");
+  await overlayPanel
+    .getByRole("button", { name: "Load Cardano RDF SHACL shapes" })
+    .click();
+
+  const shapesPart = overlayPanel.getByLabel("Cardano transaction SHACL shapes");
+  await expect(shapesPart).toBeVisible();
+  await shapesPart.check();
+  await expect(shapesPart).toBeChecked();
+  await expect(overlayPanel.getByLabel("Selected overlay Turtle")).toHaveValue("");
+});
+
 test("keeps signer-critical intent visible in the first viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await decodeFixture(page, signingIntentFixturePath);

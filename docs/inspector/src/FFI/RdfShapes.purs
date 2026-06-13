@@ -1,12 +1,15 @@
 module FFI.RdfShapes
   ( Json
   , ResolvedLabelRow
+  , ShaclReport
+  , ShaclViolation
   , TypedFieldRow
   , TransactionOutputRow
   , query
   , queryResolvedLabels
   , queryTypedFields
   , queryTransactionOutputs
+  , validate
   ) where
 
 import Data.Either (Either(..))
@@ -34,6 +37,20 @@ type TypedFieldRow =
   , value :: String
   }
 
+type ShaclViolation =
+  { focusNode :: String
+  , path :: String
+  , value :: String
+  , sourceConstraintComponent :: String
+  , message :: String
+  , severity :: String
+  }
+
+type ShaclReport =
+  { conforms :: Boolean
+  , violations :: Array ShaclViolation
+  }
+
 foreign import queryImpl
   :: (String -> Either String Json)
   -> (Json -> Either String Json)
@@ -59,6 +76,13 @@ foreign import queryTypedFieldsImpl
   -> String
   -> Effect (Either String (Array TypedFieldRow))
 
+foreign import validateImpl
+  :: (String -> Either String ShaclReport)
+  -> (ShaclReport -> Either String ShaclReport)
+  -> String
+  -> String
+  -> Effect (Either String ShaclReport)
+
 query :: String -> String -> Effect (Either String Json)
 query = queryImpl Left Right
 
@@ -70,3 +94,6 @@ queryResolvedLabels = queryResolvedLabelsImpl Left Right
 
 queryTypedFields :: String -> Effect (Either String (Array TypedFieldRow))
 queryTypedFields = queryTypedFieldsImpl Left Right
+
+validate :: String -> String -> Effect (Either String ShaclReport)
+validate = validateImpl Left Right
