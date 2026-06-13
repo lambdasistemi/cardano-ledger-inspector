@@ -15,7 +15,7 @@ import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty) as Json
+import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
 import FFI.OverlayBook (OverlayPart)
 import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
@@ -1688,7 +1688,8 @@ inspectorComponent initial =
               }
         Just txCbor -> do
           H.modify_ _ { running = true, fetchError = Nothing, overlayError = Nothing }
-          rdfResult <- H.liftAff (runLedgerOperation txCbor "tx.rdf" (selectedBlueprintArgs st))
+          let rdfArgs = Json.operationArgsMerged st.operationArgs (selectedBlueprintArgs st)
+          rdfResult <- H.liftAff (runLedgerOperation txCbor "tx.rdf" rdfArgs)
           let rdf = Json.operationRdfGraph rdfResult.stdout
           if rdfResult.exitOk && rdf.valid then do
             lenses <- rdfLensesForState st rdf
@@ -1786,13 +1787,19 @@ inspectorComponent initial =
                 (attempt (Provider.resolveProducerTxContext st.provider st.network providerKeyValue canFetchProducerTxs operationResult.stdout))
               case ctx of
                 Right args -> pure args
-                Left _     -> pure "{}"
+                Left err ->
+                  pure
+                    ( Json.providerResolutionErrorArgs
+                        (Provider.providerName st.provider)
+                        (message err)
+                    )
             else pure "{}"
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
           intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
           validationResult <- H.liftAff (runLedgerOperation h "tx.validate" inputContextArgs)
-          rdfResult <- H.liftAff (runLedgerOperation h "tx.rdf" (selectedBlueprintArgs st))
+          let rdfArgs = Json.operationArgsMerged inputContextArgs (selectedBlueprintArgs st)
+          rdfResult <- H.liftAff (runLedgerOperation h "tx.rdf" rdfArgs)
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout

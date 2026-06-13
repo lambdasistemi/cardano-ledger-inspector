@@ -37,6 +37,57 @@ export const operationArgsWithPathImpl = (argsText) => (pathText) => {
   return JSON.stringify(args);
 };
 
+const objectFromJson = (textValue) => {
+  try {
+    const parsed = JSON.parse(textValue);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (_err) {
+    // Fall through to the empty args object.
+  }
+  return {};
+};
+
+export const operationArgsMergedImpl = (leftText) => (rightText) => {
+  const left = objectFromJson(leftText);
+  const right = objectFromJson(rightText);
+  const leftContext =
+    left.context && typeof left.context === "object" && !Array.isArray(left.context)
+      ? left.context
+      : {};
+  const rightContext =
+    right.context && typeof right.context === "object" && !Array.isArray(right.context)
+      ? right.context
+      : {};
+  const context = { ...leftContext, ...rightContext };
+  const merged = { ...left, ...right };
+
+  if (Object.keys(context).length > 0) {
+    merged.context = context;
+  }
+
+  return JSON.stringify(merged);
+};
+
+export const providerResolutionErrorArgsImpl = (provider) => (error) =>
+  JSON.stringify({
+    input_policy: "preserve",
+    context: {
+      resolution: {
+        provider: text(provider).toLowerCase(),
+        source: "tx-cbor",
+        requested_input_count: 0,
+        requested_reference_input_count: 0,
+        requested_tx_count: 0,
+        resolved_count: 0,
+        missing: [],
+        errors: [`provider context: ${text(error)}`],
+        unspent_status: "not_checked",
+      },
+    },
+  });
+
 const emptyInspection = (title, subtitle = "") => ({
   valid: false,
   title,
