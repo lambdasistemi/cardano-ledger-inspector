@@ -23,6 +23,8 @@ module FFI.Json
   , operationValidation
   , operationWitnessPlan
   , operationRdfGraph
+  , operationArgsMerged
+  , providerResolutionErrorArgs
   , operationArgsWithPath
   , pretty
   ) where
@@ -44,6 +46,8 @@ foreign import operationIdentificationImpl :: String -> Identification
 foreign import operationValidationImpl :: String -> Validation
 foreign import operationWitnessPlanImpl :: String -> WitnessPlan
 foreign import operationRdfGraphImpl :: String -> RdfGraph
+foreign import operationArgsMergedImpl :: String -> String -> String
+foreign import providerResolutionErrorArgsImpl :: String -> String -> String
 foreign import operationArgsWithPathImpl :: String -> String -> String
 
 type Metric =
@@ -199,6 +203,12 @@ operationWitnessPlan = operationWitnessPlanImpl
 
 operationRdfGraph :: String -> RdfGraph
 operationRdfGraph = operationRdfGraphImpl
+
+operationArgsMerged :: String -> String -> String
+operationArgsMerged = operationArgsMergedImpl
+
+providerResolutionErrorArgs :: String -> String -> String
+providerResolutionErrorArgs = providerResolutionErrorArgsImpl
 
 invalidIntentSummary :: String -> String -> IntentSummary
 invalidIntentSummary title subtitle =

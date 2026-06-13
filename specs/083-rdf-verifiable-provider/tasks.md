@@ -15,14 +15,14 @@
 
 ## Slice 2 - Browser Provider Surface and Error Surfacing
 
-- [ ] T083-S2 Keep the provider adapter surface to transaction-CBOR fetch plus
+- [X] T083-S2 Keep the provider adapter surface to transaction-CBOR fetch plus
   network/protocol-parameter fetch.
-- [ ] T083-S2 Feed the resolved producer context into `tx.rdf` during browser
+- [X] T083-S2 Feed the resolved producer context into `tx.rdf` during browser
   decode.
-- [ ] T083-S2 Surface provider resolution errors instead of swallowing them
+- [X] T083-S2 Surface provider resolution errors instead of swallowing them
   into `{}` or invisible context fields.
-- [ ] T083-S2 Add Playwright coverage for provider error surfacing and resolved
+- [X] T083-S2 Add Playwright coverage for provider error surfacing and resolved
   input/value-flow RDF output.
-- [ ] T083-S2 Run `nix develop --quiet -c just ui-check`,
+- [X] T083-S2 Run `nix develop --quiet -c just ui-check`,
   `nix develop --quiet -c just test-playwright`, and `./gate.sh`.
-- [ ] T083-S2 Commit as `feat: surface rdf provider resolution`.
+- [X] T083-S2 Commit as `feat: surface rdf provider resolution`.

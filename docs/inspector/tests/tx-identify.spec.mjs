@@ -659,6 +659,113 @@ test("passes producer transaction CBOR into witness planning", async ({
   expect(copied).toMatch(/^[0-9a-f]{64}#[0-9]+$/);
 });
 
+test("passes producer transaction CBOR into RDF resolved value flow", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
+  let producerCborRequests = 0;
+  let utxoRequests = 0;
+  let latestBlockRequests = 0;
+  let protocolParameterRequests = 0;
+
+  await installClipboardMock(page);
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/cbor", async (route) => {
+    producerCborRequests += 1;
+    const txHash = route.request().url().match(/\/txs\/([0-9a-f]+)\/cbor/)?.[1];
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ cbor: producerCbor(validationContext, txHash, txCbor) }),
+    });
+  });
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/blocks/latest", async (route) => {
+    latestBlockRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        slot: Number(validationContext.slot),
+        epoch: Number(validationContext.epoch),
+      }),
+    });
+  });
+  await page.route(
+    "https://cardano-mainnet.blockfrost.io/api/v0/epochs/latest/parameters",
+    async (route) => {
+      protocolParameterRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          blockfrostParamsFromLedger(validationContext.protocol_parameters),
+        ),
+      });
+    },
+  );
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/utxos", async (route) => {
+    utxoRequests += 1;
+    await route.abort();
+  });
+
+  await page.goto("/");
+  await page
+    .getByPlaceholder("mainnet... / preprod... / preview...")
+    .fill("mainnet-test-project");
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const turtle = page.locator(".rdf-panel .rdf-turtle");
+  await expect(turtle).toContainText("cardano:resolvedTo");
+  await expect(turtle).toContainText("resolvedInput");
+  expect(producerCborRequests).toBeGreaterThan(0);
+  expect(latestBlockRequests).toBe(1);
+  expect(protocolParameterRequests).toBe(1);
+  expect(utxoRequests).toBe(0);
+});
+
+test("surfaces hard provider context resolution failures", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+
+  await installClipboardMock(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(globalThis, "runInspector", {
+      configurable: true,
+      set(originalRunInspector) {
+        Object.defineProperty(globalThis, "runInspector", {
+          configurable: true,
+          writable: true,
+          value: async (stdinText) => {
+            const request = JSON.parse(stdinText);
+            const result = await originalRunInspector(stdinText);
+            if (request && request.op === "tx.inspect") {
+              return { ...result, exitOk: true, stdout: "{not-json" };
+            }
+            return result;
+          },
+        });
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page
+    .getByPlaceholder("mainnet... / preprod... / preview...")
+    .fill("mainnet-test-project");
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const providerResolution = page
+    .locator(".validation-panel .witness-section")
+    .filter({ hasText: "Provider resolution" });
+  await expect(providerResolution.getByText("provider error").first()).toBeVisible();
+  await expect(providerResolution).toContainText(/provider context|Unexpected token|JSON/);
+});
+
 test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
   const validationContext = await loadValidationContext();
