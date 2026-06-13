@@ -840,6 +840,26 @@ const normalizeBrowser = (browser) => {
 
 const operationResult = (parsed) => parsed?.result ?? parsed;
 
+const invalidRdfGraph = () => ({
+  valid: false,
+  format: "",
+  turtle: "",
+});
+
+const normalizeRdfGraph = (rdf) => {
+  if (!rdf || typeof rdf !== "object") {
+    return invalidRdfGraph();
+  }
+
+  const format = text(rdf.format);
+  const turtle = text(rdf.turtle);
+  return {
+    valid: format !== "" && turtle !== "",
+    format,
+    turtle,
+  };
+};
+
 export const operationInspectionImpl = (raw) => {
   try {
     const parsed = JSON.parse(raw);
@@ -880,6 +900,15 @@ export const operationWitnessPlanImpl = (raw) => {
     return normalizeWitnessPlan(operationResult(parsed)?.witness_plan);
   } catch (_err) {
     return invalidWitnessPlan("Witness plan", "Ledger operation response was not JSON.");
+  }
+};
+
+export const operationRdfGraphImpl = (raw) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return normalizeRdfGraph(operationResult(parsed)?.rdf);
+  } catch (_err) {
+    return invalidRdfGraph();
   }
 };
 

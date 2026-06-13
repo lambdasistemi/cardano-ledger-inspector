@@ -12,9 +12,9 @@
 
 ## Slice 2 - Browser Rendering
 
-- [ ] T078-S2 Add browser JSON extraction/state for the RDF result.
-- [ ] T078-S2 Call the RDF operation during decode and reset it with the existing operation state.
-- [ ] T078-S2 Render a graph panel with the emitted Turtle.
-- [ ] T078-S2 Add Playwright coverage proving the fixture graph appears.
-- [ ] T078-S2 Run `just ui-check`, `just test-playwright`, and `./gate.sh`.
-- [ ] T078-S2 Commit as `feat: render rdf transaction graphs`.
+- [X] T078-S2 Add browser JSON extraction/state for the RDF result.
+- [X] T078-S2 Call the RDF operation during decode and reset it with the existing operation state.
+- [X] T078-S2 Render a graph panel with the emitted Turtle.
+- [X] T078-S2 Add Playwright coverage proving the fixture graph appears.
+- [X] T078-S2 Run `just ui-check`, `just test-playwright`, and `./gate.sh`.
+- [X] T078-S2 Commit as `feat: render rdf transaction graphs`.

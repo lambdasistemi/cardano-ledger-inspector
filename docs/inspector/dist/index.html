@@ -441,7 +441,8 @@
       }
 
       .identity-panel,
-      .intent-panel {
+      .intent-panel,
+      .rdf-panel {
         display: grid;
         gap: 12px;
         border: 1px solid var(--border);
@@ -568,6 +569,22 @@
 
       .witness-plan {
         background: #ffffff;
+      }
+
+      .rdf-panel {
+        min-width: 0;
+      }
+
+      .rdf-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        min-width: 0;
+      }
+
+      .rdf-turtle {
+        max-width: 100%;
+        white-space: pre;
       }
 
       .witness-section {

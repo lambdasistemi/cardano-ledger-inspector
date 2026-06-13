@@ -15,7 +15,7 @@ import Effect.Exception (message)
 import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, IntentSummary, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationValidation, operationWitnessPlan, pretty) as Json
+import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty) as Json
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
@@ -86,6 +86,7 @@ type State =
   , intent :: Maybe Json.IntentSummary
   , witnessPlan :: Maybe Json.WitnessPlan
   , validation :: Maybe Json.Validation
+  , rdf :: Maybe Json.RdfGraph
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , running :: Boolean
@@ -145,6 +146,7 @@ inspectorComponent initial =
         , intent: Nothing
         , witnessPlan: Nothing
         , validation: Nothing
+        , rdf: Nothing
         , browserNodes: []
         , expandedPaths: []
         , running: false
@@ -439,6 +441,7 @@ inspectorComponent initial =
               <> renderIdentificationMaybe state
               <> renderWitnessPlanMaybe state
               <> renderValidationMaybe state
+              <> renderRdfMaybe state r.exitOk
               <> renderBrowserMaybe state r.exitOk
               <> [ renderRawJson r.stdout ]
               <> renderStderr r.stderr
@@ -469,6 +472,13 @@ inspectorComponent initial =
     case state.validation of
       Just validation ->
         if validation.valid then [ renderValidation state validation ]
+        else []
+      Nothing -> []
+
+  renderRdfMaybe state exitOk =
+    case state.rdf of
+      Just rdf ->
+        if exitOk && rdf.valid then [ renderRdfGraph rdf ]
         else []
       Nothing -> []
 
@@ -599,6 +609,28 @@ inspectorComponent initial =
       , renderWitnessWarnings validation.warnings
       , HH.div_
           (map (renderValidationSection state) validation.sections)
+      ]
+
+  renderRdfGraph rdf =
+    HH.div
+      [ classNames [ "rdf-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "Transaction RDF graph" ]
+              , HH.p_ [ HH.text "Transaction graph serialized as Turtle." ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "rdf-meta" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Format" ]
+          , HH.code_ [ HH.text rdf.format ]
+          ]
+      , HH.pre
+          [ classNames [ "rdf-turtle" ] ]
+          [ HH.text rdf.turtle ]
       ]
 
   renderValidationSection state section =
@@ -971,6 +1003,7 @@ inspectorComponent initial =
           , intent = Nothing
           , witnessPlan = Nothing
           , validation = Nothing
+          , rdf = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -1026,6 +1059,7 @@ inspectorComponent initial =
           intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
           validationResult <- H.liftAff (runLedgerOperation h "tx.validate" inputContextArgs)
+          rdfResult <- H.liftAff (runLedgerOperation h "tx.rdf" "{}")
           let
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
@@ -1033,6 +1067,7 @@ inspectorComponent initial =
             intent = Json.operationIntentSummary intentResult.stdout
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
             validation = Json.operationValidation validationResult.stdout
+            rdf = Json.operationRdfGraph rdfResult.stdout
           H.modify_
             _
               { running = false
@@ -1051,6 +1086,9 @@ inspectorComponent initial =
                   else Nothing
               , validation =
                   if validationResult.exitOk && validation.valid then Just validation
+                  else Nothing
+              , rdf =
+                  if operationResult.exitOk && rdfResult.exitOk && rdf.valid then Just rdf
                   else Nothing
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
