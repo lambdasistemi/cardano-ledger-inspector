@@ -190,6 +190,20 @@ test("decodes a Conway transaction and exposes compact identity values", async (
     .toBe(bodyHash);
 });
 
+test("renders the transaction RDF graph after decode", async ({ page }) => {
+  await decodeFixture(page);
+
+  const rdfPanel = page.locator(".rdf-panel");
+  await expect(
+    rdfPanel.getByRole("heading", { name: "Transaction RDF graph" }),
+  ).toBeVisible();
+  await expect(rdfPanel.getByText("text/turtle", { exact: true })).toBeVisible();
+
+  const turtle = rdfPanel.locator(".rdf-turtle");
+  await expect(turtle).toContainText("@prefix cardano:");
+  await expect(turtle).toContainText("cardano:Transaction");
+});
+
 test("keeps signer-critical intent visible in the first viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await decodeFixture(page, signingIntentFixturePath);

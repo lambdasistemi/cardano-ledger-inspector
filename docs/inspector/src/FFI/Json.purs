@@ -10,6 +10,7 @@ module FFI.Json
   , Metric
   , MintRow
   , OutputRow
+  , RdfGraph
   , Validation
   , WitnessPlan
   , WitnessPlanRow
@@ -21,6 +22,7 @@ module FFI.Json
   , operationInspection
   , operationValidation
   , operationWitnessPlan
+  , operationRdfGraph
   , operationArgsWithPath
   , pretty
   ) where
@@ -41,6 +43,7 @@ foreign import operationBrowserImpl :: String -> Browser
 foreign import operationIdentificationImpl :: String -> Identification
 foreign import operationValidationImpl :: String -> Validation
 foreign import operationWitnessPlanImpl :: String -> WitnessPlan
+foreign import operationRdfGraphImpl :: String -> RdfGraph
 foreign import operationArgsWithPathImpl :: String -> String -> String
 
 type Metric =
@@ -162,6 +165,12 @@ type Validation =
   , sections :: Array WitnessPlanSection
   }
 
+type RdfGraph =
+  { valid :: Boolean
+  , format :: String
+  , turtle :: String
+  }
+
 pretty :: String -> String
 pretty = prettyImpl
 
@@ -187,6 +196,9 @@ operationValidation = operationValidationImpl
 
 operationWitnessPlan :: String -> WitnessPlan
 operationWitnessPlan = operationWitnessPlanImpl
+
+operationRdfGraph :: String -> RdfGraph
+operationRdfGraph = operationRdfGraphImpl
 
 invalidIntentSummary :: String -> String -> IntentSummary
 invalidIntentSummary title subtitle =
