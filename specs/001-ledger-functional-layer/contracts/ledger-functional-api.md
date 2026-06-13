@@ -299,6 +299,8 @@ and null it is compact JSON.
 | `tx.witness.attach` | implemented | Attach or replace one vkey witness in transaction CBOR, preserve all other witness-set content, and return patched transaction bytes plus stable diagnostics. |
 | `tx.validate` | implemented | Report whether explicit validation context is usable or incomplete; run Conway `applyTx` when modeled context is complete. |
 | `tx.evaluate.scripts` | implemented | Evaluate phase-2 scripts and report per-redeemer execution units or failures with explicit context. |
+| `tx.rdf` | implemented | Decode transaction CBOR and return deterministic Turtle for the transaction graph. |
+| `tx.graph` | implemented | Alias of `tx.rdf`; returns the same deterministic Turtle result while preserving the requested operation name. |
 | `tx.patch` | 0.1 target | Apply a controlled structural patch and return new transaction CBOR. |
 | `tx.balance` | 0.1 target | Try to balance fees, change, collateral, and return value when explicit context gives enough slack. |
 | `tx.submit` | out of scope | Submission belongs to a node, wallet, or provider layer, not the ledger WASI layer. |
@@ -821,6 +823,27 @@ Result:
 
 The result never includes `tx_cbor` and never mutates the transaction.
 
+### `tx.rdf` / `tx.graph`
+
+Decode the supplied Conway transaction and return a deterministic RDF graph
+serialized as Turtle. `tx.graph` is an alias accepted by the WASI boundary; the
+response `op` matches the requested operation.
+
+Arguments: none.
+
+Result:
+
+```json
+{
+  "rdf": {
+    "format": "text/turtle",
+    "turtle": "@prefix cardano: <https://w3id.org/cardano/> .\n..."
+  }
+}
+```
+
+The result never includes `tx_cbor` and never mutates the transaction.
+
 ## 0.1 Target Operations
 
 These operations define the next API surface. They are intentionally explicit
@@ -913,6 +936,7 @@ Machine-readable draft schemas are tracked next to this contract:
 - `../schemas/tx-witness-attach-result.schema.json`
 - `../schemas/tx-validate-result.schema.json`
 - `../schemas/tx-evaluate-scripts-result.schema.json`
+- `../schemas/tx-rdf-result.schema.json`
 
 The OpenAPI document is packaged as the `ledger-functional-openapi` flake
 output and rendered by the published Swagger UI. The schemas describe the draft

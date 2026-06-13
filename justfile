@@ -19,6 +19,9 @@ check-swagger:
 check-identify:
     nix build .#checks.x86_64-linux.tx-identify-smoke -o result-identify-smoke
 
+check-rdf:
+    nix build .#checks.x86_64-linux.tx-rdf-smoke -o result-rdf-smoke
+
 check-witness-plan:
     nix build .#checks.x86_64-linux.tx-witness-plan-smoke -o result-witness-plan-smoke
 
@@ -51,6 +54,7 @@ test-playwright: build-ui
 
 test:
     just check-identify
+    just check-rdf
     just check-witness-plan
     just check-witness-attach
     just check-intent

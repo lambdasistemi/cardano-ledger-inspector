@@ -106,7 +106,22 @@
 
           hostTargets = import ./nix/host { inherit pkgs CHaP; };
 
-          wasmTargets = import ./nix/wasm-targets.nix {
+          txRdfCoreSrc = pkgs.fetchgit {
+            url = expectedTxRdfCore.location;
+            rev = expectedTxRdfCore.rev;
+            hash = "sha256:${expectedTxRdfCore.sha256}";
+          };
+
+          txInspectorWithRdfSrc =
+            pkgs.runCommand "wasm-tx-inspector-src-with-tx-rdf-core" { } ''
+              mkdir -p "$out"
+              cp -rL ${./libs/cardano-ledger-inspector}/. "$out/"
+              chmod -R u+w "$out"
+              mkdir -p "$out/external"
+              cp -rL ${txRdfCoreSrc}/tx-rdf-core "$out/external/tx-rdf-core"
+            '';
+
+          wasmTargetsBase = import ./nix/wasm-targets.nix {
             inherit pkgs;
             libWasm = self.lib.wasm;
             ghcWasmMeta = ghc-wasm-meta.packages.${system}.all_9_12;
@@ -115,8 +130,36 @@
             cardanoLedgerWasmSrc = cardanoLedgerWasm;
             smokeSrc = ./nix/wasm/smoke;
             ledgerSmokeSrc = ./nix/wasm/ledger-smoke;
-            txInspectorSrc = ./libs/cardano-ledger-inspector;
+            txInspectorSrc = txInspectorWithRdfSrc;
             extismSpikeSrc = ./.;
+          };
+
+          wasmTargets = wasmTargetsBase // {
+            wasm-tx-inspector =
+              wasmTargetsBase.wasm-tx-inspector.overrideAttrs
+                (old: {
+                  configurePhase = old.configurePhase + ''
+
+                    # tx-rdf-core is an injected local path package for the
+                    # WASI wrapper. The upstream builder's metadata-only
+                    # prebuild strips module inventories and only purges local
+                    # packages at version 0.1.0.0, so remove tx-rdf-core's
+                    # metadata-only artifacts here and let Cabal rebuild it
+                    # from the full source tree.
+                    for pkg in $(find dist-newstyle/build -mindepth 3 -maxdepth 3 -type d \
+                                   -path '*/wasm32-wasi/*' -name 'tx-rdf-core-0.4.0.0'); do
+                      echo "purging tx-rdf-core metadata-only dist entry: $pkg"
+                      rm -rf "$pkg"
+                    done
+                    find dist-newstyle -name 'package.conf.d' -exec sh -c '
+                      for d; do
+                        for entry in "$d"/tx-rdf-core-0.4.0.0-inplace*.conf; do
+                          [ -e "$entry" ] && rm -f "$entry"
+                        done
+                      done
+                    ' sh {} +
+                  '';
+                });
           };
 
           tx-inspector-ui = import ./nix/wasm-ui.nix {
@@ -131,6 +174,12 @@
           expectedCardanoLedgerWasm = {
             rev = "5897e8da1c043eb53cdafa6ada9782b56c74b18e";
             sha256 = "1x107phcsmn2g1zw0lm39nm064rpdw7ni9jim047s825f6b53rzx";
+          };
+
+          expectedTxRdfCore = {
+            location = "https://github.com/lambdasistemi/cardano-ledger-rdf";
+            rev = "6769e28535aafee20743710ebdff53e652e8a22b";
+            sha256 = "0m1yj9cdzdh1bcrz1wn5d34fw8y6rh7gl624qh5h3idyni8jdqnw";
           };
 
           expectedPlutusPin = {
@@ -175,6 +224,18 @@
               require_file_contains "cardano-ledger-wasm SRP sha256" \
                 "--sha256: ${expectedCardanoLedgerWasm.sha256}" \
                 ${./cabal.project}
+              require_file_contains "tx-rdf-core SRP location" \
+                "location: ${expectedTxRdfCore.location}" \
+                ${./cabal.project}
+              require_file_contains "tx-rdf-core SRP tag" \
+                "tag: ${expectedTxRdfCore.rev}" \
+                ${./cabal.project}
+              require_file_contains "tx-rdf-core SRP sha256" \
+                "--sha256: ${expectedTxRdfCore.sha256}" \
+                ${./cabal.project}
+              require_file_contains "tx-rdf-core WASI package path" \
+                "external/tx-rdf-core" \
+                ${./libs/cardano-ledger-inspector/cabal-wasm.project}
 
               require_equal "cardanoLedgerWasm flake input rev" \
                 "${expectedCardanoLedgerWasm.rev}" \
@@ -249,6 +310,38 @@
               and (.result.identification.witness_counts.bootstrap >= 0)
             ' response.json
             cp request.json response.json $out/
+          '';
+
+          tx-rdf-smoke = pkgs.runCommand "tx-rdf-smoke" { } ''
+            mkdir -p $out
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.rdf",
+                args: {}
+              }' > request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < request.json > response-1.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < request.json > response-2.json
+            ${pkgs.jq}/bin/jq -r '.result.rdf.turtle' response-1.json > turtle-1.ttl
+            ${pkgs.jq}/bin/jq -r '.result.rdf.turtle' response-2.json > turtle-2.ttl
+            ${pkgs.diffutils}/bin/diff -u turtle-1.ttl turtle-2.ttl
+            ${pkgs.jq}/bin/jq -e '
+              .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.rdf"
+              and .result.rdf.format == "text/turtle"
+              and (.result.rdf.turtle | contains("@prefix cardano:"))
+              and (.result.rdf.turtle | contains("cardano:Transaction"))
+            ' response-1.json
+            cp request.json response-1.json response-2.json turtle-1.ttl turtle-2.ttl $out/
           '';
 
           tx-witness-plan-smoke = pkgs.runCommand "tx-witness-plan-smoke" { } ''
@@ -907,6 +1000,7 @@
             inherit
               ledger-functional-openapi-check
               tx-identify-smoke
+              tx-rdf-smoke
               tx-witness-plan-smoke
               tx-witness-attach-smoke
               tx-intent-smoke
