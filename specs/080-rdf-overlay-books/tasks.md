@@ -2,15 +2,15 @@
 
 ## Slice 1 - Overlay Book Asset And Parser
 
-- [ ] T080-S1 Add an Amaru overlay Turtle asset derived from
+- [X] T080-S1 Add an Amaru overlay Turtle asset derived from
   `docs/inspector/protocols/amaru-treasury/journal-2026.json`.
-- [ ] T080-S1 Add browser import/parse state for pasted Turtle and bundled
+- [X] T080-S1 Add browser import/parse state for pasted Turtle and bundled
   Amaru journal JSON.
-- [ ] T080-S1 Add selectable overlay parts with deterministic selected Turtle
+- [X] T080-S1 Add selectable overlay parts with deterministic selected Turtle
   output and zero contribution from unselected parts.
-- [ ] T080-S1 Run `nix develop --quiet -c just check-rdf`,
+- [X] T080-S1 Run `nix develop --quiet -c just check-rdf`,
   `nix develop --quiet -c just ui-check`, and `./gate.sh`.
-- [ ] T080-S1 Commit as `feat: add rdf overlay book import model`.
+- [X] T080-S1 Commit as `feat: add rdf overlay book import model`.
 
 ## Slice 2 - Merge And Resolved Labels UX
 

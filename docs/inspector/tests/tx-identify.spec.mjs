@@ -19,6 +19,10 @@ const validationFixturePath = path.join(
   repoRoot,
   "specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json",
 );
+const amaruJournalFixturePath = path.join(
+  repoRoot,
+  "docs/inspector/protocols/amaru-treasury/journal-2026.json",
+);
 
 async function loadValidationContext() {
   const request = JSON.parse(await readFile(validationFixturePath, "utf8"));
@@ -212,6 +216,32 @@ test("renders the transaction RDF graph after decode", async ({ page }) => {
   await expect(lensPanel.locator(".sparql-lens-row").first()).toBeVisible();
   await expect(lensPanel.getByText("5", { exact: true })).toBeVisible();
   await expect(lensPanel.getByText(/urn:cardano:tx:/)).toBeVisible();
+});
+
+test("selects Amaru overlay book parts into deterministic Turtle", async ({
+  page,
+}) => {
+  const journalJson = await readFile(amaruJournalFixturePath, "utf8");
+  await decodeFixture(page);
+
+  const overlayPanel = page.locator(".overlay-book-panel");
+  await expect(
+    overlayPanel.getByRole("heading", { name: "Overlay books" }),
+  ).toBeVisible();
+
+  await overlayPanel
+    .getByLabel("Overlay Turtle or Amaru journal JSON")
+    .fill(journalJson);
+  await overlayPanel.getByRole("button", { name: "Import overlay book" }).click();
+
+  const selectedTurtle = overlayPanel.getByLabel("Selected overlay Turtle");
+  const coreDevelopment = overlayPanel.getByLabel("Core development");
+  await coreDevelopment.check();
+  await expect(selectedTurtle).toHaveValue(/Amaru Core Development treasury/);
+  await expect(selectedTurtle).toHaveValue(/@prefix cardano:/);
+
+  await coreDevelopment.uncheck();
+  await expect(selectedTurtle).not.toHaveValue(/Amaru Core Development treasury/);
 });
 
 test("exposes the vendored RDF query engine", async ({ page }) => {
