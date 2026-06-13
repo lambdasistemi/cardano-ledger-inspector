@@ -13,6 +13,8 @@ executable wasm-tx-inspector
                   , aeson
                   , bytestring
                   , text
+                  , containers
                   , cardano-ledger-wasm
+                  , tx-rdf-core
   default-language: Haskell2010
   ghc-options:      -Wall

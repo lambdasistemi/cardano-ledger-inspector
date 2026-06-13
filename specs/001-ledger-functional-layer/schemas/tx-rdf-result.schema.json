@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-rdf-result.schema.json",
+  "title": "Cardano Ledger WASI tx.rdf Result",
+  "type": "object",
+  "required": ["rdf"],
+  "properties": {
+    "rdf": {
+      "type": "object",
+      "required": ["format", "turtle"],
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "text/turtle"
+        },
+        "turtle": {
+          "type": "string",
+          "minLength": 1,
+          "description": "UTF-8 Turtle serialization of the deterministic Cardano transaction graph."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

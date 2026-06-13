@@ -2,13 +2,13 @@
 
 ## Slice 1 - WASI RDF Operation
 
-- [ ] T078-S1 Add the pinned `tx-rdf-core` source repository package to Cabal project files.
-- [ ] T078-S1 Add the executable dependencies needed by the WASI wrapper.
-- [ ] T078-S1 Implement `tx.rdf` and `tx.graph` in the WASI artifact without changing existing operation behavior.
-- [ ] T078-S1 Add `just check-rdf` fixture smoke coverage for deterministic Turtle.
-- [ ] T078-S1 Update the public contract/schema docs for the new RDF result.
-- [ ] T078-S1 Run `just build-wasm`, `just check-rdf`, and `./gate.sh`.
-- [ ] T078-S1 Commit as `feat: emit rdf transaction graphs`.
+- [X] T078-S1 Add the pinned `tx-rdf-core` source repository package to Cabal project files.
+- [X] T078-S1 Add the executable dependencies needed by the WASI wrapper.
+- [X] T078-S1 Implement `tx.rdf` and `tx.graph` in the WASI artifact without changing existing operation behavior.
+- [X] T078-S1 Add `just check-rdf` fixture smoke coverage for deterministic Turtle.
+- [X] T078-S1 Update the public contract/schema docs for the new RDF result.
+- [X] T078-S1 Run `just build-wasm`, `just check-rdf`, and `./gate.sh`.
+- [X] T078-S1 Commit as `feat: emit rdf transaction graphs`.
 
 ## Slice 2 - Browser Rendering
 

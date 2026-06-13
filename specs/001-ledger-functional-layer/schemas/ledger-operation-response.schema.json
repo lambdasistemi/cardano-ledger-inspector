@@ -18,5 +18,24 @@
       "additionalProperties": true
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "enum": ["tx.rdf", "tx.graph"]
+          }
+        },
+        "required": ["op"]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "$ref": "tx-rdf-result.schema.json"
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": true
 }

@@ -27,6 +27,14 @@ index-state:
 packages:
   .
   external/cardano-ledger-wasm
+  external/tx-rdf-core
+
+source-repository-package
+  type: git
+  location: https://github.com/lambdasistemi/cardano-ledger-rdf
+  tag: 6769e28535aafee20743710ebdff53e652e8a22b
+  subdir: tx-rdf-core
+  --sha256: 0m1yj9cdzdh1bcrz1wn5d34fw8y6rh7gl624qh5h3idyni8jdqnw
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
