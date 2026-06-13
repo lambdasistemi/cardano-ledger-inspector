@@ -16,6 +16,7 @@ import FFI.Blockfrost (Network(..))
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
 import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty) as Json
+import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
@@ -87,6 +88,7 @@ type State =
   , witnessPlan :: Maybe Json.WitnessPlan
   , validation :: Maybe Json.Validation
   , rdf :: Maybe Json.RdfGraph
+  , sparqlLens :: Maybe SparqlLens
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , running :: Boolean
@@ -99,6 +101,11 @@ type State =
 type BrowserNode =
   { path :: String
   , browser :: Json.Browser
+  }
+
+type SparqlLens =
+  { rows :: Array RdfShapes.TransactionOutputRow
+  , error :: Maybe String
   }
 
 type InitialKeys =
@@ -147,6 +154,7 @@ inspectorComponent initial =
         , witnessPlan: Nothing
         , validation: Nothing
         , rdf: Nothing
+        , sparqlLens: Nothing
         , browserNodes: []
         , expandedPaths: []
         , running: false
@@ -478,7 +486,7 @@ inspectorComponent initial =
   renderRdfMaybe state exitOk =
     case state.rdf of
       Just rdf ->
-        if exitOk && rdf.valid then [ renderRdfGraph rdf ]
+        if exitOk && rdf.valid then [ renderRdfGraph rdf ] <> renderSparqlLensMaybe state.sparqlLens
         else []
       Nothing -> []
 
@@ -631,6 +639,63 @@ inspectorComponent initial =
       , HH.pre
           [ classNames [ "rdf-turtle" ] ]
           [ HH.text rdf.turtle ]
+      ]
+
+  renderSparqlLensMaybe lens =
+    case lens of
+      Just value -> [ renderSparqlLens value ]
+      Nothing -> []
+
+  renderSparqlLens lens =
+    HH.div
+      [ classNames [ "sparql-lens-panel" ] ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "SPARQL lens: transaction outputs" ]
+              , HH.p_ [ HH.text "Fixed query over the transaction RDF graph." ]
+              ]
+          ]
+      , case lens.error of
+          Just err ->
+            HH.div
+              [ classNames [ "sparql-lens-error" ] ]
+              [ HH.text ("SPARQL query failed: " <> err) ]
+          Nothing ->
+            if Array.null lens.rows then
+              HH.div
+                [ classNames [ "witness-empty" ] ]
+                [ HH.text "No rows." ]
+            else
+              HH.div
+                [ classNames [ "sparql-lens-row-list" ] ]
+                (map renderSparqlLensRow lens.rows)
+      ]
+
+  renderSparqlLensRow row =
+    HH.div
+      [ classNames [ "sparql-lens-row" ] ]
+      [ HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Transaction" ]
+          , HH.code_ [ HH.text row.transaction ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Tx id" ]
+          , HH.code_ [ HH.text row.txId ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell", "sparql-lens-count" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Outputs" ]
+          , HH.strong_ [ HH.text row.outputs ]
+          ]
       ]
 
   renderValidationSection state section =
@@ -1004,6 +1069,7 @@ inspectorComponent initial =
           , witnessPlan = Nothing
           , validation = Nothing
           , rdf = Nothing
+          , sparqlLens = Nothing
           , browserNodes = []
           , expandedPaths = []
           , copied = false
@@ -1068,6 +1134,24 @@ inspectorComponent initial =
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
             validation = Json.operationValidation validationResult.stdout
             rdf = Json.operationRdfGraph rdfResult.stdout
+          sparqlLens <-
+            if operationResult.exitOk && rdfResult.exitOk && rdf.valid then do
+              lensResult <- liftEffect (RdfShapes.queryTransactionOutputs rdf.turtle)
+              pure
+                ( Just
+                    ( case lensResult of
+                        Left err ->
+                          { rows: []
+                          , error: Just err
+                          }
+                        Right rows ->
+                          { rows
+                          , error: Nothing
+                          }
+                    )
+                )
+            else
+              pure Nothing
           H.modify_
             _
               { running = false
@@ -1090,6 +1174,7 @@ inspectorComponent initial =
               , rdf =
                   if operationResult.exitOk && rdfResult.exitOk && rdf.valid then Just rdf
                   else Nothing
+              , sparqlLens = sparqlLens
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
                   else []

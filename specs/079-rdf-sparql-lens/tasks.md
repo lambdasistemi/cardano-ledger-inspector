@@ -11,8 +11,8 @@
 
 ## Slice 2 - Named SPARQL Lens UI
 
-- [ ] T079-S2 Add fixed named lens state, query invocation, normalization, and error handling.
-- [ ] T079-S2 Render the SPARQL lens panel with result rows over the RDF graph.
-- [ ] T079-S2 Extend Playwright coverage proving the fixed lens renders rows after fixture decode.
-- [ ] T079-S2 Run `nix develop --quiet -c just check-rdf`, `nix develop --quiet -c just test-playwright`, and `./gate.sh`.
-- [ ] T079-S2 Commit as `feat: render rdf sparql lens`.
+- [X] T079-S2 Add fixed named lens state, query invocation, normalization, and error handling.
+- [X] T079-S2 Render the SPARQL lens panel with result rows over the RDF graph.
+- [X] T079-S2 Extend Playwright coverage proving the fixed lens renders rows after fixture decode.
+- [X] T079-S2 Run `nix develop --quiet -c just check-rdf`, `nix develop --quiet -c just test-playwright`, and `./gate.sh`.
+- [X] T079-S2 Commit as `feat: render rdf sparql lens`.
