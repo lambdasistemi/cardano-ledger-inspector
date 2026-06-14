@@ -20,6 +20,6 @@
 
 ## Finalization
 
-- [ ] T009 Run final `./gate.sh` and browser smoke on the packaged UI.
-- [ ] T010 Update PR #99 body with verification evidence.
-- [ ] T011 Drop `gate.sh`, mark PR ready only after local acceptance and CI are green.
+- [X] T009 Run final `./gate.sh` and browser smoke on the packaged UI.
+- [X] T010 Update PR #99 body with verification evidence.
+- [X] T011 Drop `gate.sh`, mark PR ready only after local acceptance and CI are green.
