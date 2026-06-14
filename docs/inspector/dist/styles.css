@@ -291,7 +291,7 @@ fieldset {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.22fr);
+  grid-template-columns: 1fr;
   gap: 18px;
   align-items: start;
 }
@@ -311,14 +311,38 @@ fieldset {
 }
 
 .panel[data-md3-surface],
+.settings-summary[data-md3-surface],
 [data-md3-surface="decoded"] {
   border-color: var(--md-sys-color-outline-variant);
   background: var(--md-sys-color-surface-container-low);
 }
 
-.provider-panel {
-  position: sticky;
-  top: 16px;
+.settings-layout {
+  display: grid;
+  max-width: 760px;
+}
+
+.settings-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 14px;
+}
+
+.settings-summary-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.settings-summary-copy strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .panel-heading {
@@ -1066,9 +1090,6 @@ pre {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .provider-panel {
-    position: static;
-  }
 }
 
 @media (max-width: 640px) {
@@ -1165,5 +1186,10 @@ pre {
     align-items: start;
     flex-direction: column;
     gap: 0.2rem;
+  }
+
+  .settings-summary {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

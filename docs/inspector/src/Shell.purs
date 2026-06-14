@@ -38,7 +38,7 @@ topbar active opts =
         [ HH.div
             [ classNames [ "brand" ] ]
             [ HH.strong_ [ HH.text "Cardano transaction inspector" ]
-            , HH.span_ [ HH.text "Haskell ledger in the browser" ]
+            , HH.span_ [ HH.text "Decode, inspect, and validate transactions" ]
             ]
         , HH.nav
             [ classNames [ "topbar-nav" ]
@@ -108,10 +108,7 @@ siteFooter =
         , extLink "https://github.com/lambdasistemi/cardano-ledger-inspector" "Source"
         ]
     , HH.div_
-        [ HH.text "Built with the upstream Haskell ledger, cross-compiled to "
-        , HH.code_ [ HH.text "wasm32-wasi" ]
-        , HH.text "."
-        ]
+        [ HH.text "Browser-based Cardano transaction inspection with explicit chain-data context." ]
     ]
   where
   extLink href label =
