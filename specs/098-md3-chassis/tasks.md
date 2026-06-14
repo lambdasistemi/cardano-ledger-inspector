@@ -13,10 +13,10 @@
 
 ## Slice B: Inspector MD3 Reskin
 
-- [ ] T005 Reskin current inspector panels, controls, and result surfaces with MD3 tokens.
-- [ ] T006 Preserve provider config, bundled books, decode operations, and flat result order.
-- [ ] T007 Extend/adjust Playwright coverage for decoded content under the shell and viewport fit.
-- [ ] T008 Run `./gate.sh`, commit `feat(inspector): reskin inspect flow with md3 tokens`, and stop before push.
+- [X] T005 Reskin current inspector panels, controls, and result surfaces with MD3 tokens.
+- [X] T006 Preserve provider config, bundled books, decode operations, and flat result order.
+- [X] T007 Extend/adjust Playwright coverage for decoded content under the shell and viewport fit.
+- [X] T008 Run `./gate.sh`, commit `feat(inspector): reskin inspect flow with md3 tokens`, and stop before push.
 
 ## Finalization
 
