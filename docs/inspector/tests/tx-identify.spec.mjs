@@ -202,6 +202,35 @@ async function decodeFixture(page, txFixturePath = fixturePath) {
   await decodeFixtureAt(page, "/", txFixturePath);
 }
 
+async function configureChainData(page, options = {}) {
+  const {
+    provider = "Blockfrost",
+    network = "mainnet",
+    blockfrostKey = "mainnet-test-project",
+    koiosBearer = "koios-test-token",
+    persist = false,
+  } = options;
+
+  await page.goto("/settings");
+  await page.getByRole("radio", { name: provider }).check();
+  await page.getByRole("radio", { name: network }).check();
+  if (provider === "Blockfrost") {
+    await page
+      .getByPlaceholder("mainnet... / preprod... / preview...")
+      .fill(blockfrostKey);
+  } else {
+    await page.getByPlaceholder("eyJhbGciOi...").fill(koiosBearer);
+  }
+  if (persist) {
+    await page.getByRole("switch", { name: "Persist API credentials" }).check();
+  }
+}
+
+async function openInspectViaShell(page) {
+  await page.getByRole("banner").getByRole("link", { name: "Inspect" }).click();
+  await expect(page).toHaveURL(/\/inspect$/);
+}
+
 async function expectInFirstViewport(locator) {
   await expect(locator).toBeVisible();
   const box = await locator.evaluate((element) => {
@@ -277,7 +306,11 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await navigation.getByRole("link", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(page.getByText("Settings placeholder", { exact: true })).toBeVisible();
+  await expect(page.locator(".provider-panel")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Koios" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Persist API credentials" })).toBeVisible();
+  await expect(page.getByText("cleartext", { exact: false })).toBeVisible();
 
   await navigation.getByRole("link", { name: "Library" }).click();
   await expect(page).toHaveURL(/\/library$/);
@@ -289,20 +322,31 @@ test("MD3 shell keeps route navigation inside deployed subpaths", async ({
   page,
 }) => {
   await withPrefixedInspectorSite(async (baseUrl) => {
-    await page.goto(`${baseUrl}settings/`);
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    expect(page.url().startsWith(`${baseUrl}settings/`)).toBe(true);
+    const routes = [
+      { path: "inspect", assert: async () => {
+        await expect(page.getByRole("radio", { name: "CBOR hex" })).toBeVisible();
+      } },
+      { path: "settings", assert: async () => {
+        await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+        await expect(page.locator(".provider-panel")).toBeVisible();
+      } },
+      { path: "library", assert: async () => {
+        await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
+        await expect(page.getByText("Library placeholder", { exact: true })).toBeVisible();
+      } },
+    ];
+
+    for (const route of routes) {
+      await page.goto(`${baseUrl}${route.path}/`);
+      await route.assert();
+      expect(page.url().startsWith(`${baseUrl}${route.path}`)).toBe(true);
+      expect(new URL(page.url()).pathname).not.toBe(`/${route.path}`);
+      await page.reload();
+      await route.assert();
+      expect(page.url().startsWith(`${baseUrl}${route.path}`)).toBe(true);
+    }
 
     const navigation = page.getByRole("banner").getByRole("navigation");
-    await navigation.getByRole("link", { name: "Library" }).click();
-    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
-    expect(page.url().startsWith(`${baseUrl}library`)).toBe(true);
-    expect(new URL(page.url()).pathname).not.toBe("/library");
-
-    await page.reload();
-    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
-    expect(page.url().startsWith(`${baseUrl}library`)).toBe(true);
-
     await navigation.getByRole("link", { name: "Inspect" }).click();
     await expect(page.getByRole("radio", { name: "CBOR hex" })).toBeVisible();
     expect(page.url().startsWith(`${baseUrl}inspect`)).toBe(true);
@@ -316,36 +360,14 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   await page.addInitScript(() => {
     localStorage.setItem("cardano-ledger-inspector-theme", "light");
   });
-  await decodeFixtureAt(page, "/inspect");
+  await page.goto("/settings");
 
   const providerPanel = page.locator(".provider-panel");
-  const inputPanel = page.locator(".input-panel");
-  const resultPanel = page.locator(".result-panel");
-  const identityPanel = page.locator(".identity-panel").first();
-  const validationPanel = page.locator(".validation-panel");
-  const rdfPanel = page.locator(".rdf-panel");
-  const lensPanel = page.locator(".sparql-lens-panel").first();
 
   await expect(providerPanel).toHaveAttribute("data-md3-surface", "provider");
-  await expect(inputPanel).toHaveAttribute("data-md3-surface", "input");
-  await expect(resultPanel).toHaveAttribute("data-md3-surface", "result");
-  await expect(identityPanel).toHaveAttribute("data-md3-surface", "decoded");
-  await expect(validationPanel).toHaveAttribute("data-md3-surface", "decoded");
-  await expect(rdfPanel).toHaveAttribute("data-md3-surface", "decoded");
-  await expect(lensPanel).toHaveAttribute("data-md3-surface", "decoded");
-
-  await expect(page.getByRole("button", { name: "Decode" })).toHaveAttribute(
-    "data-md3-control",
-    "primary",
-  );
-  await expect(page.getByRole("button", { name: "Copy JSON" })).toHaveAttribute(
-    "data-md3-control",
-    "secondary",
-  );
-  await expect(page.getByRole("button", { name: "Copy current" })).toHaveAttribute(
-    "data-md3-control",
-    "inline",
-  );
+  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "mainnet" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Persist API credentials" })).toBeVisible();
 
   await expectColorToken(
     page,
@@ -374,6 +396,127 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
     "--md-sys-color-surface-container-low",
   );
   await expect(providerPanel).not.toHaveCSS("background-color", lightBackground);
+
+  await page.goto("/inspect");
+  await decodeFixtureAt(page, "/inspect");
+
+  const inputPanel = page.locator(".input-panel");
+  const resultPanel = page.locator(".result-panel");
+  const identityPanel = page.locator(".identity-panel").first();
+  const validationPanel = page.locator(".validation-panel");
+  const rdfPanel = page.locator(".rdf-panel");
+  const lensPanel = page.locator(".sparql-lens-panel").first();
+
+  await expect(page.locator(".provider-panel")).toHaveCount(0);
+  await expect(inputPanel).toHaveAttribute("data-md3-surface", "input");
+  await expect(resultPanel).toHaveAttribute("data-md3-surface", "result");
+  await expect(identityPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await expect(validationPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await expect(rdfPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await expect(lensPanel).toHaveAttribute("data-md3-surface", "decoded");
+
+  await expect(page.getByRole("button", { name: "Decode" })).toHaveAttribute(
+    "data-md3-control",
+    "primary",
+  );
+  await expect(page.getByRole("button", { name: "Copy JSON" })).toHaveAttribute(
+    "data-md3-control",
+    "secondary",
+  );
+  await expect(page.getByRole("button", { name: "Copy current" })).toHaveAttribute(
+    "data-md3-control",
+    "inline",
+  );
+});
+
+test("inspect keeps chain-data settings compact and gives input/results the workspace", async ({
+  page,
+}) => {
+  await page.goto("/inspect");
+
+  await expect(page.locator(".provider-panel")).toHaveCount(0);
+  const settingsSummary = page.locator(".settings-summary");
+  await expect(settingsSummary).toBeVisible();
+  await expect(settingsSummary).toContainText("Blockfrost");
+  await expect(settingsSummary).toContainText("mainnet");
+  await expect(settingsSummary.getByRole("link", { name: "Settings" })).toBeVisible();
+
+  const workspaceBox = await page.locator(".workspace").boundingBox();
+  const inputBox = await page.locator(".input-panel").boundingBox();
+  const resultBox = await page.locator(".result-panel").boundingBox();
+  expect(inputBox.width).toBeGreaterThan(workspaceBox.width * 0.9);
+  expect(resultBox.width).toBeGreaterThan(workspaceBox.width * 0.9);
+});
+
+test("settings changes provider state used by inspect hash decode", async ({ page }) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
+  const requestedHashes = [];
+  let tipRequests = 0;
+  let protocolParameterRequests = 0;
+
+  await installClipboardMock(page);
+  await page.route("https://preview.koios.rest/api/v1/tx_cbor", async (route) => {
+    const requestBody = route.request().postDataJSON();
+    requestedHashes.push(...requestBody._tx_hashes);
+    expect(route.request().headers().authorization).toBe("Bearer koios-settings-token");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        requestBody._tx_hashes.map((txHash) => ({
+          cbor: producerCbor(validationContext, txHash, txCbor),
+        })),
+      ),
+    });
+  });
+  await page.route("https://preview.koios.rest/api/v1/tip", async (route) => {
+    tipRequests += 1;
+    expect(route.request().headers().authorization).toBe("Bearer koios-settings-token");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          abs_slot: Number(validationContext.slot),
+          epoch_no: Number(validationContext.epoch),
+        },
+      ]),
+    });
+  });
+  await page.route(
+    "https://preview.koios.rest/api/v1/cli_protocol_params",
+    async (route) => {
+      protocolParameterRequests += 1;
+      expect(route.request().headers().authorization).toBe("Bearer koios-settings-token");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(validationContext.protocol_parameters),
+      });
+    },
+  );
+
+  await configureChainData(page, {
+    provider: "Koios",
+    network: "preview",
+    koiosBearer: "koios-settings-token",
+  });
+
+  await openInspectViaShell(page);
+  await expect(page.locator(".settings-summary")).toContainText("Koios");
+  await expect(page.locator(".settings-summary")).toContainText("preview");
+  await page
+    .getByPlaceholder("64-char tx hash")
+    .fill("0".repeat(64));
+  await page.getByRole("button", { name: "Fetch and decode" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Conway transaction identity" }),
+  ).toBeVisible();
+  expect(requestedHashes).toContain("0".repeat(64));
+  expect(tipRequests).toBe(1);
+  expect(protocolParameterRequests).toBe(1);
 });
 
 test("decodes a Conway transaction and exposes compact identity values", async ({
@@ -818,10 +961,12 @@ test("passes producer transaction CBOR into witness planning", async ({
     await route.abort();
   });
 
-  await page.goto("/");
-  await page
-    .getByPlaceholder("mainnet... / preprod... / preview...")
-    .fill("mainnet-test-project");
+  await configureChainData(page, {
+    provider: "Blockfrost",
+    network: "mainnet",
+    blockfrostKey: "mainnet-test-project",
+  });
+  await openInspectViaShell(page);
   await page.getByRole("radio", { name: "CBOR hex" }).check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -909,10 +1054,12 @@ test("passes producer transaction CBOR into RDF resolved value flow", async ({
     await route.abort();
   });
 
-  await page.goto("/");
-  await page
-    .getByPlaceholder("mainnet... / preprod... / preview...")
-    .fill("mainnet-test-project");
+  await configureChainData(page, {
+    provider: "Blockfrost",
+    network: "mainnet",
+    blockfrostKey: "mainnet-test-project",
+  });
+  await openInspectViaShell(page);
   await page.getByRole("radio", { name: "CBOR hex" }).check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -952,10 +1099,12 @@ test("surfaces hard provider context resolution failures", async ({
     });
   });
 
-  await page.goto("/");
-  await page
-    .getByPlaceholder("mainnet... / preprod... / preview...")
-    .fill("mainnet-test-project");
+  await configureChainData(page, {
+    provider: "Blockfrost",
+    network: "mainnet",
+    blockfrostKey: "mainnet-test-project",
+  });
+  await openInspectViaShell(page);
   await page.getByRole("radio", { name: "CBOR hex" }).check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -1008,9 +1157,12 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
     });
   });
 
-  await page.goto("/");
-  await page.getByRole("radio", { name: "Koios" }).check();
-  await page.getByPlaceholder("eyJhbGciOi...").fill("koios-test-token");
+  await configureChainData(page, {
+    provider: "Koios",
+    network: "mainnet",
+    koiosBearer: "koios-test-token",
+  });
+  await openInspectViaShell(page);
   await page.getByRole("radio", { name: "CBOR hex" }).check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -1030,7 +1182,7 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
 });
 
 test("routes Blockfrost-shaped keys away from Koios auth", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/settings");
   await page.getByRole("radio", { name: "Koios" }).check();
   await page.getByPlaceholder("eyJhbGciOi...").fill("mainnet-test-project");
 

@@ -12,7 +12,7 @@ import Effect.Aff (attempt)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (message)
-import FFI.Blockfrost (Network(..))
+import FFI.Blockfrost (Network(..), networkName)
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
 import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
@@ -46,6 +46,9 @@ koiosKey = "koios_bearer_token"
 providerKey :: String
 providerKey = "provider"
 
+networkKey :: String
+networkKey = "network"
+
 persistKeysStorageKey :: String
 persistKeysStorageKey = "persist_api_keys"
 
@@ -76,12 +79,17 @@ main = HA.runHalogenAff do
   kOS  <- liftEffect
     (if persistInitial then Storage.getItem koiosKey else pure "")
   prov <- liftEffect (Storage.getItem providerKey)
+  net  <- liftEffect (Storage.getItem networkKey)
   route <- liftEffect Routing.currentRoute
   routeBase <- liftEffect Routing.currentBasePath
   theme <- liftEffect Shell.initialTheme
   let initialProv = case prov of
         "Koios"      -> Koios
         _            -> Blockfrost
+      initialNetwork = case net of
+        "preprod" -> Preprod
+        "preview" -> Preview
+        _         -> Mainnet
       mountTarget = case app of
         Just el -> el
         Nothing -> body
@@ -90,6 +98,7 @@ main = HA.runHalogenAff do
         { bf
         , koios: kOS
         , prov: initialProv
+        , network: initialNetwork
         , persistKeys: persistInitial
         , route
         , routeBase
@@ -169,6 +178,7 @@ type InitialKeys =
   { bf :: String
   , koios :: String
   , prov :: Provider
+  , network :: Network
   , persistKeys :: Boolean
   , route :: Route
   , routeBase :: String
@@ -211,7 +221,7 @@ inspectorComponent initial =
         , koiosBearer: initial.koios
         , persistKeys: initial.persistKeys
         , mode: ByHash
-        , network: Mainnet
+        , network: initial.network
         , txHash: ""
         , txHex: ""
         , result: Nothing
@@ -261,7 +271,7 @@ inspectorComponent initial =
           [ classNames [ "page-frame", "shell-main" ] ]
           [ case state.route of
               RouteInspect -> renderInspector state
-              RouteSettings -> Shell.placeholderPage "Settings"
+              RouteSettings -> renderSettings state
               RouteLibrary -> Shell.placeholderPage "Library"
           ]
       , Shell.siteFooter
@@ -276,25 +286,64 @@ inspectorComponent initial =
               [ HH.h1_ [ HH.text "Conway tx inspector" ]
               , HH.p_
                   [ HH.text
-                      "Decode Conway transaction CBOR in the browser with the upstream Haskell ledger compiled to "
-                  , HH.code_ [ HH.text "wasm32-wasi" ]
-                  , HH.text "."
+                      "Decode, inspect, and validate Conway transaction CBOR with explicit chain-data context."
                   ]
               ]
           , HH.div
               [ classNames [ "tech-pills" ] ]
-              [ HH.span_ [ HH.text "cardano-ledger-conway" ]
-              , HH.span_ [ HH.text "cardano-ledger-binary" ]
-              , HH.span_ [ HH.text "WASI" ]
+              [ HH.span_ [ HH.text "CBOR" ]
+              , HH.span_ [ HH.text "context-aware" ]
+              , HH.span_ [ HH.text "RDF views" ]
               ]
           ]
+      , renderSettingsSummary state
       , HH.div
           [ classNames [ "workspace" ] ]
-          [ renderProvider state
-          , HH.div
+          [ HH.div
               [ classNames [ "workspace-main" ] ]
               (renderWorkspaceMain state)
           ]
+      ]
+
+  renderSettings state =
+    HH.div
+      [ classNames [ "app-shell", "settings-page" ] ]
+      [ HH.section
+          [ classNames [ "intro-strip" ] ]
+          [ HH.div_
+              [ HH.h1_ [ HH.text "Settings" ]
+              , HH.p_
+                  [ HH.text
+                      "Configure the chain-data provider, network, and credential persistence used by transaction decoding."
+                  ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "settings-layout" ] ]
+          [ renderProvider state ]
+      ]
+
+  renderSettingsSummary state =
+    HH.section
+      [ classNames [ "settings-summary" ]
+      , mdSurface "provider"
+      ]
+      [ HH.div
+          [ classNames [ "settings-summary-copy" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Active chain data" ]
+          , HH.strong_
+              [ HH.text
+                  (Provider.providerName state.provider <> " / " <> networkName state.network)
+              ]
+          ]
+      , HH.a
+          [ classNames [ "header-link" ]
+          , HP.href (state.routeBase <> Routing.routePath RouteSettings)
+          , HE.onClick (Navigate RouteSettings)
+          ]
+          [ HH.text "Settings" ]
       ]
 
   renderWorkspaceMain state =
@@ -1676,7 +1725,9 @@ inspectorComponent initial =
             Storage.setItem blockfrostKey ""
             Storage.setItem koiosKey ""
     SelectMode m -> H.modify_ _ { mode = m, fetchError = Nothing, copiedPath = Nothing }
-    SelectNetwork n -> H.modify_ _ { network = n, fetchError = Nothing, copiedPath = Nothing }
+    SelectNetwork n -> do
+      H.modify_ _ { network = n, fetchError = Nothing, copiedPath = Nothing }
+      liftEffect (Storage.setItem networkKey (networkName n))
     SetTxHash s -> H.modify_ _ { txHash = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
     SetTxHex s -> H.modify_ _ { txHex = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
     SetOverlayInput s -> H.modify_ _ { overlayInput = s, overlayError = Nothing }
