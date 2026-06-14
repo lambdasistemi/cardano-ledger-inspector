@@ -34,7 +34,7 @@ jobs:
       - name: Prepare preview site
         run: |
           mkdir -p preview-site/inspector
-          cp -L result-inspector/* preview-site/inspector/
+          cp -RL result-inspector/. preview-site/inspector/
           mkdir -p preview-site/openapi
           cp -L result-openapi/* preview-site/openapi/
           chmod -R u+w preview-site

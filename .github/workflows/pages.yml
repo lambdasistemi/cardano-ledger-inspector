@@ -40,7 +40,7 @@ jobs:
       - name: Prepare Pages artifact
         run: |
           mkdir -p _site/inspector
-          cp -L result-inspector/* _site/inspector/
+          cp -RL result-inspector/. _site/inspector/
           mkdir -p _site/openapi
           cp -L result-openapi/* _site/openapi/
           touch _site/.nojekyll
