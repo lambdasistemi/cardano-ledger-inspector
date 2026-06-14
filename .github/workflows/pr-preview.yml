@@ -4,9 +4,16 @@ on:
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,6 +21,7 @@ concurrency:
 
 jobs:
   preview:
+    if: github.event.action != 'closed'
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
@@ -39,6 +47,11 @@ jobs:
           cp -L result-openapi/* preview-site/openapi/
           chmod -R u+w preview-site
 
+      - name: Publish PR preview
+        uses: paolino/dev-assets/static-preview@main
+        with:
+          path: preview-site
+
       - name: Smoke test preview site on localhost
         run: |
           nix --quiet shell nixpkgs#python3 nixpkgs#curl -c bash -euo pipefail <<'SCRIPT'
@@ -57,3 +70,11 @@ jobs:
           curl -fsS http://127.0.0.1:4173/inspector/ >/dev/null
           curl -fsS http://127.0.0.1:4173/openapi/ >/dev/null
           SCRIPT
+
+  pr-preview-cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: nixos
+    steps:
+      - uses: paolino/dev-assets/static-preview@main
+        with:
+          mode: cleanup

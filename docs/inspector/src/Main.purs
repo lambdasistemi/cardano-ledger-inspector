@@ -77,6 +77,7 @@ main = HA.runHalogenAff do
     (if persistInitial then Storage.getItem koiosKey else pure "")
   prov <- liftEffect (Storage.getItem providerKey)
   route <- liftEffect Routing.currentRoute
+  routeBase <- liftEffect Routing.currentBasePath
   theme <- liftEffect Shell.initialTheme
   let initialProv = case prov of
         "Koios"      -> Koios
@@ -91,6 +92,7 @@ main = HA.runHalogenAff do
         , prov: initialProv
         , persistKeys: persistInitial
         , route
+        , routeBase
         , theme
         }
     ) unit mountTarget
@@ -133,6 +135,7 @@ type State =
   , browserPath :: String
   , fetchError :: Maybe String
   , route :: Route
+  , routeBase :: String
   , theme :: Theme.Theme
   }
 
@@ -168,6 +171,7 @@ type InitialKeys =
   , prov :: Provider
   , persistKeys :: Boolean
   , route :: Route
+  , routeBase :: String
   , theme :: Theme.Theme
   }
 
@@ -235,6 +239,7 @@ inspectorComponent initial =
         , browserPath: "[]"
         , fetchError: Nothing
         , route: initial.route
+        , routeBase: initial.routeBase
         , theme: initial.theme
         }
     , render
@@ -248,6 +253,7 @@ inspectorComponent initial =
       [ Shell.topbar
           state.route
           { themeLabel: Shell.themeLabel state.theme
+          , basePath: state.routeBase
           , onToggleTheme: ToggleTheme
           , onNavigate: Navigate
           }
@@ -1631,9 +1637,10 @@ inspectorComponent initial =
 
   handleAction = case _ of
     Navigate route event -> do
+      routeBase <- H.gets _.routeBase
       liftEffect do
         Event.preventDefault (MouseEvent.toEvent event)
-        Routing.pushRoute route
+        Routing.pushRoute routeBase route
       H.modify_ _ { route = route }
     ToggleTheme -> do
       theme <- H.gets _.theme
