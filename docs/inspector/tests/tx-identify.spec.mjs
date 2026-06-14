@@ -128,14 +128,14 @@ function blockfrostParamsFromLedger(params) {
   };
 }
 
-async function decodeFixture(page, txFixturePath = fixturePath) {
+async function decodeFixtureAt(page, route, txFixturePath = fixturePath) {
   const txCbor = (await readFile(txFixturePath, "utf8")).trim();
   const validationContext = await loadValidationContext();
 
   await installClipboardMock(page);
   await mockKoiosValidationContext(page, validationContext);
 
-  await page.goto("/");
+  await page.goto(route);
   await page.getByRole("radio", { name: "CBOR hex" }).check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -143,6 +143,10 @@ async function decodeFixture(page, txFixturePath = fixturePath) {
   await expect(
     page.getByRole("heading", { name: "Conway transaction identity" }),
   ).toBeVisible();
+}
+
+async function decodeFixture(page, txFixturePath = fixturePath) {
+  await decodeFixtureAt(page, "/", txFixturePath);
 }
 
 async function expectInFirstViewport(locator) {
@@ -158,6 +162,26 @@ async function expectInFirstViewport(locator) {
 
   expect(box.top).toBeGreaterThanOrEqual(0);
   expect(box.bottom).toBeLessThanOrEqual(box.innerHeight);
+}
+
+async function expectColorToken(page, locator, property, tokenName) {
+  const values = await locator.evaluate(
+    (element, { property, tokenName }) => {
+      const probe = document.createElement("span");
+      probe.style.color = `var(${tokenName})`;
+      document.body.append(probe);
+      const tokenValue = getComputedStyle(probe).color;
+      probe.remove();
+
+      return {
+        actual: getComputedStyle(element)[property],
+        tokenValue,
+      };
+    },
+    { property, tokenName },
+  );
+
+  expect(values.actual).toBe(values.tokenValue);
 }
 
 async function installClipboardMock(page) {
@@ -206,6 +230,72 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(page).toHaveURL(/\/library$/);
   await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
   await expect(page.getByText("Library placeholder", { exact: true })).toBeVisible();
+});
+
+test("MD3 inspector surfaces expose tokenized panels and controls", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("cardano-ledger-inspector-theme", "light");
+  });
+  await decodeFixtureAt(page, "/inspect");
+
+  const providerPanel = page.locator(".provider-panel");
+  const inputPanel = page.locator(".input-panel");
+  const resultPanel = page.locator(".result-panel");
+  const identityPanel = page.locator(".identity-panel").first();
+  const validationPanel = page.locator(".validation-panel");
+  const rdfPanel = page.locator(".rdf-panel");
+  const lensPanel = page.locator(".sparql-lens-panel").first();
+
+  await expect(providerPanel).toHaveAttribute("data-md3-surface", "provider");
+  await expect(inputPanel).toHaveAttribute("data-md3-surface", "input");
+  await expect(resultPanel).toHaveAttribute("data-md3-surface", "result");
+  await expect(identityPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await expect(validationPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await expect(rdfPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await expect(lensPanel).toHaveAttribute("data-md3-surface", "decoded");
+
+  await expect(page.getByRole("button", { name: "Decode" })).toHaveAttribute(
+    "data-md3-control",
+    "primary",
+  );
+  await expect(page.getByRole("button", { name: "Copy JSON" })).toHaveAttribute(
+    "data-md3-control",
+    "secondary",
+  );
+  await expect(page.getByRole("button", { name: "Copy current" })).toHaveAttribute(
+    "data-md3-control",
+    "inline",
+  );
+
+  await expectColorToken(
+    page,
+    providerPanel,
+    "backgroundColor",
+    "--md-sys-color-surface-container-low",
+  );
+  await expectColorToken(
+    page,
+    providerPanel,
+    "borderColor",
+    "--md-sys-color-outline-variant",
+  );
+
+  const lightBackground = await providerPanel.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  await page.getByRole("button", { name: "Toggle theme" }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .toBe("dark");
+  await expectColorToken(
+    page,
+    providerPanel,
+    "backgroundColor",
+    "--md-sys-color-surface-container-low",
+  );
+  await expect(providerPanel).not.toHaveCSS("background-color", lightBackground);
 });
 
 test("decodes a Conway transaction and exposes compact identity values", async ({

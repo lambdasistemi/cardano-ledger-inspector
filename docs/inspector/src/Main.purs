@@ -300,7 +300,9 @@ inspectorComponent initial =
 
   renderProvider state =
     HH.section
-      [ classNames [ "panel", "provider-panel" ] ]
+      [ classNames [ "panel", "provider-panel" ]
+      , mdSurface "provider"
+      ]
       [ HH.div
           [ classNames [ "panel-heading" ] ]
           [ HH.h2_ [ HH.text "Chain data" ]
@@ -423,7 +425,9 @@ inspectorComponent initial =
 
   renderModeTabs state =
     HH.section
-      [ classNames [ "panel", "input-panel" ] ]
+      [ classNames [ "panel", "input-panel" ]
+      , mdSurface "input"
+      ]
       [ HH.div
           [ classNames [ "panel-heading" ] ]
           [ HH.h2_ [ HH.text "Input" ]
@@ -468,6 +472,7 @@ inspectorComponent initial =
         , HH.button
             [ HP.disabled state.running
             , classNames [ "primary-action" ]
+            , mdControl "primary"
             , HE.onClick (\_ -> Decode)
             ]
             [ HH.text (if state.running then "Fetching..." else "Fetch and decode") ]
@@ -484,6 +489,7 @@ inspectorComponent initial =
         , HH.button
             [ HP.disabled state.running
             , classNames [ "primary-action" ]
+            , mdControl "primary"
             , HE.onClick (\_ -> Decode)
             ]
             [ HH.text (if state.running then "Decoding..." else "Decode") ]
@@ -493,7 +499,9 @@ inspectorComponent initial =
     case state.fetchError of
       Just err ->
         HH.section
-          [ classNames [ "panel", "result-panel", "error-panel" ] ]
+          [ classNames [ "panel", "result-panel", "error-panel" ]
+          , mdSurface "result"
+          ]
           [ HH.div
               [ classNames [ "panel-heading" ] ]
               [ HH.h2_ [ HH.text "Fetch error" ] ]
@@ -502,7 +510,9 @@ inspectorComponent initial =
       Nothing -> case state.result of
         Nothing ->
           HH.section
-            [ classNames [ "panel", "result-panel", "empty-result" ] ]
+            [ classNames [ "panel", "result-panel", "empty-result" ]
+            , mdSurface "result"
+            ]
             [ HH.div
                 [ classNames [ "panel-heading" ] ]
                 [ HH.h2_ [ HH.text "Decoded JSON" ] ]
@@ -515,7 +525,9 @@ inspectorComponent initial =
             summary = Json.inspect r.stdout
           in
             HH.section
-              [ classNames [ "panel", "result-panel" ] ]
+              [ classNames [ "panel", "result-panel" ]
+              , mdSurface "result"
+              ]
               ( [ HH.div
                     [ classNames [ "panel-heading", "result-heading" ] ]
                     [ HH.div_
@@ -529,6 +541,7 @@ inspectorComponent initial =
                           HH.button
                             [ HE.onClick (\_ -> Copy)
                             , classNames [ "secondary-action" ]
+                            , mdControl "secondary"
                             ]
                             [ HH.text (if state.copied then "Copied" else "Copy JSON") ]
                         else HH.text ""
@@ -606,7 +619,9 @@ inspectorComponent initial =
 
   renderIntentSummary state intent =
     HH.div
-      [ classNames [ "intent-panel" ] ]
+      [ classNames [ "intent-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -662,7 +677,9 @@ inspectorComponent initial =
 
   renderIdentification state identification =
     HH.div
-      [ classNames [ "identity-panel" ] ]
+      [ classNames [ "identity-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -683,7 +700,9 @@ inspectorComponent initial =
 
   renderWitnessPlan state witnessPlan =
     HH.div
-      [ classNames [ "identity-panel", "witness-plan" ] ]
+      [ classNames [ "identity-panel", "witness-plan" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -701,7 +720,9 @@ inspectorComponent initial =
 
   renderValidation state validation =
     HH.div
-      [ classNames [ "identity-panel", "validation-panel" ] ]
+      [ classNames [ "identity-panel", "validation-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -719,7 +740,9 @@ inspectorComponent initial =
 
   renderRdfGraph rdf =
     HH.div
-      [ classNames [ "rdf-panel" ] ]
+      [ classNames [ "rdf-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -741,7 +764,9 @@ inspectorComponent initial =
 
   renderOverlayBooks state =
     HH.div
-      [ classNames [ "overlay-book-panel" ] ]
+      [ classNames [ "overlay-book-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -767,26 +792,31 @@ inspectorComponent initial =
               [ classNames [ "overlay-actions" ] ]
               [ HH.button
                   [ classNames [ "secondary-action" ]
+                  , mdControl "secondary"
                   , HE.onClick (\_ -> LoadAmaruOverlayBook)
                   ]
                   [ HH.text "Load Amaru overlay book" ]
               , HH.button
                   [ classNames [ "secondary-action" ]
+                  , mdControl "secondary"
                   , HE.onClick (\_ -> LoadSundaeSwapBlueprintBook)
                   ]
                   [ HH.text "Load SundaeSwap V3 blueprint" ]
               , HH.button
                   [ classNames [ "secondary-action" ]
+                  , mdControl "secondary"
                   , HE.onClick (\_ -> LoadShaclShapesBook)
                   ]
                   [ HH.text "Load Cardano RDF SHACL shapes" ]
               , HH.button
                   [ classNames [ "primary-action" ]
+                  , mdControl "primary"
                   , HE.onClick (\_ -> ImportOverlayBook)
                   ]
                   [ HH.text "Import overlay book" ]
               , HH.button
                   [ classNames [ "primary-action" ]
+                  , mdControl "primary"
                   , HE.onClick (\_ -> ApplySelectedBooks)
                   ]
                   [ HH.text "Apply selected books" ]
@@ -880,7 +910,9 @@ inspectorComponent initial =
 
   renderShaclConformance conformance =
     HH.div
-      [ classNames [ "shacl-conformance-panel" ] ]
+      [ classNames [ "shacl-conformance-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -981,7 +1013,9 @@ inspectorComponent initial =
 
   renderResolvedLabelsLens lens =
     HH.div
-      [ classNames [ "resolved-labels-panel" ] ]
+      [ classNames [ "resolved-labels-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -1045,7 +1079,9 @@ inspectorComponent initial =
 
   renderTypedFieldsLens lens =
     HH.div
-      [ classNames [ "sparql-lens-panel", "typed-fields-panel" ] ]
+      [ classNames [ "sparql-lens-panel", "typed-fields-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -1102,7 +1138,9 @@ inspectorComponent initial =
 
   renderSparqlLens lens =
     HH.div
-      [ classNames [ "sparql-lens-panel" ] ]
+      [ classNames [ "sparql-lens-panel" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
@@ -1255,6 +1293,7 @@ inspectorComponent initial =
               HH.button
                 [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
                 , classNames [ "inline-action" ]
+                , mdControl "inline"
                 ]
                 [ HH.text
                     ( if state.copiedPath == Just row.path then
@@ -1308,7 +1347,9 @@ inspectorComponent initial =
 
   renderBrowser state browser =
     HH.div
-      [ classNames [ "json-browser" ] ]
+      [ classNames [ "json-browser" ]
+      , mdSurface "decoded"
+      ]
       [ HH.div
           [ classNames [ "browser-heading" ] ]
           [ HH.div_
@@ -1318,6 +1359,7 @@ inspectorComponent initial =
           , HH.button
               [ HE.onClick (\_ -> CopyValue browser.currentPath browser.currentJson)
               , classNames [ "inline-action" ]
+              , mdControl "inline"
               ]
               [ HH.text
                   ( if state.copiedPath == Just browser.currentPath then
@@ -1380,6 +1422,7 @@ inspectorComponent initial =
                   HH.button
                     [ HE.onClick (\_ -> BrowseJson row.path)
                     , classNames [ "inline-action" ]
+                    , mdControl "inline"
                     ]
                     [ HH.text (if expanded then "Close" else "Open") ]
                 ]
@@ -1457,6 +1500,12 @@ inspectorComponent initial =
 
   classNames :: forall r a. Array String -> HP.IProp (class :: String | r) a
   classNames names = HP.classes (map HH.ClassName names)
+
+  mdSurface :: forall r a. String -> HP.IProp r a
+  mdSurface = HH.attr (HH.AttrName "data-md3-surface")
+
+  mdControl :: forall r a. String -> HP.IProp r a
+  mdControl = HH.attr (HH.AttrName "data-md3-control")
 
   choiceClass :: forall r a. Boolean -> HP.IProp (class :: String | r) a
   choiceClass selected =
