@@ -9,6 +9,9 @@ module Shell
 
 import Prelude
 
+import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..))
+import Data.String.CodeUnits as StringCodeUnits
 import Effect (Effect)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -22,6 +25,7 @@ topbar
   :: forall w i
    . Route
   -> { themeLabel :: String
+     , basePath :: String
      , onToggleTheme :: i
      , onNavigate :: Route -> MouseEvent -> i
      }
@@ -40,9 +44,9 @@ topbar active opts =
             [ classNames [ "topbar-nav" ]
             , HH.attr (HH.AttrName "aria-label") "Primary"
             ]
-            [ navLink RouteInspect active "Inspect" opts.onNavigate
-            , navLink RouteSettings active "Settings" opts.onNavigate
-            , navLink RouteLibrary active "Library" opts.onNavigate
+            [ navLink opts.basePath RouteInspect active "Inspect" opts.onNavigate
+            , navLink opts.basePath RouteSettings active "Settings" opts.onNavigate
+            , navLink opts.basePath RouteLibrary active "Library" opts.onNavigate
             ]
         , HH.button
             [ classNames [ "topbar-theme" ]
@@ -67,14 +71,15 @@ topbar active opts =
 
 navLink
   :: forall w i
-   . Route
+   . String
+  -> Route
   -> Route
   -> String
   -> (Route -> MouseEvent -> i)
   -> HH.HTML w i
-navLink target active label onNavigate =
+navLink basePath target active label onNavigate =
   HH.a
-    ( [ HP.href (routePath target)
+    ( [ HP.href (routeHref basePath target)
       , classNames [ "topbar-nav-link" ]
       , HE.onClick (onNavigate target)
       ]
@@ -83,6 +88,15 @@ navLink target active label onNavigate =
         else []
     )
     [ HH.text label ]
+
+routeHref :: String -> Route -> String
+routeHref basePath route =
+  normalizedBase <> routePath route
+  where
+  normalizedBase =
+    case StringCodeUnits.stripSuffix (Pattern "/") basePath of
+      Just _ -> basePath
+      Nothing -> basePath <> "/"
 
 siteFooter :: forall w i. HH.HTML w i
 siteFooter =

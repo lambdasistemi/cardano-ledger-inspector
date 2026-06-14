@@ -1,6 +1,7 @@
 module Routing
   ( Route(..)
   , currentRoute
+  , currentBasePath
   , routePath
   , pushRoute
   ) where
@@ -18,22 +19,24 @@ derive instance eqRoute :: Eq Route
 
 routePath :: Route -> String
 routePath = case _ of
-  RouteInspect -> "/inspect"
-  RouteSettings -> "/settings"
-  RouteLibrary -> "/library"
+  RouteInspect -> "inspect"
+  RouteSettings -> "settings"
+  RouteLibrary -> "library"
 
 currentRoute :: Effect Route
 currentRoute = do
-  path <- _pathname
-  pure case path of
-    "/settings" -> RouteSettings
-    "/settings/" -> RouteSettings
-    "/library" -> RouteLibrary
-    "/library/" -> RouteLibrary
+  suffix <- _routeSuffix
+  pure case suffix of
+    "settings" -> RouteSettings
+    "library" -> RouteLibrary
     _ -> RouteInspect
 
-pushRoute :: Route -> Effect Unit
-pushRoute = _pushPath <<< routePath
+currentBasePath :: Effect String
+currentBasePath = _basePath
 
-foreign import _pathname :: Effect String
-foreign import _pushPath :: String -> Effect Unit
+pushRoute :: String -> Route -> Effect Unit
+pushRoute basePath = _pushPath basePath <<< routePath
+
+foreign import _routeSuffix :: Effect String
+foreign import _basePath :: Effect String
+foreign import _pushPath :: String -> String -> Effect Unit

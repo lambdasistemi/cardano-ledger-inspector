@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +28,11 @@ const sundaeBlueprintFixturePath = path.join(
   repoRoot,
   "docs/inspector/protocols/sundaeswap-v3/plutus.json",
 );
+const packagedSiteDir = path.resolve(
+  process.cwd(),
+  process.env.TX_INSPECTOR_SITE_DIR || "result",
+);
+const previewPrefix = "/lambdasistemi/cardano-ledger-inspector/pr-99/";
 const violatingShaclShapes = `
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
@@ -41,6 +47,53 @@ cardano:RequiresSentinelShape
   sh:minCount 1 ;
   sh:message "Transactions must include sentinel off-spec marker." .
 `;
+
+function contentTypeFor(filePath) {
+  if (filePath.endsWith(".html")) return "text/html";
+  if (filePath.endsWith(".js")) return "text/javascript";
+  if (filePath.endsWith(".css")) return "text/css";
+  if (filePath.endsWith(".wasm")) return "application/wasm";
+  return "application/octet-stream";
+}
+
+async function withPrefixedInspectorSite(callback) {
+  const server = createServer(async (request, response) => {
+    try {
+      const url = new URL(request.url || "/", "http://127.0.0.1");
+      if (!url.pathname.startsWith(previewPrefix)) {
+        response.writeHead(404).end("outside preview prefix");
+        return;
+      }
+
+      let relativePath = decodeURIComponent(url.pathname.slice(previewPrefix.length));
+      if (relativePath === "" || relativePath.endsWith("/")) {
+        relativePath += "index.html";
+      } else if (["inspect", "settings", "library"].includes(relativePath)) {
+        relativePath += "/index.html";
+      }
+
+      const targetPath = path.normalize(path.join(packagedSiteDir, relativePath));
+      if (!targetPath.startsWith(packagedSiteDir + path.sep)) {
+        response.writeHead(403).end("outside site root");
+        return;
+      }
+
+      const body = await readFile(targetPath);
+      response.writeHead(200, { "content-type": contentTypeFor(targetPath) });
+      response.end(body);
+    } catch {
+      response.writeHead(404).end("not found");
+    }
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  try {
+    await callback(`http://127.0.0.1:${port}${previewPrefix}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
 
 async function loadValidationContext() {
   const request = JSON.parse(await readFile(validationFixturePath, "utf8"));
@@ -230,6 +283,31 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(page).toHaveURL(/\/library$/);
   await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
   await expect(page.getByText("Library placeholder", { exact: true })).toBeVisible();
+});
+
+test("MD3 shell keeps route navigation inside deployed subpaths", async ({
+  page,
+}) => {
+  await withPrefixedInspectorSite(async (baseUrl) => {
+    await page.goto(`${baseUrl}settings/`);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    expect(page.url().startsWith(`${baseUrl}settings/`)).toBe(true);
+
+    const navigation = page.getByRole("banner").getByRole("navigation");
+    await navigation.getByRole("link", { name: "Library" }).click();
+    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
+    expect(page.url().startsWith(`${baseUrl}library`)).toBe(true);
+    expect(new URL(page.url()).pathname).not.toBe("/library");
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
+    expect(page.url().startsWith(`${baseUrl}library`)).toBe(true);
+
+    await navigation.getByRole("link", { name: "Inspect" }).click();
+    await expect(page.getByRole("radio", { name: "CBOR hex" })).toBeVisible();
+    expect(page.url().startsWith(`${baseUrl}inspect`)).toBe(true);
+    expect(new URL(page.url()).pathname).not.toBe("/inspect");
+  });
 });
 
 test("MD3 inspector surfaces expose tokenized panels and controls", async ({
