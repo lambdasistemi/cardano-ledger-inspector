@@ -23,3 +23,10 @@
 - [X] T009 Run final `./gate.sh` and browser smoke on the packaged UI.
 - [X] T010 Update PR #99 body with verification evidence.
 - [X] T011 Drop `gate.sh`, mark PR ready only after local acceptance and CI are green.
+
+## Corrective 001: Subpath Routing and Preview Publishing
+
+- [ ] C001 Make inspector routing safe under arbitrary subpath deployment.
+- [ ] C002 Add Playwright regression coverage for subpath deep-link, navigation, and refresh.
+- [ ] C003 Publish PR previews with `paolino/dev-assets/static-preview` and cleanup on PR close.
+- [ ] C004 Verify local subpath smoke, final gate, CI, and live preview URL before ready.
