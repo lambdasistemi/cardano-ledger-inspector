@@ -6,10 +6,10 @@
 
 ## Slice A: Material Shell Foundation
 
-- [ ] T001 Add route/theme/shell modules for `/inspect`, `/settings`, `/library`.
-- [ ] T002 Load `material.js` and external `styles.css` from the packaged UI.
-- [ ] T003 Add route/theme Playwright RED coverage and make it pass.
-- [ ] T004 Run `./gate.sh`, commit `feat(inspector): add md3 shell foundation`, and stop before push.
+- [X] T001 Add route/theme/shell modules for `/inspect`, `/settings`, `/library`.
+- [X] T002 Load `material.js` and external `styles.css` from the packaged UI.
+- [X] T003 Add route/theme Playwright RED coverage and make it pass.
+- [X] T004 Run `./gate.sh`, commit `feat(inspector): add md3 shell foundation`, and stop before push.
 
 ## Slice B: Inspector MD3 Reskin
 
