@@ -85,6 +85,16 @@ pkgs.mkSpagoDerivation {
     mkdir -p $out
     cp dist/index.html $out/
     cp dist/index.js $out/
+    cp dist/styles.css $out/
+    cp dist/material.js $out/
+
+    for route in inspect settings library; do
+      mkdir -p "$out/$route"
+      cp dist/index.html "$out/$route/"
+      cp dist/index.js "$out/$route/"
+      cp dist/styles.css "$out/$route/"
+      cp dist/material.js "$out/$route/"
+    done
   '';
 
   passthru = { inherit nodeModules pkgs; };

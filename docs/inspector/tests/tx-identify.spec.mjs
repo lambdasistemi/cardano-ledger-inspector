@@ -175,6 +175,39 @@ async function installClipboardMock(page) {
   });
 }
 
+test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
+  await page.goto("/inspect");
+
+  const topbar = page.getByRole("banner");
+  const navigation = topbar.getByRole("navigation");
+  await expect(
+    topbar.getByText("Cardano transaction inspector", { exact: true }),
+  ).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Inspect" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Settings" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Library" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "CBOR hex" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Decode" })).toBeVisible();
+
+  const initialTheme = await page.evaluate(
+    () => document.documentElement.dataset.theme,
+  );
+  await topbar.getByRole("button", { name: "Toggle theme" }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .not.toBe(initialTheme);
+
+  await navigation.getByRole("link", { name: "Settings" }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByText("Settings placeholder", { exact: true })).toBeVisible();
+
+  await navigation.getByRole("link", { name: "Library" }).click();
+  await expect(page).toHaveURL(/\/library$/);
+  await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
+  await expect(page.getByText("Library placeholder", { exact: true })).toBeVisible();
+});
+
 test("decodes a Conway transaction and exposes compact identity values", async ({
   page,
 }) => {

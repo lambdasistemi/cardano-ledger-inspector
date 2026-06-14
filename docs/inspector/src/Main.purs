@@ -22,13 +22,20 @@ import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
 import Provider (Provider(..))
 import Provider as Provider
+import Routing (Route(..))
+import Routing as Routing
+import Shell as Shell
+import Theme as Theme
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Web.Event.Event as Event
 import Web.DOM.ParentNode (QuerySelector(..))
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 blockfrostKey :: String
 blockfrostKey = "blockfrost_project_id"
@@ -69,6 +76,8 @@ main = HA.runHalogenAff do
   kOS  <- liftEffect
     (if persistInitial then Storage.getItem koiosKey else pure "")
   prov <- liftEffect (Storage.getItem providerKey)
+  route <- liftEffect Routing.currentRoute
+  theme <- liftEffect Shell.initialTheme
   let initialProv = case prov of
         "Koios"      -> Koios
         _            -> Blockfrost
@@ -81,6 +90,8 @@ main = HA.runHalogenAff do
         , koios: kOS
         , prov: initialProv
         , persistKeys: persistInitial
+        , route
+        , theme
         }
     ) unit mountTarget
 
@@ -121,6 +132,8 @@ type State =
   , copiedPath :: Maybe String
   , browserPath :: String
   , fetchError :: Maybe String
+  , route :: Route
+  , theme :: Theme.Theme
   }
 
 type BrowserNode =
@@ -154,6 +167,8 @@ type InitialKeys =
   , koios :: String
   , prov :: Provider
   , persistKeys :: Boolean
+  , route :: Route
+  , theme :: Theme.Theme
   }
 
 data Action
@@ -176,6 +191,8 @@ data Action
   | Copy
   | CopyValue String String
   | BrowseJson String
+  | Navigate Route MouseEvent
+  | ToggleTheme
 
 inspectorComponent
   :: forall q i o m
@@ -217,6 +234,8 @@ inspectorComponent initial =
         , copiedPath: Nothing
         , browserPath: "[]"
         , fetchError: Nothing
+        , route: initial.route
+        , theme: initial.theme
         }
     , render
     , eval: H.mkEval H.defaultEval { handleAction = handleAction }
@@ -224,6 +243,25 @@ inspectorComponent initial =
   where
 
   render state =
+    HH.div
+      [ classNames [ "shell-root" ] ]
+      [ Shell.topbar
+          state.route
+          { themeLabel: Shell.themeLabel state.theme
+          , onToggleTheme: ToggleTheme
+          , onNavigate: Navigate
+          }
+      , HH.main
+          [ classNames [ "page-frame", "shell-main" ] ]
+          [ case state.route of
+              RouteInspect -> renderInspector state
+              RouteSettings -> Shell.placeholderPage "Settings"
+              RouteLibrary -> Shell.placeholderPage "Library"
+          ]
+      , Shell.siteFooter
+      ]
+
+  renderInspector state =
     HH.div
       [ classNames [ "app-shell" ] ]
       [ HH.section
@@ -1543,6 +1581,15 @@ inspectorComponent initial =
       Nothing -> pure Nothing
 
   handleAction = case _ of
+    Navigate route event -> do
+      liftEffect do
+        Event.preventDefault (MouseEvent.toEvent event)
+        Routing.pushRoute route
+      H.modify_ _ { route = route }
+    ToggleTheme -> do
+      theme <- H.gets _.theme
+      nextTheme <- liftEffect (Shell.toggleThemeEff theme)
+      H.modify_ _ { theme = nextTheme }
     SetBlockfrostKey s -> do
       H.modify_ _ { blockfrostKey = s }
       persist <- H.gets _.persistKeys
