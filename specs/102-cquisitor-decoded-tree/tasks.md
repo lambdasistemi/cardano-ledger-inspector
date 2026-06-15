@@ -19,6 +19,6 @@
 
 ## Finalization — Orchestrator Owned
 
-- [ ] T113 Verify the full local gate and non-root subpath browser smoke at HEAD.
-- [ ] T114 Verify PR preview renders `/inspect`, `/settings`, `/library`, and fixture decode.
-- [ ] T115 Update PR body, run finalization audit, drop `gate.sh`, and leave PR draft for epic-owner review.
+- [X] T113 Verify the full local gate and non-root subpath browser smoke at HEAD.
+- [X] T114 Verify PR preview renders `/inspect`, `/settings`, `/library`, and fixture decode.
+- [X] T115 Update PR body, run finalization audit, drop `gate.sh`, and leave PR draft for epic-owner review.
