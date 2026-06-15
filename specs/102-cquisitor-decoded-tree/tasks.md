@@ -23,12 +23,12 @@
 - [X] T114 Verify PR preview renders `/inspect`, `/settings`, `/library`, and fixture decode.
 - [X] T115 Update PR body, run finalization audit, drop `gate.sh`, and leave PR draft for epic-owner review.
 
-## Corrective Slice 3 — Decode Real Conway Datum Tx
+## Corrective Slice 3 — Use Genuine Conway Fixture
 
 - [X] T116 Restore the branch gate for returned PR work and record the corrective scope.
-- [ ] T117 Add an end-to-end Playwright regression for `/tmp/epic-97/clins-102/sample-tx.cbor` in CBOR-hex mode that fails on the current malformed-CBOR decode path.
-- [ ] T118 Fix the SPA decode invocation/input handling so the sample Conway transaction with indefinite-length Plutus datums decodes successfully.
-- [ ] T119 Verify the decoded-structure tree renders from the sample transaction RDF graph and is not left pending.
-- [ ] T120 Update preview smoke coverage to decode the real datum transaction, not only the simple fixture.
-- [ ] T121 Run `./gate.sh`, record evidence, and commit the corrective slice.
+- [X] T117 Replace the malformed `/tmp/epic-97/clins-102/sample-tx.cbor` corrective input with the genuine in-repo `specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex` fixture.
+- [X] T118 Cancel the S4 dependency fix after A-002 and remove the uncommitted dependency cabal/test scaffolding without flake, pin, hash, or dependency PR changes.
+- [X] T119 Remove the failed browser-side CBOR normalization/fallback experiment and restore the simple inspector FFI wrapper.
+- [X] T120 Verify the decoded-structure tree renders from the genuine Conway fixture RDF graph and is not left pending.
+- [X] T121 Update preview subpath coverage to decode the genuine in-repo Conway fixture.
 - [ ] T122 Re-run final PR CI/preview smoke, update PR body/status, drop `gate.sh`, and leave PR draft for epic-owner review.

@@ -6,12 +6,13 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
+const conwayMainnetFixturePath = path.join(
+  repoRoot,
+  "specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex",
+);
 const fixturePath =
   process.env.TX_FIXTURE_PATH ||
-  path.join(
-    repoRoot,
-    "specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex",
-  );
+  conwayMainnetFixturePath;
 const signingIntentFixturePath = path.join(
   repoRoot,
   "specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex",
@@ -675,6 +676,76 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     }),
   ).toBeVisible();
   await expect(lensPanel.locator(".sparql-lens-row").first()).toBeVisible();
+});
+
+test("decodes genuine Conway fixture into RDF tree", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(conwayMainnetFixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
+
+  await installClipboardMock(page);
+  await mockKoiosValidationContext(page, validationContext);
+
+  await page.goto("/");
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const body = page.locator("body");
+  await expect(
+    page.getByRole("heading", { name: /Conway transaction identity|stderr/ }),
+  ).toBeVisible();
+  await expect(body).not.toContainText(/malformed_cbor|DeserialiseFailure/);
+  await expect(
+    page.getByRole("heading", { name: "Conway transaction identity" }),
+  ).toBeVisible();
+
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await expect(decodedPanel.locator(".decoded-structure-placeholder")).toHaveCount(0);
+  await expect(decodedPanel.getByText("Tree renderer pending.", { exact: true })).toHaveCount(0);
+
+  const rootRow = decodedPanel.locator(".decoded-tree-row", {
+    hasText: "Transaction",
+  });
+  await expect(rootRow).toBeVisible();
+  await expect(rootRow).toContainText(/urn:cardano:tx:/);
+
+  for (const section of ["Outputs", "Witnesses"]) {
+    await expect(
+      decodedPanel.getByRole("button", { name: new RegExp(`^${section}\\b`) }),
+    ).toBeVisible();
+  }
+
+  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: "Output 0" }),
+  ).toBeVisible();
+
+  await decodedPanel.getByRole("button", { name: /^Witnesses\b/ }).click();
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: /Key witness|Script witness|Redeemer/ }).first(),
+  ).toBeVisible();
+});
+
+test("preview subpath decodes genuine Conway fixture into RDF tree", async ({
+  page,
+}) => {
+  await withPrefixedInspectorSite(async (baseUrl) => {
+    await decodeFixtureAt(page, `${baseUrl}inspect/`, conwayMainnetFixturePath);
+
+    const body = page.locator("body");
+    await expect(body).not.toContainText(/malformed_cbor|DeserialiseFailure/);
+
+    const decodedPanel = page.locator(".decoded-structure-panel");
+    await expect(decodedPanel.locator(".decoded-structure-placeholder")).toHaveCount(0);
+    await expect(decodedPanel.getByText("Tree renderer pending.", { exact: true })).toHaveCount(0);
+    await expect(
+      decodedPanel.locator(".decoded-tree-row", { hasText: "Transaction" }),
+    ).toBeVisible();
+    await expect(decodedPanel.getByRole("button", { name: /^Outputs\b/ })).toBeVisible();
+    await expect(decodedPanel.getByRole("button", { name: /^Witnesses\b/ })).toBeVisible();
+  });
 });
 
 test("selects Amaru overlay book parts into deterministic Turtle", async ({
