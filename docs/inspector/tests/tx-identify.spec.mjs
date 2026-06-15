@@ -286,6 +286,14 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
 
   const topbar = page.getByRole("banner");
   const navigation = topbar.getByRole("navigation");
+  const indexHtml = await readFile(
+    path.join(repoRoot, "docs/inspector/dist/index.html"),
+    "utf8",
+  );
+  expect(indexHtml).toContain("Material+Symbols+Outlined");
+  expect(indexHtml).toContain("Roboto+Flex");
+  expect(indexHtml).toContain("Roboto+Mono");
+
   await expect(
     topbar.getByText("Cardano transaction inspector", { exact: true }),
   ).toBeVisible();
@@ -298,6 +306,11 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   const initialTheme = await page.evaluate(
     () => document.documentElement.dataset.theme,
   );
+  const themeIcon = topbar.locator("md-icon").first();
+  await expect(themeIcon).toBeVisible();
+  await expect(themeIcon).toHaveCSS("font-family", /Material Symbols Outlined/);
+  await expect(topbar.getByRole("button", { name: "dark_mode" })).toHaveCount(0);
+  await expect(topbar.getByRole("button", { name: "light_mode" })).toHaveCount(0);
   await topbar.getByRole("button", { name: "Toggle theme" }).click();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
@@ -415,15 +428,15 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   await expect(rdfPanel).toHaveAttribute("data-md3-surface", "decoded");
   await expect(lensPanel).toHaveAttribute("data-md3-surface", "decoded");
 
-  await expect(page.getByRole("button", { name: "Decode" })).toHaveAttribute(
+  await expect(page.locator("md-filled-button", { hasText: "Decode" })).toHaveAttribute(
     "data-md3-control",
     "primary",
   );
-  await expect(page.getByRole("button", { name: "Copy JSON" })).toHaveAttribute(
+  await expect(page.locator("md-outlined-button", { hasText: "Copy JSON" })).toHaveAttribute(
     "data-md3-control",
     "secondary",
   );
-  await expect(page.getByRole("button", { name: "Copy current" })).toHaveAttribute(
+  await expect(page.locator("md-outlined-button", { hasText: "Copy current" })).toHaveAttribute(
     "data-md3-control",
     "inline",
   );
@@ -435,17 +448,29 @@ test("inspect keeps chain-data settings compact and gives input/results the work
   await page.goto("/inspect");
 
   await expect(page.locator(".provider-panel")).toHaveCount(0);
-  const settingsSummary = page.locator(".settings-summary");
+  const leftPane = page.locator(".workspace-left");
+  const rightPane = page.locator(".workspace-right");
+  const settingsSummary = leftPane.locator(".settings-summary");
+  const inputPanel = leftPane.locator(".input-panel");
+  const resultPanel = rightPane.locator(".result-panel");
+
+  await expect(leftPane).toBeVisible();
+  await expect(rightPane).toBeVisible();
   await expect(settingsSummary).toBeVisible();
   await expect(settingsSummary).toContainText("Blockfrost");
   await expect(settingsSummary).toContainText("mainnet");
   await expect(settingsSummary.getByRole("link", { name: "Settings" })).toBeVisible();
+  await expect(inputPanel).toBeVisible();
+  await expect(leftPane.getByRole("heading", { name: "Books" })).toBeVisible();
+  await expect(resultPanel.getByRole("heading", { name: "Decoded JSON" })).toBeVisible();
+  await expect(rightPane.getByRole("heading", { name: "Decoded structure" })).toBeVisible();
 
   const workspaceBox = await page.locator(".workspace").boundingBox();
-  const inputBox = await page.locator(".input-panel").boundingBox();
-  const resultBox = await page.locator(".result-panel").boundingBox();
-  expect(inputBox.width).toBeGreaterThan(workspaceBox.width * 0.9);
-  expect(resultBox.width).toBeGreaterThan(workspaceBox.width * 0.9);
+  const leftBox = await leftPane.boundingBox();
+  const rightBox = await rightPane.boundingBox();
+  expect(leftBox.width).toBeLessThan(workspaceBox.width * 0.52);
+  expect(rightBox.width).toBeGreaterThan(workspaceBox.width * 0.52);
+  expect(Math.abs(leftBox.y - rightBox.y)).toBeLessThan(8);
 });
 
 test("settings changes provider state used by inspect hash decode", async ({ page }) => {

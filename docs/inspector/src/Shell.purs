@@ -48,8 +48,9 @@ topbar active opts =
             , navLink opts.basePath RouteSettings active "Settings" opts.onNavigate
             , navLink opts.basePath RouteLibrary active "Library" opts.onNavigate
             ]
-        , HH.button
+        , HH.element (HH.ElemName "md-icon-button")
             [ classNames [ "topbar-theme" ]
+            , HH.attr (HH.AttrName "role") "button"
             , HH.attr (HH.AttrName "aria-label") "Toggle theme"
             , HP.title ("Switch to " <> opts.themeLabel <> " theme")
             , HE.onClick (\_ -> opts.onToggleTheme)

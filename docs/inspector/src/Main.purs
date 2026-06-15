@@ -296,12 +296,19 @@ inspectorComponent initial =
               , HH.span_ [ HH.text "RDF views" ]
               ]
           ]
-      , renderSettingsSummary state
       , HH.div
           [ classNames [ "workspace" ] ]
           [ HH.div
-              [ classNames [ "workspace-main" ] ]
-              (renderWorkspaceMain state)
+              [ classNames [ "workspace-left" ] ]
+              [ renderSettingsSummary state
+              , renderModeTabs state
+              , renderBooksPlaceholder
+              ]
+          , HH.div
+              [ classNames [ "workspace-right" ] ]
+              [ renderResult state
+              , renderDecodedStructurePlaceholder state
+              ]
           ]
       ]
 
@@ -324,7 +331,7 @@ inspectorComponent initial =
       ]
 
   renderSettingsSummary state =
-    HH.section
+    HH.element (HH.ElemName "md-elevated-card")
       [ classNames [ "settings-summary" ]
       , mdSurface "provider"
       ]
@@ -346,15 +353,76 @@ inspectorComponent initial =
           [ HH.text "Settings" ]
       ]
 
-  renderWorkspaceMain state =
-    case state.fetchError of
-      Just _ -> [ renderResult state, renderModeTabs state ]
-      Nothing -> case state.result of
-        Just _  -> [ renderResult state, renderModeTabs state ]
-        Nothing -> [ renderModeTabs state, renderResult state ]
+  renderBooksPlaceholder =
+    HH.element (HH.ElemName "md-elevated-card")
+      [ classNames [ "panel", "books-panel" ]
+      , mdSurface "books"
+      ]
+      [ HH.div
+          [ classNames [ "panel-heading" ] ]
+          [ HH.div_
+              [ HH.h2_ [ HH.text "Books" ]
+              , HH.p_ [ HH.text "Overlay and protocol books will attach decoded labels in a later slice." ]
+              ]
+          ]
+      , HH.element (HH.ElemName "md-outlined-text-field")
+          [ classNames [ "book-filter" ]
+          , HH.attr (HH.AttrName "label") "Book filter"
+          , HH.attr (HH.AttrName "disabled") "disabled"
+          , HH.attr (HH.AttrName "value") "Book resolution pending"
+          ]
+          []
+      , HH.element (HH.ElemName "md-list")
+          [ classNames [ "books-list" ] ]
+          [ HH.element (HH.ElemName "md-list-item") []
+              [ HH.div
+                  [ HH.attr (HH.AttrName "slot") "headline" ]
+                  [ HH.text "Protocol overlays" ]
+              , HH.div
+                  [ HH.attr (HH.AttrName "slot") "supporting-text" ]
+                  [ HH.text "Import and resolution remain in the decoded result stack for now." ]
+              ]
+          , HH.element (HH.ElemName "md-list-item") []
+              [ HH.div
+                  [ HH.attr (HH.AttrName "slot") "headline" ]
+                  [ HH.text "Local book store" ]
+              , HH.div
+                  [ HH.attr (HH.AttrName "slot") "supporting-text" ]
+                  [ HH.text "Reserved for a later issue." ]
+              ]
+          ]
+      ]
+
+  renderDecodedStructurePlaceholder state =
+    HH.element (HH.ElemName "md-elevated-card")
+      [ classNames [ "panel", "decoded-structure-panel" ]
+      , mdSurface "decoded"
+      ]
+      [ HH.div
+          [ classNames [ "panel-heading" ] ]
+          [ HH.div_
+              [ HH.h2_ [ HH.text "Decoded structure" ]
+              , HH.p_
+                  [ HH.text
+                      ( case state.result of
+                          Just r ->
+                            if r.exitOk then
+                              "Stable surface for the structured decoded transaction tree."
+                            else
+                              "Decode a transaction to populate the structured tree in the next slice."
+                          _ ->
+                            "Decode a transaction to populate the structured tree in the next slice."
+                      )
+                  ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "empty-state", "decoded-structure-placeholder" ] ]
+          [ HH.text "Tree renderer pending." ]
+      ]
 
   renderProvider state =
-    HH.section
+    HH.element (HH.ElemName "md-elevated-card")
       [ classNames [ "panel", "provider-panel" ]
       , mdSurface "provider"
       ]
@@ -437,6 +505,12 @@ inspectorComponent initial =
               , HP.checked state.persistKeys
               , HE.onChecked TogglePersist
               ]
+          , HH.element (HH.ElemName "md-switch")
+              [ classNames [ "persist-md-switch" ]
+              , HH.attr (HH.AttrName "aria-hidden") "true"
+              , HH.attr (HH.AttrName "tabindex") "-1"
+              ]
+              []
           , HH.span_ [ HH.text "Persist API credentials" ]
           ]
       , HH.p
@@ -479,7 +553,7 @@ inspectorComponent initial =
       ]
 
   renderModeTabs state =
-    HH.section
+    HH.element (HH.ElemName "md-elevated-card")
       [ classNames [ "panel", "input-panel" ]
       , mdSurface "input"
       ]
@@ -524,9 +598,10 @@ inspectorComponent initial =
             , HP.value state.txHash
             , HE.onValueInput SetTxHash
             ]
-        , HH.button
+        , HH.element (HH.ElemName "md-filled-button")
             [ HP.disabled state.running
             , classNames [ "primary-action" ]
+            , HH.attr (HH.AttrName "role") "button"
             , mdControl "primary"
             , HE.onClick (\_ -> Decode)
             ]
@@ -541,9 +616,10 @@ inspectorComponent initial =
             , HP.rows 9
             , HE.onValueInput SetTxHex
             ]
-        , HH.button
+        , HH.element (HH.ElemName "md-filled-button")
             [ HP.disabled state.running
             , classNames [ "primary-action" ]
+            , HH.attr (HH.AttrName "role") "button"
             , mdControl "primary"
             , HE.onClick (\_ -> Decode)
             ]
@@ -553,7 +629,7 @@ inspectorComponent initial =
   renderResult state =
     case state.fetchError of
       Just err ->
-        HH.section
+        HH.element (HH.ElemName "md-elevated-card")
           [ classNames [ "panel", "result-panel", "error-panel" ]
           , mdSurface "result"
           ]
@@ -564,7 +640,7 @@ inspectorComponent initial =
           ]
       Nothing -> case state.result of
         Nothing ->
-          HH.section
+          HH.element (HH.ElemName "md-elevated-card")
             [ classNames [ "panel", "result-panel", "empty-result" ]
             , mdSurface "result"
             ]
@@ -579,7 +655,7 @@ inspectorComponent initial =
           let
             summary = Json.inspect r.stdout
           in
-            HH.section
+            HH.element (HH.ElemName "md-elevated-card")
               [ classNames [ "panel", "result-panel" ]
               , mdSurface "result"
               ]
@@ -593,9 +669,10 @@ inspectorComponent initial =
                         ]
                     , if r.exitOk
                         then
-                          HH.button
+                          HH.element (HH.ElemName "md-outlined-button")
                             [ HE.onClick (\_ -> Copy)
                             , classNames [ "secondary-action" ]
+                            , HH.attr (HH.AttrName "role") "button"
                             , mdControl "secondary"
                             ]
                             [ HH.text (if state.copied then "Copied" else "Copy JSON") ]
@@ -845,32 +922,37 @@ inspectorComponent initial =
               ]
           , HH.div
               [ classNames [ "overlay-actions" ] ]
-              [ HH.button
+              [ HH.element (HH.ElemName "md-outlined-button")
                   [ classNames [ "secondary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
                   , mdControl "secondary"
                   , HE.onClick (\_ -> LoadAmaruOverlayBook)
                   ]
                   [ HH.text "Load Amaru overlay book" ]
-              , HH.button
+              , HH.element (HH.ElemName "md-outlined-button")
                   [ classNames [ "secondary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
                   , mdControl "secondary"
                   , HE.onClick (\_ -> LoadSundaeSwapBlueprintBook)
                   ]
                   [ HH.text "Load SundaeSwap V3 blueprint" ]
-              , HH.button
+              , HH.element (HH.ElemName "md-outlined-button")
                   [ classNames [ "secondary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
                   , mdControl "secondary"
                   , HE.onClick (\_ -> LoadShaclShapesBook)
                   ]
                   [ HH.text "Load Cardano RDF SHACL shapes" ]
-              , HH.button
+              , HH.element (HH.ElemName "md-filled-button")
                   [ classNames [ "primary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
                   , mdControl "primary"
                   , HE.onClick (\_ -> ImportOverlayBook)
                   ]
                   [ HH.text "Import overlay book" ]
-              , HH.button
+              , HH.element (HH.ElemName "md-filled-button")
                   [ classNames [ "primary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
                   , mdControl "primary"
                   , HE.onClick (\_ -> ApplySelectedBooks)
                   ]
@@ -1345,9 +1427,10 @@ inspectorComponent initial =
               [ classNames [ "identity-label" ] ]
               [ HH.text row.label ]
           , if showCopy then
-              HH.button
+              HH.element (HH.ElemName "md-outlined-button")
                 [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
                 , classNames [ "inline-action" ]
+                , HH.attr (HH.AttrName "role") "button"
                 , mdControl "inline"
                 ]
                 [ HH.text
@@ -1411,9 +1494,10 @@ inspectorComponent initial =
               [ HH.h3_ [ HH.text "Transaction browser" ]
               , HH.p_ [ HH.text browser.subtitle ]
               ]
-          , HH.button
+          , HH.element (HH.ElemName "md-outlined-button")
               [ HE.onClick (\_ -> CopyValue browser.currentPath browser.currentJson)
               , classNames [ "inline-action" ]
+              , HH.attr (HH.AttrName "role") "button"
               , mdControl "inline"
               ]
               [ HH.text
@@ -1474,9 +1558,10 @@ inspectorComponent initial =
               HH.div
                 [ classNames [ "browser-actions" ] ]
                 [
-                  HH.button
+                  HH.element (HH.ElemName "md-outlined-button")
                     [ HE.onClick (\_ -> BrowseJson row.path)
                     , classNames [ "inline-action" ]
+                    , HH.attr (HH.AttrName "role") "button"
                     , mdControl "inline"
                     ]
                     [ HH.text (if expanded then "Close" else "Open") ]

@@ -40,7 +40,7 @@
   --shadow: 0 14px 34px rgba(23, 33, 47, 0.08);
   --app-radius: 8px;
   font-family:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Roboto Flex", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-size: 15px;
   line-height: 1.5;
@@ -123,8 +123,28 @@ textarea,
 input[type="text"],
 input[type="password"] {
   font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     monospace;
+}
+
+md-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  font-family: "Material Symbols Outlined";
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  font-feature-settings: "liga";
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
 }
 
 code {
@@ -205,6 +225,9 @@ code {
 .topbar-theme {
   width: 40px;
   padding: 0;
+  --md-icon-button-icon-color: var(--text);
+  --md-icon-button-hover-icon-color: var(--accent-strong);
+  --md-icon-button-pressed-icon-color: var(--accent-strong);
 }
 
 .topbar-theme md-icon {
@@ -291,11 +314,13 @@ fieldset {
 
 .workspace {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(280px, 0.42fr) minmax(0, 0.58fr);
   gap: 18px;
   align-items: start;
 }
 
+.workspace-left,
+.workspace-right,
 .workspace-main {
   display: grid;
   gap: 18px;
@@ -303,6 +328,7 @@ fieldset {
 }
 
 .panel {
+  display: block;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -332,6 +358,35 @@ fieldset {
   border-radius: 8px;
   background: var(--surface);
   padding: 12px 14px;
+}
+
+.books-panel,
+.decoded-structure-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.books-panel .panel-heading,
+.decoded-structure-panel .panel-heading {
+  margin-bottom: 0;
+}
+
+.book-filter {
+  width: 100%;
+  --md-outlined-text-field-container-shape: 8px;
+  --md-outlined-text-field-label-text-font: "Roboto Flex";
+  --md-outlined-text-field-input-text-font: "Roboto Mono";
+}
+
+.books-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-low);
+  overflow: hidden;
+}
+
+.decoded-structure-placeholder {
+  min-height: 120px;
 }
 
 .settings-summary-copy {
@@ -480,6 +535,9 @@ textarea {
 input:focus,
 textarea:focus,
 button:focus-visible,
+md-filled-button:focus-visible,
+md-outlined-button:focus-visible,
+md-icon-button:focus-visible,
 .header-link:focus-visible,
 .choice-option:focus-within {
   border-color: var(--accent);
@@ -502,6 +560,10 @@ button:focus-visible,
   width: 2.35rem;
   height: 1.2rem;
   accent-color: var(--accent);
+}
+
+.persist-md-switch {
+  display: none;
 }
 
 .warning-note {
@@ -530,6 +592,10 @@ button:focus-visible,
   border: 1px solid transparent;
   padding: 0.62rem 0.9rem;
   font-weight: 700;
+  --md-filled-button-container-shape: 8px;
+  --md-filled-button-label-text-font: "Roboto Flex";
+  --md-outlined-button-container-shape: 8px;
+  --md-outlined-button-label-text-font: "Roboto Flex";
 }
 
 .primary-action {
@@ -557,6 +623,8 @@ button:focus-visible,
   font-size: 0.84rem;
   font-weight: 700;
   white-space: nowrap;
+  --md-outlined-button-container-shape: 7px;
+  --md-outlined-button-label-text-font: "Roboto Flex";
 }
 
 .inline-action:hover {

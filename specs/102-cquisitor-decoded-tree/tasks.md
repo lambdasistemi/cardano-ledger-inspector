@@ -2,11 +2,11 @@
 
 ## Slice 1 — Material Baseline And Two-Pane Workspace
 
-- [ ] T102 Add Material Symbols and Roboto font loading to the inspector HTML shell.
-- [ ] T103 Convert available shell and inspector controls to bundled `md-*` Material Web components.
-- [ ] T104 Reshape `/inspect` into a responsive two-pane workspace with input, active chain-data, and books placeholder on the left.
-- [ ] T105 Update Playwright coverage for icon rendering, typography signal, and two-pane layout.
-- [ ] T106 Run `./gate.sh`, record evidence, and commit the slice.
+- [X] T102 Add Material Symbols and Roboto font loading to the inspector HTML shell.
+- [X] T103 Convert available shell and inspector controls to bundled `md-*` Material Web components.
+- [X] T104 Reshape `/inspect` into a responsive two-pane workspace with input, active chain-data, and books placeholder on the left.
+- [X] T105 Update Playwright coverage for icon rendering, typography signal, and two-pane layout.
+- [X] T106 Run `./gate.sh`, record evidence, and commit the slice.
 
 ## Slice 2 — SPARQL Decoded Structure Tree
 
