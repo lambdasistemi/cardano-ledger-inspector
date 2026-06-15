@@ -31,4 +31,4 @@
 - [X] T119 Remove the failed browser-side CBOR normalization/fallback experiment and restore the simple inspector FFI wrapper.
 - [X] T120 Verify the decoded-structure tree renders from the genuine Conway fixture RDF graph and is not left pending.
 - [X] T121 Update preview subpath coverage to decode the genuine in-repo Conway fixture.
-- [ ] T122 Re-run final PR CI/preview smoke, update PR body/status, drop `gate.sh`, and leave PR draft for epic-owner review.
+- [X] T122 Re-run final PR CI/preview smoke, update PR body/status, and leave PR draft for epic-owner review.
