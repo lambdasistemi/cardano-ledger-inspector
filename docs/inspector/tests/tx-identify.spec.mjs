@@ -605,6 +605,78 @@ test("renders the transaction RDF graph after decode", async ({ page }) => {
   await expect(lensPanel.getByText(/urn:cardano:tx:/)).toBeVisible();
 });
 
+test("renders decoded-structure tree from RDF rows", async ({ page }) => {
+  await decodeFixture(page);
+
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await expect(
+    decodedPanel.getByRole("heading", { name: "Decoded structure" }),
+  ).toBeVisible();
+  await expect(decodedPanel.locator(".decoded-structure-placeholder")).toHaveCount(0);
+
+  const rootRow = decodedPanel.locator(".decoded-tree-row", {
+    hasText: "Transaction",
+  });
+  await expect(rootRow).toBeVisible();
+  await expect(rootRow).toContainText(/urn:cardano:tx:/);
+
+  for (const section of [
+    "Body",
+    "Inputs",
+    "Outputs",
+    "Fee",
+    "Witnesses",
+    "Redeemers",
+    "Metadata",
+  ]) {
+    await expect(
+      decodedPanel.getByRole("button", { name: new RegExp(`^${section}\\b`) }),
+    ).toBeVisible();
+  }
+
+  const outputs = decodedPanel.getByRole("button", { name: /^Outputs\b/ });
+  await outputs.click();
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: "Output 0" }),
+  ).toBeVisible();
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: "Index" }).first(),
+  ).toContainText("0");
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: "Lovelace" }).first(),
+  ).toBeVisible();
+
+  await outputs.click();
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: "Output 0" }),
+  ).toHaveCount(0);
+
+  await decodedPanel.getByRole("button", { name: /^Witnesses\b/ }).click();
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: "Key witness" }).first(),
+  ).toBeVisible();
+
+  const metadata = decodedPanel.getByRole("button", { name: /^Metadata\b/ });
+  await metadata.click();
+  await expect(
+    decodedPanel.locator(".decoded-tree-row", { hasText: "Metadata label" }).first(),
+  ).toBeVisible();
+
+  const rdfPanel = page.locator(".rdf-panel");
+  await expect(
+    rdfPanel.getByRole("heading", { name: "Transaction RDF graph" }),
+  ).toBeVisible();
+  await expect(rdfPanel.locator(".rdf-turtle")).toContainText("cardano:Transaction");
+
+  const lensPanel = page.locator(".sparql-lens-panel");
+  await expect(
+    lensPanel.getByRole("heading", {
+      name: "SPARQL lens: transaction outputs",
+    }),
+  ).toBeVisible();
+  await expect(lensPanel.locator(".sparql-lens-row").first()).toBeVisible();
+});
+
 test("selects Amaru overlay book parts into deterministic Turtle", async ({
   page,
 }) => {

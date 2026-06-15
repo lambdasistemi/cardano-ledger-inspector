@@ -1,11 +1,13 @@
 module FFI.RdfShapes
   ( Json
+  , DecodedTreeRow
   , ResolvedLabelRow
   , ShaclReport
   , ShaclViolation
   , TypedFieldRow
   , TransactionOutputRow
   , query
+  , queryDecodedTree
   , queryResolvedLabels
   , queryTypedFields
   , queryTransactionOutputs
@@ -17,6 +19,20 @@ import Effect (Effect)
 import Foreign (Foreign)
 
 type Json = Foreign
+
+type DecodedTreeRow =
+  { id :: String
+  , parentId :: String
+  , depth :: Int
+  , order :: Int
+  , label :: String
+  , kind :: String
+  , value :: String
+  , summary :: String
+  , raw :: String
+  , resolvedLabel :: String
+  , resolvedType :: String
+  }
 
 type TransactionOutputRow =
   { transaction :: String
@@ -77,6 +93,12 @@ foreign import queryTypedFieldsImpl
   -> String
   -> Effect (Either String (Array TypedFieldRow))
 
+foreign import queryDecodedTreeImpl
+  :: (String -> Either String (Array DecodedTreeRow))
+  -> (Array DecodedTreeRow -> Either String (Array DecodedTreeRow))
+  -> String
+  -> Effect (Either String (Array DecodedTreeRow))
+
 foreign import validateImpl
   :: (String -> Either String ShaclReport)
   -> (ShaclReport -> Either String ShaclReport)
@@ -95,6 +117,9 @@ queryResolvedLabels = queryResolvedLabelsImpl Left Right
 
 queryTypedFields :: String -> Effect (Either String (Array TypedFieldRow))
 queryTypedFields = queryTypedFieldsImpl Left Right
+
+queryDecodedTree :: String -> Effect (Either String (Array DecodedTreeRow))
+queryDecodedTree = queryDecodedTreeImpl Left Right
 
 validate :: String -> String -> Effect (Either String ShaclReport)
 validate = validateImpl Left Right
