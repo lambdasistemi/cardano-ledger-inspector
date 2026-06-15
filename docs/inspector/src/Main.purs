@@ -131,6 +131,7 @@ type State =
   , sparqlLens :: Maybe SparqlLens
   , resolvedLabelsLens :: Maybe ResolvedLabelsLens
   , typedFieldsLens :: Maybe TypedFieldsLens
+  , decodedTreeLens :: Maybe DecodedTreeLens
   , shaclConformance :: Maybe ShaclConformance
   , overlayInput :: String
   , overlayParts :: Array OverlayPart
@@ -138,6 +139,7 @@ type State =
   , overlayError :: Maybe String
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
+  , decodedTreeExpanded :: Array String
   , running :: Boolean
   , copied :: Boolean
   , copiedPath :: Maybe String
@@ -165,6 +167,11 @@ type ResolvedLabelsLens =
 
 type TypedFieldsLens =
   { rows :: Array RdfShapes.TypedFieldRow
+  , error :: Maybe String
+  }
+
+type DecodedTreeLens =
+  { rows :: Array RdfShapes.DecodedTreeRow
   , error :: Maybe String
   }
 
@@ -205,6 +212,7 @@ data Action
   | Copy
   | CopyValue String String
   | BrowseJson String
+  | ToggleDecodedTree String
   | Navigate Route MouseEvent
   | ToggleTheme
 
@@ -236,6 +244,7 @@ inspectorComponent initial =
         , sparqlLens: Nothing
         , resolvedLabelsLens: Nothing
         , typedFieldsLens: Nothing
+        , decodedTreeLens: Nothing
         , shaclConformance: Nothing
         , overlayInput: ""
         , overlayParts: []
@@ -243,6 +252,7 @@ inspectorComponent initial =
         , overlayError: Nothing
         , browserNodes: []
         , expandedPaths: []
+        , decodedTreeExpanded: []
         , running: false
         , copied: false
         , copiedPath: Nothing
@@ -307,7 +317,7 @@ inspectorComponent initial =
           , HH.div
               [ classNames [ "workspace-right" ] ]
               [ renderResult state
-              , renderDecodedStructurePlaceholder state
+              , renderDecodedStructure state
               ]
           ]
       ]
@@ -393,7 +403,7 @@ inspectorComponent initial =
           ]
       ]
 
-  renderDecodedStructurePlaceholder state =
+  renderDecodedStructure state =
     HH.element (HH.ElemName "md-elevated-card")
       [ classNames [ "panel", "decoded-structure-panel" ]
       , mdSurface "decoded"
@@ -416,10 +426,95 @@ inspectorComponent initial =
                   ]
               ]
           ]
-      , HH.div
-          [ classNames [ "empty-state", "decoded-structure-placeholder" ] ]
-          [ HH.text "Tree renderer pending." ]
+      , case state.decodedTreeLens of
+          Just lens ->
+            renderDecodedTreeLens state lens
+          Nothing ->
+            HH.div
+              [ classNames [ "empty-state", "decoded-structure-placeholder" ] ]
+              [ HH.text "Tree renderer pending." ]
       ]
+
+  renderDecodedTreeLens state lens =
+    case lens.error of
+      Just err ->
+        HH.div
+          [ classNames [ "sparql-lens-error" ] ]
+          [ HH.text ("Decoded-tree query failed: " <> err) ]
+      Nothing ->
+        if Array.null lens.rows then
+          HH.div
+            [ classNames [ "empty-state" ] ]
+            [ HH.text "No decoded RDF tree rows." ]
+        else
+          HH.div
+            [ classNames [ "decoded-tree-row-list" ] ]
+            (renderDecodedTreeRows state "" lens.rows)
+
+  renderDecodedTreeRows state parentId rows =
+    rows
+      # Array.filter (\row -> row.parentId == parentId)
+      # Array.concatMap (renderDecodedTreeRow state rows)
+
+  renderDecodedTreeRow state rows row =
+    let
+      hasChildren = Array.any (\candidate -> candidate.parentId == row.id) rows
+      expanded = row.parentId == "" || row.depth >= 2 || Array.elem row.id state.decodedTreeExpanded
+      rowClasses =
+        if hasChildren && expanded then
+          [ "decoded-tree-row", "is-expanded", "decoded-tree-depth-" <> show row.depth ]
+        else
+          [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
+      summaryText =
+        if row.summary == "" then row.value else row.summary
+      metaText =
+        if row.resolvedLabel /= "" then row.resolvedLabel
+        else if row.resolvedType /= "" then row.resolvedType
+        else row.kind
+    in
+      [ HH.div
+          [ classNames rowClasses ]
+          [ HH.div
+              [ classNames [ "decoded-tree-main" ] ]
+              [ HH.div
+                  [ classNames [ "decoded-tree-keyline" ] ]
+                  [ if hasChildren then
+                      HH.element (HH.ElemName "md-outlined-button")
+                        [ HE.onClick (\_ -> ToggleDecodedTree row.id)
+                        , classNames [ "inline-action", "decoded-tree-toggle" ]
+                        , HH.attr (HH.AttrName "role") "button"
+                        , HH.attr
+                            (HH.AttrName "aria-label")
+                            (row.label <> if row.summary == "" then "" else " " <> row.summary)
+                        , mdControl "inline"
+                        ]
+                        [ HH.text (row.label <> if row.summary == "" then "" else " " <> row.summary) ]
+                    else
+                      HH.strong_ [ HH.text row.label ]
+                  , HH.span
+                      [ classNames [ "kind-badge" ] ]
+                      [ HH.text row.kind ]
+                  ]
+              , if summaryText == "" then
+                  HH.text ""
+                else
+                  HH.div
+                    [ classNames [ "decoded-tree-summary" ] ]
+                    [ HH.text summaryText ]
+              , if metaText == "" then
+                  HH.text ""
+                else
+                  HH.div
+                    [ classNames [ "decoded-tree-meta" ] ]
+                    [ HH.text metaText ]
+              ]
+          ]
+      ] <> if expanded && hasChildren then
+        [ HH.div
+            [ classNames [ "decoded-tree-children" ] ]
+            (renderDecodedTreeRows state row.id rows)
+        ]
+      else []
 
   renderProvider state =
     HH.element (HH.ElemName "md-elevated-card")
@@ -1712,6 +1807,22 @@ inspectorComponent initial =
           )
       )
 
+  decodedTreeLensFromGraph graphTurtle = do
+    lensResult <- liftEffect (RdfShapes.queryDecodedTree graphTurtle)
+    pure
+      ( Just
+          ( case lensResult of
+              Left err ->
+                { rows: []
+                , error: Just err
+                }
+              Right rows ->
+                { rows
+                , error: Nothing
+                }
+          )
+      )
+
   shaclConformanceFromGraph graphTurtle st =
     let
       shapeParts = selectedShaclParts st
@@ -1740,11 +1851,13 @@ inspectorComponent initial =
     resolvedLabelsLens <-
       resolvedLabelsLensFromGraph graphTurtle
     typedFieldsLens <- typedFieldsLensFromGraph rdf.turtle
+    decodedTreeLens <- decodedTreeLensFromGraph rdf.turtle
     shaclConformance <- shaclConformanceFromGraph graphTurtle st
     pure
       { sparqlLens
       , resolvedLabelsLens
       , typedFieldsLens
+      , decodedTreeLens
       , shaclConformance
       }
 
@@ -1939,6 +2052,7 @@ inspectorComponent initial =
                 , sparqlLens = lenses.sparqlLens
                 , resolvedLabelsLens = lenses.resolvedLabelsLens
                 , typedFieldsLens = lenses.typedFieldsLens
+                , decodedTreeLens = lenses.decodedTreeLens
                 , shaclConformance = lenses.shaclConformance
                 , fetchError = Nothing
                 }
@@ -1950,6 +2064,7 @@ inspectorComponent initial =
                 , sparqlLens = Nothing
                 , resolvedLabelsLens = Nothing
                 , typedFieldsLens = Nothing
+                , decodedTreeLens = Nothing
                 , shaclConformance = Nothing
                 , fetchError =
                     Just
@@ -1976,9 +2091,11 @@ inspectorComponent initial =
           , sparqlLens = Nothing
           , resolvedLabelsLens = Nothing
           , typedFieldsLens = Nothing
+          , decodedTreeLens = Nothing
           , shaclConformance = Nothing
           , browserNodes = []
           , expandedPaths = []
+          , decodedTreeExpanded = []
           , copied = false
           , copiedPath = Nothing
           , browserPath = "[]"
@@ -2055,6 +2172,7 @@ inspectorComponent initial =
                 { sparqlLens: Nothing
                 , resolvedLabelsLens: Nothing
                 , typedFieldsLens: Nothing
+                , decodedTreeLens: Nothing
                 , shaclConformance: Nothing
                 }
           H.modify_
@@ -2082,11 +2200,13 @@ inspectorComponent initial =
               , sparqlLens = lenses.sparqlLens
               , resolvedLabelsLens = lenses.resolvedLabelsLens
               , typedFieldsLens = lenses.typedFieldsLens
+              , decodedTreeLens = lenses.decodedTreeLens
               , shaclConformance = lenses.shaclConformance
               , browserNodes =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
                   else []
               , expandedPaths = []
+              , decodedTreeExpanded = []
               , browserPath = browser.currentPath
               }
     Copy -> do
@@ -2129,6 +2249,16 @@ inspectorComponent initial =
                     if operationResult.exitOk && browser.valid then Nothing
                     else Just (if operationResult.stderr == "" then "Haskell ledger operation browse failed." else operationResult.stderr)
                 }
+    ToggleDecodedTree rowId -> do
+      H.modify_
+        \st ->
+          st
+            { decodedTreeExpanded =
+                if Array.elem rowId st.decodedTreeExpanded then
+                  closePath rowId st.decodedTreeExpanded
+                else
+                  expandPath rowId st.decodedTreeExpanded
+            }
 
   toggleOverlayPartId partId selected ids =
     if selected then

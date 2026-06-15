@@ -10,12 +10,12 @@
 
 ## Slice 2 — SPARQL Decoded Structure Tree
 
-- [ ] T107 Add graph/SPARQL decoded-tree query rows and PureScript FFI types.
-- [ ] T108 Render an expandable decoded-structure tree from SPARQL rows over `tx.rdf`.
-- [ ] T109 Include transaction/body/input/output/mint/cert/withdrawal/fee/validity/signer/witness/redeemer/metadata sections when graph data is present.
-- [ ] T110 Keep optional label/type bindings for future book resolution while rendering raw opaque leaves for this child.
-- [ ] T111 Update Playwright coverage for fixture decode, decoded tree visibility, expand/collapse, and subpath safety.
-- [ ] T112 Run `./gate.sh`, record evidence, and commit the slice.
+- [X] T107 Add graph/SPARQL decoded-tree query rows and PureScript FFI types.
+- [X] T108 Render an expandable decoded-structure tree from SPARQL rows over `tx.rdf`.
+- [X] T109 Include transaction/body/input/output/mint/cert/withdrawal/fee/validity/signer/witness/redeemer/metadata sections when graph data is present.
+- [X] T110 Keep optional label/type bindings for future book resolution while rendering raw opaque leaves for this child.
+- [X] T111 Update Playwright coverage for fixture decode, decoded tree visibility, expand/collapse, and subpath safety.
+- [X] T112 Run `./gate.sh`, record evidence, and commit the slice.
 
 ## Finalization — Orchestrator Owned
 
