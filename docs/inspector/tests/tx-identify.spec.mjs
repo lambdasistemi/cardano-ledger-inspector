@@ -447,6 +447,136 @@ test("library page allocates unique local ids after deleting seed books", async 
   ]);
 });
 
+test("library page exchanges local books through URL, file, and store JSON", async ({
+  page,
+}) => {
+  await page.route("https://books.example.test/local-shapes.ttl", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/turtle",
+      body: violatingShaclShapes,
+    });
+  });
+
+  await page.goto("/library");
+
+  const library = page.locator(".library-page");
+  await library.getByLabel("Book URL").fill("https://books.example.test/local-shapes.ttl");
+  await library.getByRole("button", { name: "Import book from URL" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Pasted SHACL shapes" }),
+  ).toBeVisible();
+
+  await library.getByLabel("Book file").setInputFiles({
+    name: "local-book.ttl",
+    mimeType: "text/turtle",
+    buffer: Buffer.from(pastedTurtleBook),
+  });
+  await expect(
+    library.getByRole("heading", { name: "Pasted overlay Turtle" }),
+  ).toBeVisible();
+
+  const fileBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await fileBook
+    .getByLabel("Rename Pasted overlay Turtle")
+    .fill("Round-trip local treasury label");
+  await fileBook
+    .getByRole("button", { name: "Save name for Pasted overlay Turtle" })
+    .click();
+  await expect(
+    library.getByRole("heading", { name: "Round-trip local treasury label" }),
+  ).toBeVisible();
+
+  for (const name of [
+    "Amaru treasury 2026 overlay",
+    "SundaeSwap V3 blueprint",
+    "Cardano RDF SHACL shapes",
+    "Pasted SHACL shapes",
+  ]) {
+    await library
+      .locator(".library-book", { hasText: name })
+      .getByRole("checkbox", { name: `Select ${name}` })
+      .uncheck();
+  }
+
+  const [selectedDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    library.getByRole("button", { name: "Export selected books" }).click(),
+  ]);
+  const selectedPath = await selectedDownload.path();
+  expect(selectedPath).not.toBeNull();
+  const selectedJson = await readFile(selectedPath, "utf8");
+  const selectedStore = JSON.parse(selectedJson);
+  expect(selectedStore.kind).toBe(localBookStoreKey);
+  expect(selectedStore.books.map((book) => book.name)).toEqual([
+    "Round-trip local treasury label",
+  ]);
+  expect(selectedStore.books[0].selected).toBe(true);
+
+  const [allDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    library.getByRole("button", { name: "Export all books" }).click(),
+  ]);
+  const allPath = await allDownload.path();
+  expect(allPath).not.toBeNull();
+  const allStore = JSON.parse(await readFile(allPath, "utf8"));
+  expect(allStore.kind).toBe(localBookStoreKey);
+  expect(allStore.books.map((book) => book.name)).toEqual([
+    "Amaru treasury 2026 overlay",
+    "SundaeSwap V3 blueprint",
+    "Cardano RDF SHACL shapes",
+    "Pasted SHACL shapes",
+    "Round-trip local treasury label",
+  ]);
+
+  const browser = page.context().browser();
+  expect(browser).not.toBeNull();
+  const cleanContext = await browser.newContext();
+  try {
+    const cleanPage = await cleanContext.newPage();
+    await cleanPage.goto("/library");
+
+    const cleanLibrary = cleanPage.locator(".library-page");
+    await expect(
+      cleanLibrary.getByRole("heading", { name: "Amaru treasury 2026 overlay" }),
+    ).toBeVisible();
+
+    await cleanLibrary.getByLabel("Book store JSON file").setInputFiles({
+      name: "selected-books.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(selectedJson),
+    });
+
+    const importedBook = cleanLibrary.locator(".library-book", {
+      hasText: "Round-trip local treasury label",
+    });
+    await expect(importedBook).toBeVisible();
+    await expect(
+      importedBook.getByRole("checkbox", {
+        name: "Select Round-trip local treasury label",
+      }),
+    ).toBeChecked();
+
+    const cleanRawStore = await cleanPage.evaluate(
+      (key) => window.localStorage.getItem(key),
+      localBookStoreKey,
+    );
+    const cleanStore = JSON.parse(cleanRawStore);
+    const cleanIds = cleanStore.books.map((book) => book.id);
+    expect(cleanStore.kind).toBe(localBookStoreKey);
+    expect(cleanStore.books.map((book) => book.name)).toContain(
+      "Round-trip local treasury label",
+    );
+    expect(new Set(cleanIds).size).toBe(cleanIds.length);
+    expect(
+      cleanStore.books.find((book) => book.name === "Round-trip local treasury label")
+        ?.selected,
+    ).toBe(true);
+  } finally {
+    await cleanContext.close();
+  }
+});
+
 test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await page.goto("/inspect");
 

@@ -408,6 +408,18 @@ fieldset {
   gap: 0.65rem;
 }
 
+.library-exchange-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.library-url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
 .library-book-list {
   display: grid;
   gap: 12px;
@@ -460,6 +472,16 @@ fieldset {
 
 .library-name-field {
   min-width: min(100%, 360px);
+}
+
+.library-url-field,
+.library-file-field {
+  min-width: min(100%, 320px);
+}
+
+.library-file-field input[type="file"] {
+  min-height: 42px;
+  padding: 0.55rem 0;
 }
 
 .danger-action {

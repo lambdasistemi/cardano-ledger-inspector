@@ -23,11 +23,11 @@
 
 ## Slice 3 - Exchange Paths
 
-- [ ] T106-S3 Add file upload, URL import, export selected, export all, and
+- [X] T106-S3 Add file upload, URL import, export selected, export all, and
   import store JSON.
-- [ ] T106-S3 Add Playwright coverage for export/import round-trip into a
+- [X] T106-S3 Add Playwright coverage for export/import round-trip into a
   clean browser context.
-- [ ] T106-S3 Run `./gate.sh` and commit `feat(inspector): exchange local book stores`.
+- [X] T106-S3 Run `./gate.sh` and commit `feat(inspector): exchange local book stores`.
 
 ## Slice 4 - Inspect Wiring + Acceptance
 
