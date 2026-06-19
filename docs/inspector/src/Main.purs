@@ -18,7 +18,6 @@ import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
 import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
-import FFI.OverlayBook (OverlayPart)
 import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
@@ -55,22 +54,6 @@ networkKey = "network"
 
 persistKeysStorageKey :: String
 persistKeysStorageKey = "persist_api_keys"
-
-cardanoShaclShapes :: String
-cardanoShaclShapes =
-  "@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .\n"
-    <> "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
-    <> "\n"
-    <> "cardano:TransactionShape\n"
-    <> "  a sh:NodeShape ;\n"
-    <> "  sh:targetClass cardano:Transaction ;\n"
-    <> "  sh:property cardano:TransactionIdShape .\n"
-    <> "\n"
-    <> "cardano:TransactionIdShape\n"
-    <> "  sh:path cardano:hasTxId ;\n"
-    <> "  sh:minCount 1 ;\n"
-    <> "  sh:class cardano:Identifier ;\n"
-    <> "  sh:message \"Cardano transactions must reference a transaction id identifier.\" .\n"
 
 main :: Effect Unit
 main = HA.runHalogenAff do
@@ -144,10 +127,6 @@ type State =
   , libraryInput :: String
   , libraryUrl :: String
   , libraryError :: Maybe String
-  , overlayInput :: String
-  , overlayParts :: Array OverlayPart
-  , selectedOverlayPartIds :: Array String
-  , overlayError :: Maybe String
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , decodedTreeExpanded :: Array String
@@ -230,12 +209,6 @@ data Action
   | SetLibraryBookName String String
   | SaveLibraryBookName String
   | DeleteLibraryBook String
-  | SetOverlayInput String
-  | ImportOverlayBook
-  | LoadAmaruOverlayBook
-  | LoadSundaeSwapBlueprintBook
-  | LoadShaclShapesBook
-  | ToggleOverlayPart String Boolean
   | ApplySelectedBooks
   | Decode
   | Copy
@@ -280,10 +253,6 @@ inspectorComponent initial =
         , libraryInput: ""
         , libraryUrl: ""
         , libraryError: Nothing
-        , overlayInput: ""
-        , overlayParts: []
-        , selectedOverlayPartIds: []
-        , overlayError: Nothing
         , browserNodes: []
         , expandedPaths: []
         , decodedTreeExpanded: []
@@ -346,7 +315,7 @@ inspectorComponent initial =
               [ classNames [ "workspace-left" ] ]
               [ renderSettingsSummary state
               , renderModeTabs state
-              , renderBooksPlaceholder
+              , renderBooksPanel state
               ]
           , HH.div
               [ classNames [ "workspace-right" ] ]
@@ -628,7 +597,14 @@ inspectorComponent initial =
           [ HH.text "Settings" ]
       ]
 
-  renderBooksPlaceholder =
+  renderBooksPanel state =
+    let
+      selected = selectedBooks state
+      parts = selectedBookParts state
+      overlayCount = Array.length (selectedOverlayParts state)
+      blueprintCount = Array.length (selectedBlueprintParts state)
+      shaclCount = Array.length (selectedShaclParts state)
+    in
     HH.element (HH.ElemName "md-elevated-card")
       [ classNames [ "panel", "books-panel" ]
       , mdSurface "books"
@@ -637,34 +613,56 @@ inspectorComponent initial =
           [ classNames [ "panel-heading" ] ]
           [ HH.div_
               [ HH.h2_ [ HH.text "Books" ]
-              , HH.p_ [ HH.text "Overlay and protocol books will attach decoded labels in a later slice." ]
+              , HH.p_ [ HH.text "Selected library books resolve labels, blueprints, and SHACL checks." ]
               ]
           ]
-      , HH.element (HH.ElemName "md-outlined-text-field")
-          [ classNames [ "book-filter" ]
-          , HH.attr (HH.AttrName "label") "Book filter"
-          , HH.attr (HH.AttrName "disabled") "disabled"
-          , HH.attr (HH.AttrName "value") "Book resolution pending"
+      , HH.div
+          [ classNames [ "tech-pills" ] ]
+          [ HH.span_ [ HH.text (show (Array.length selected) <> " selected") ]
+          , HH.span_ [ HH.text (show (Array.length parts) <> " parts") ]
+          , HH.span_ [ HH.text (show overlayCount <> " overlays") ]
+          , HH.span_ [ HH.text (show blueprintCount <> " blueprints") ]
+          , HH.span_ [ HH.text (show shaclCount <> " SHACL") ]
           ]
-          []
-      , HH.element (HH.ElemName "md-list")
+      , HH.div
+          [ classNames [ "books-actions" ] ]
+          [ HH.a
+              [ classNames [ "header-link" ]
+              , HP.href (state.routeBase <> Routing.routePath RouteLibrary)
+              , HE.onClick (Navigate RouteLibrary)
+              ]
+              [ HH.text "Library" ]
+          , HH.element (HH.ElemName "md-filled-button")
+              [ classNames [ "primary-action" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , mdControl "primary"
+              , HP.disabled state.running
+              , HE.onClick (\_ -> ApplySelectedBooks)
+              ]
+              [ HH.text "Apply selected books" ]
+          ]
+      , HH.div
           [ classNames [ "books-list" ] ]
-          [ HH.element (HH.ElemName "md-list-item") []
+          ( if Array.null selected then
               [ HH.div
-                  [ HH.attr (HH.AttrName "slot") "headline" ]
-                  [ HH.text "Protocol overlays" ]
-              , HH.div
-                  [ HH.attr (HH.AttrName "slot") "supporting-text" ]
-                  [ HH.text "Import and resolution remain in the decoded result stack for now." ]
+                  [ classNames [ "empty-state" ] ]
+                  [ HH.text "No selected books. Select books in Library." ]
               ]
-          , HH.element (HH.ElemName "md-list-item") []
-              [ HH.div
-                  [ HH.attr (HH.AttrName "slot") "headline" ]
-                  [ HH.text "Local book store" ]
-              , HH.div
-                  [ HH.attr (HH.AttrName "slot") "supporting-text" ]
-                  [ HH.text "Reserved for a later issue." ]
-              ]
+            else
+              map renderSelectedBook selected
+          )
+      ]
+
+  renderSelectedBook book =
+    HH.div
+      [ classNames [ "book-summary-row" ] ]
+      [ HH.strong_ [ HH.text book.name ]
+      , HH.span_
+          [ HH.text
+              ( libraryBookSummary book
+                  <> " - "
+                  <> book.source
+              )
           ]
       ]
 
@@ -1255,6 +1253,9 @@ inspectorComponent initial =
       ]
 
   renderOverlayBooks state =
+    let
+      parts = selectedBookParts state
+    in
     HH.div
       [ classNames [ "overlay-book-panel" ]
       , mdSurface "decoded"
@@ -1262,74 +1263,23 @@ inspectorComponent initial =
       [ HH.div
           [ classNames [ "identity-heading" ] ]
           [ HH.div_
-              [ HH.h3_ [ HH.text "Overlay books" ]
-              , HH.p_ [ HH.text "Import optional RDF overlay or blueprint parts." ]
+              [ HH.h3_ [ HH.text "Selected books" ]
+              , HH.p_ [ HH.text "Selections are managed in Library and applied to RDF resolution." ]
               ]
+          , HH.element (HH.ElemName "md-filled-button")
+              [ classNames [ "primary-action" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , mdControl "primary"
+              , HP.disabled state.running
+              , HE.onClick (\_ -> ApplySelectedBooks)
+              ]
+              [ HH.text "Apply selected books" ]
           ]
-      , HH.div
-          [ classNames [ "overlay-import-grid" ] ]
-          [ HH.label
-              [ classNames [ "field-stack" ] ]
-              [ HH.span
-                  [ classNames [ "field-label" ] ]
-                  [ HH.text "Overlay Turtle or Amaru journal JSON" ]
-              , HH.textarea
-                  [ HP.value state.overlayInput
-                  , HP.rows 8
-                  , HH.attr (HH.AttrName "aria-label") "Overlay Turtle or Amaru journal JSON"
-                  , HE.onValueInput SetOverlayInput
-                  ]
-              ]
-          , HH.div
-              [ classNames [ "overlay-actions" ] ]
-              [ HH.element (HH.ElemName "md-outlined-button")
-                  [ classNames [ "secondary-action" ]
-                  , HH.attr (HH.AttrName "role") "button"
-                  , mdControl "secondary"
-                  , HE.onClick (\_ -> LoadAmaruOverlayBook)
-                  ]
-                  [ HH.text "Load Amaru overlay book" ]
-              , HH.element (HH.ElemName "md-outlined-button")
-                  [ classNames [ "secondary-action" ]
-                  , HH.attr (HH.AttrName "role") "button"
-                  , mdControl "secondary"
-                  , HE.onClick (\_ -> LoadSundaeSwapBlueprintBook)
-                  ]
-                  [ HH.text "Load SundaeSwap V3 blueprint" ]
-              , HH.element (HH.ElemName "md-outlined-button")
-                  [ classNames [ "secondary-action" ]
-                  , HH.attr (HH.AttrName "role") "button"
-                  , mdControl "secondary"
-                  , HE.onClick (\_ -> LoadShaclShapesBook)
-                  ]
-                  [ HH.text "Load Cardano RDF SHACL shapes" ]
-              , HH.element (HH.ElemName "md-filled-button")
-                  [ classNames [ "primary-action" ]
-                  , HH.attr (HH.AttrName "role") "button"
-                  , mdControl "primary"
-                  , HE.onClick (\_ -> ImportOverlayBook)
-                  ]
-                  [ HH.text "Import overlay book" ]
-              , HH.element (HH.ElemName "md-filled-button")
-                  [ classNames [ "primary-action" ]
-                  , HH.attr (HH.AttrName "role") "button"
-                  , mdControl "primary"
-                  , HE.onClick (\_ -> ApplySelectedBooks)
-                  ]
-                  [ HH.text "Apply selected books" ]
-              ]
-          ]
-      , case state.overlayError of
-          Just err ->
-            HH.div
-              [ classNames [ "sparql-lens-error" ] ]
-              [ HH.text ("Overlay import failed: " <> err) ]
-          Nothing -> HH.text ""
       , HH.div
           [ classNames [ "overlay-selection-grid" ] ]
           [ HH.div
               [ classNames [ "overlay-part-list" ] ]
-              (renderOverlayPartList state)
+              (renderSelectedBookParts parts)
           , HH.label
               [ classNames [ "field-stack" ] ]
               [ HH.span
@@ -1345,30 +1295,21 @@ inspectorComponent initial =
           ]
       ]
 
-  renderOverlayPartList state =
-    if Array.null state.overlayParts then
+  renderSelectedBookParts parts =
+    if Array.null parts then
       [ HH.div
           [ classNames [ "witness-empty" ] ]
-          [ HH.text "No overlay parts imported." ]
+          [ HH.text "No selected book parts." ]
       ]
     else
-      map (renderOverlayPart state) state.overlayParts
+      map renderSelectedBookPart parts
 
-  renderOverlayPart state part =
-    let
-      selected = Array.elem part.id state.selectedOverlayPartIds
-    in
-      HH.label
-        [ choiceClass selected ]
-        [ HH.input
-            [ HP.type_ HP.InputCheckbox
-            , HP.checked selected
-            , HE.onChecked (ToggleOverlayPart part.id)
-            ]
-        , HH.span
-            [ classNames [ "choice-title" ] ]
-            [ HH.text part.label ]
-        ]
+  renderSelectedBookPart part =
+    HH.div
+      [ classNames [ "book-part-row" ] ]
+      [ HH.strong_ [ HH.text part.label ]
+      , HH.span_ [ HH.text part.kind ]
+      ]
 
   selectedOverlayTurtle state =
     String.joinWith "\n" (map _.turtle (selectedOverlayParts state))
@@ -1376,20 +1317,26 @@ inspectorComponent initial =
   mergedRdfTurtle transactionGraphTurtle overlayTurtle =
     transactionGraphTurtle <> overlayTurtle
 
+  selectedBooks state =
+    BookStore.selectedBooks { kind: BookStore.envelopeKind, books: state.books }
+
+  selectedBookParts state =
+    Array.concatMap _.parts (selectedBooks state)
+
   selectedOverlayParts state =
     Array.filter
-      (\part -> part.kind == "overlay" && Array.elem part.id state.selectedOverlayPartIds)
-      state.overlayParts
+      (\part -> part.kind == "overlay")
+      (selectedBookParts state)
 
   selectedBlueprintParts state =
     Array.filter
-      (\part -> part.kind == "blueprint" && Array.elem part.id state.selectedOverlayPartIds)
-      state.overlayParts
+      (\part -> part.kind == "blueprint")
+      (selectedBookParts state)
 
   selectedShaclParts state =
     Array.filter
-      (\part -> part.kind == "shacl" && Array.elem part.id state.selectedOverlayPartIds)
-      state.overlayParts
+      (\part -> part.kind == "shacl")
+      (selectedBookParts state)
 
   selectedShaclTurtle state =
     String.joinWith "\n" (map _.turtle (selectedShaclParts state))
@@ -2305,114 +2252,6 @@ inspectorComponent initial =
               edits = Array.filter (\edit -> edit.id /= bookId) st.bookNameEdits
             liftEffect (saveBooks books)
             H.modify_ _ { books = books, bookNameEdits = edits }
-    SetOverlayInput s -> H.modify_ _ { overlayInput = s, overlayError = Nothing }
-    ImportOverlayBook -> do
-      input <- H.gets _.overlayInput
-      parsed <- liftEffect (OverlayBook.parse input)
-      case parsed of
-        Left err ->
-          H.modify_ _ { overlayError = Just err }
-        Right book -> do
-          st <- H.get
-          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
-          resolvedLabelsLens <- resolvedLabelsLensForState nextState
-          decodedTreeLens <- decodedTreeLensForState nextState
-          shaclConformance <- shaclConformanceForState nextState
-          H.modify_
-            _
-              { overlayParts = book.parts
-              , selectedOverlayPartIds = []
-              , overlayError = Nothing
-              , resolvedLabelsLens = resolvedLabelsLens
-              , decodedTreeLens = decodedTreeLens
-              , shaclConformance = shaclConformance
-              }
-    LoadAmaruOverlayBook -> do
-      let input = OverlayBook.bundledAmaruJournal
-      parsed <- liftEffect (OverlayBook.parse input)
-      case parsed of
-        Left err ->
-          H.modify_ _ { overlayInput = input, overlayError = Just err }
-        Right book -> do
-          st <- H.get
-          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
-          resolvedLabelsLens <- resolvedLabelsLensForState nextState
-          decodedTreeLens <- decodedTreeLensForState nextState
-          shaclConformance <- shaclConformanceForState nextState
-          H.modify_
-            _
-              { overlayInput = input
-              , overlayParts = book.parts
-              , selectedOverlayPartIds = []
-              , overlayError = Nothing
-              , resolvedLabelsLens = resolvedLabelsLens
-              , decodedTreeLens = decodedTreeLens
-              , shaclConformance = shaclConformance
-              }
-    LoadSundaeSwapBlueprintBook -> do
-      let input = OverlayBook.bundledSundaeSwapBlueprint
-      parsed <- liftEffect (OverlayBook.parse input)
-      case parsed of
-        Left err ->
-          H.modify_ _ { overlayInput = input, overlayError = Just err }
-        Right book -> do
-          st <- H.get
-          let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
-          resolvedLabelsLens <- resolvedLabelsLensForState nextState
-          decodedTreeLens <- decodedTreeLensForState nextState
-          shaclConformance <- shaclConformanceForState nextState
-          H.modify_
-            _
-              { overlayInput = input
-              , overlayParts = book.parts
-              , selectedOverlayPartIds = []
-              , overlayError = Nothing
-              , resolvedLabelsLens = resolvedLabelsLens
-              , decodedTreeLens = decodedTreeLens
-              , shaclConformance = shaclConformance
-              }
-    LoadShaclShapesBook -> do
-      st <- H.get
-      let
-        input = cardanoShaclShapes
-        parts =
-          [ { id: "cardano-rdf-shacl-shapes"
-            , label: "Cardano transaction SHACL shapes"
-            , kind: "shacl"
-            , turtle: input
-            , plutusJson: ""
-            }
-          ]
-        nextState = st { overlayParts = parts, selectedOverlayPartIds = [] }
-      resolvedLabelsLens <- resolvedLabelsLensForState nextState
-      decodedTreeLens <- decodedTreeLensForState nextState
-      shaclConformance <- shaclConformanceForState nextState
-      H.modify_
-        _
-          { overlayInput = input
-          , overlayParts = parts
-          , selectedOverlayPartIds = []
-          , overlayError = Nothing
-          , resolvedLabelsLens = resolvedLabelsLens
-          , decodedTreeLens = decodedTreeLens
-          , shaclConformance = shaclConformance
-          }
-    ToggleOverlayPart partId selected -> do
-      st <- H.get
-      let
-        selectedOverlayPartIds =
-          toggleOverlayPartId partId selected st.selectedOverlayPartIds
-        nextState = st { selectedOverlayPartIds = selectedOverlayPartIds }
-      resolvedLabelsLens <- resolvedLabelsLensForState nextState
-      decodedTreeLens <- decodedTreeLensForState nextState
-      shaclConformance <- shaclConformanceForState nextState
-      H.modify_
-        _
-          { selectedOverlayPartIds = selectedOverlayPartIds
-          , resolvedLabelsLens = resolvedLabelsLens
-          , decodedTreeLens = decodedTreeLens
-          , shaclConformance = shaclConformance
-          }
     ApplySelectedBooks -> do
       st <- H.get
       case st.txCbor of
@@ -2425,10 +2264,9 @@ inspectorComponent initial =
               { resolvedLabelsLens = resolvedLabelsLens
               , decodedTreeLens = decodedTreeLens
               , shaclConformance = shaclConformance
-              , overlayError = Nothing
               }
         Just txCbor -> do
-          H.modify_ _ { running = true, fetchError = Nothing, overlayError = Nothing }
+          H.modify_ _ { running = true, fetchError = Nothing }
           let rdfArgs = Json.operationArgsMerged st.operationArgs (selectedBlueprintArgs st)
           rdfResult <- H.liftAff (runLedgerOperation txCbor "tx.rdf" rdfArgs)
           let rdf = Json.operationRdfGraph rdfResult.stdout
@@ -2762,10 +2600,3 @@ inspectorComponent initial =
       partCount = Array.length book.parts
     in
       show partCount <> if partCount == 1 then " part" else " parts"
-
-  toggleOverlayPartId partId selected ids =
-    if selected then
-      if Array.elem partId ids then ids
-      else Array.snoc ids partId
-    else
-      Array.filter (_ /= partId) ids

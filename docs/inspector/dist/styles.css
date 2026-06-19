@@ -371,18 +371,48 @@ fieldset {
   margin-bottom: 0;
 }
 
-.book-filter {
-  width: 100%;
-  --md-outlined-text-field-container-shape: 8px;
-  --md-outlined-text-field-label-text-font: "Roboto Flex";
-  --md-outlined-text-field-input-text-font: "Roboto Mono";
+.books-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .books-list {
+  display: grid;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--md-sys-color-surface-container-low);
   overflow: hidden;
+}
+
+.book-summary-row,
+.book-part-row {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0.72rem 0.82rem;
+}
+
+.book-summary-row:last-child,
+.book-part-row:last-child {
+  border-bottom: 0;
+}
+
+.book-summary-row strong,
+.book-part-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+}
+
+.book-summary-row span,
+.book-part-row span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 .library-layout {
@@ -1431,6 +1461,10 @@ pre {
   }
 
   .library-row-actions {
+    display: grid;
+  }
+
+  .books-actions {
     display: grid;
   }
 
