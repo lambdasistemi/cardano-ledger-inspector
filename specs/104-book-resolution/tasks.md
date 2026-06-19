@@ -11,4 +11,4 @@
 
 ## Final Verification
 
-- [ ] T1043 Run local gate, push the branch, verify CI, smoke the preview subpath, and leave the PR draft for epic-owner review.
+- [X] T1043 Run local gate, push the branch, verify CI, smoke the preview subpath, and leave the PR draft for epic-owner review.
