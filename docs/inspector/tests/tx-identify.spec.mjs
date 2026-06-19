@@ -34,6 +34,7 @@ const packagedSiteDir = path.resolve(
   process.env.TX_INSPECTOR_SITE_DIR || "result",
 );
 const previewPrefix = "/lambdasistemi/cardano-ledger-inspector/pr-99/";
+const localBookStoreKey = "cardano-ledger-inspector.books.v1";
 const violatingShaclShapes = `
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
@@ -281,6 +282,50 @@ async function installClipboardMock(page) {
     });
   });
 }
+
+test("local book store seeds parsed bundled books into localStorage", async ({
+  page,
+}) => {
+  await page.goto("/library");
+
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  expect(rawStore).not.toBeNull();
+
+  const store = JSON.parse(rawStore);
+  expect(store.kind).toBe(localBookStoreKey);
+  expect(store.books).toHaveLength(3);
+  expect(store.books.map((book) => book.name)).toEqual([
+    "Amaru treasury 2026 overlay",
+    "SundaeSwap V3 blueprint",
+    "Cardano RDF SHACL shapes",
+  ]);
+
+  for (const book of store.books) {
+    expect(book.id).toMatch(/^seed:/);
+    expect(book.raw).not.toHaveLength(0);
+    expect(book.source).not.toHaveLength(0);
+    expect(book.seed).toBe(true);
+    expect(book.selected).toBe(true);
+    expect(book.parts.length).toBeGreaterThan(0);
+  }
+
+  expect(store.books[0].parts.length).toBeGreaterThan(1);
+  expect(store.books[0].turtle).toContain("overlay:Treasury");
+  expect(store.books[1].parts[0]).toMatchObject({
+    id: "sundaeswap-v3",
+    kind: "blueprint",
+    label: "SundaeSwap V3 blueprint",
+  });
+  expect(store.books[2].parts[0]).toMatchObject({
+    id: "cardano-rdf-shacl-shapes",
+    kind: "shacl",
+    label: "Cardano transaction SHACL shapes",
+  });
+  expect(store.books[2].turtle).toContain("sh:NodeShape");
+});
 
 test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await page.goto("/inspect");
