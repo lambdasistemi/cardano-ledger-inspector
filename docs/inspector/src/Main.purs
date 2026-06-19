@@ -142,6 +142,7 @@ type State =
   , books :: Array BookStore.Book
   , bookNameEdits :: Array BookNameEdit
   , libraryInput :: String
+  , libraryUrl :: String
   , libraryError :: Maybe String
   , overlayInput :: String
   , overlayParts :: Array OverlayPart
@@ -218,7 +219,13 @@ data Action
   | SetTxHash String
   | SetTxHex String
   | SetLibraryInput String
+  | SetLibraryUrl String
   | AddLibraryBook
+  | ImportLibraryBookFile
+  | ImportLibraryBookFromUrl
+  | ExportSelectedLibraryBooks
+  | ExportAllLibraryBooks
+  | ImportLibraryStoreFile
   | ToggleLibraryBook String Boolean
   | SetLibraryBookName String String
   | SaveLibraryBookName String
@@ -271,6 +278,7 @@ inspectorComponent initial =
         , books: initial.books
         , bookNameEdits: bookNameEditsFromBooks initial.books
         , libraryInput: ""
+        , libraryUrl: ""
         , libraryError: Nothing
         , overlayInput: ""
         , overlayParts: []
@@ -404,7 +412,7 @@ inspectorComponent initial =
           [ classNames [ "panel-heading" ] ]
           [ HH.div_
               [ HH.h2_ [ HH.text "Add book" ]
-              , HH.p_ [ HH.text "Paste Turtle overlay content to add a selected local book." ]
+              , HH.p_ [ HH.text "Import overlay, blueprint, SHACL, or store JSON into this browser." ]
               ]
           ]
       , HH.label
@@ -419,12 +427,6 @@ inspectorComponent initial =
               , HE.onValueInput SetLibraryInput
               ]
           ]
-      , case state.libraryError of
-          Just err ->
-            HH.div
-              [ classNames [ "sparql-lens-error" ] ]
-              [ HH.text ("Book import failed: " <> err) ]
-          Nothing -> HH.text ""
       , HH.div
           [ classNames [ "library-actions" ] ]
           [ HH.element (HH.ElemName "md-filled-button")
@@ -435,7 +437,88 @@ inspectorComponent initial =
               , HE.onClick (\_ -> AddLibraryBook)
               ]
               [ HH.text "Add book" ]
+          , HH.element (HH.ElemName "md-outlined-button")
+              [ classNames [ "secondary-action" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , mdControl "secondary"
+              , HP.disabled
+                  ( Array.null
+                      ( BookStore.selectedBooks
+                          { kind: BookStore.envelopeKind, books: state.books }
+                      )
+                  )
+              , HE.onClick (\_ -> ExportSelectedLibraryBooks)
+              ]
+              [ HH.text "Export selected books" ]
+          , HH.element (HH.ElemName "md-outlined-button")
+              [ classNames [ "secondary-action" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , mdControl "secondary"
+              , HP.disabled (Array.null state.books)
+              , HE.onClick (\_ -> ExportAllLibraryBooks)
+              ]
+              [ HH.text "Export all books" ]
           ]
+      , HH.div
+          [ classNames [ "library-exchange-grid" ] ]
+          [ HH.div
+              [ classNames [ "library-url-row" ] ]
+              [ HH.label
+                  [ classNames [ "field-stack", "library-url-field" ] ]
+                  [ HH.span
+                      [ classNames [ "field-label" ] ]
+                      [ HH.text "Book URL" ]
+                  , HH.input
+                      [ HP.type_ HP.InputText
+                      , HP.value state.libraryUrl
+                      , HH.attr (HH.AttrName "aria-label") "Book URL"
+                      , HE.onValueInput SetLibraryUrl
+                      ]
+                  ]
+              , HH.element (HH.ElemName "md-outlined-button")
+                  [ classNames [ "secondary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
+                  , mdControl "secondary"
+                  , HP.disabled (String.trim state.libraryUrl == "")
+                  , HE.onClick (\_ -> ImportLibraryBookFromUrl)
+                  ]
+                  [ HH.text "Import book from URL" ]
+              ]
+          , HH.label
+              [ classNames [ "field-stack", "library-file-field" ] ]
+              [ HH.span
+                  [ classNames [ "field-label" ] ]
+                  [ HH.text "Book file" ]
+              , HH.input
+                  [ HH.attr (HH.AttrName "id") "library-book-file"
+                  , HH.attr (HH.AttrName "type") "file"
+                  , HH.attr (HH.AttrName "aria-label") "Book file"
+                  , HH.attr
+                      (HH.AttrName "accept")
+                      ".ttl,.json,.txt,application/json,text/turtle,text/plain"
+                  , HE.onChange (\_ -> ImportLibraryBookFile)
+                  ]
+              ]
+          , HH.label
+              [ classNames [ "field-stack", "library-file-field" ] ]
+              [ HH.span
+                  [ classNames [ "field-label" ] ]
+                  [ HH.text "Book store JSON file" ]
+              , HH.input
+                  [ HH.attr (HH.AttrName "id") "library-store-file"
+                  , HH.attr (HH.AttrName "type") "file"
+                  , HH.attr (HH.AttrName "aria-label") "Book store JSON file"
+                  , HH.attr (HH.AttrName "accept") ".json,application/json"
+                  , HE.onChange (\_ -> ImportLibraryStoreFile)
+                  ]
+              ]
+          ]
+      , case state.libraryError of
+          Just err ->
+            HH.div
+              [ classNames [ "sparql-lens-error" ] ]
+              [ HH.text ("Book import failed: " <> err) ]
+          Nothing -> HH.text ""
       ]
 
   renderLibraryBooks state =
@@ -2121,34 +2204,74 @@ inspectorComponent initial =
     SetTxHash s -> H.modify_ _ { txHash = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
     SetTxHex s -> H.modify_ _ { txHex = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
     SetLibraryInput s -> H.modify_ _ { libraryInput = s, libraryError = Nothing }
+    SetLibraryUrl s -> H.modify_ _ { libraryUrl = s, libraryError = Nothing }
     AddLibraryBook -> do
       st <- H.get
-      let input = String.trim st.libraryInput
-      parsed <- liftEffect (OverlayBook.parse input)
-      case parsed of
+      importLibraryBookText st.libraryInput
+    ImportLibraryBookFile -> do
+      fileText <- H.liftAff (attempt (Storage.readFileInputText "library-book-file"))
+      case fileText of
         Left err ->
-          H.modify_ _ { libraryError = Just err }
-        Right book -> do
-          let
-            newBook =
-              { id: nextLocalBookId st.books
-              , name: book.title
-              , source: book.source
-              , raw: input
-              , parts: book.parts
-              , turtle: book.turtle
-              , selected: true
-              , seed: false
-              }
-            books = Array.snoc st.books newBook
-          liftEffect (saveBooks books)
-          H.modify_
-            _
-              { books = books
-              , bookNameEdits = Array.snoc st.bookNameEdits { id: newBook.id, name: newBook.name }
-              , libraryInput = ""
-              , libraryError = Nothing
-              }
+          H.modify_ _ { libraryError = Just ("File import failed: " <> message err) }
+        Right input ->
+          importLibraryBookText input
+    ImportLibraryBookFromUrl -> do
+      st <- H.get
+      let url = String.trim st.libraryUrl
+      if url == "" then
+        H.modify_ _ { libraryError = Just "Book URL is empty." }
+      else do
+        fetched <- H.liftAff (attempt (Storage.fetchText url))
+        case fetched of
+          Left err ->
+            H.modify_ _ { libraryError = Just ("URL import failed: " <> message err) }
+          Right input ->
+            importLibraryBookText input
+    ExportSelectedLibraryBooks -> do
+      st <- H.get
+      let
+        store =
+          { kind: BookStore.envelopeKind
+          , books:
+              BookStore.selectedBooks
+                { kind: BookStore.envelopeKind, books: st.books }
+          }
+      liftEffect
+        ( Storage.downloadJson
+            "cardano-ledger-inspector-selected-books.json"
+            (BookStore.serialize store)
+        )
+      H.modify_ _ { libraryError = Nothing }
+    ExportAllLibraryBooks -> do
+      st <- H.get
+      let store = { kind: BookStore.envelopeKind, books: st.books }
+      liftEffect
+        ( Storage.downloadJson
+            "cardano-ledger-inspector-books.json"
+            (BookStore.serialize store)
+        )
+      H.modify_ _ { libraryError = Nothing }
+    ImportLibraryStoreFile -> do
+      fileText <- H.liftAff (attempt (Storage.readFileInputText "library-store-file"))
+      case fileText of
+        Left err ->
+          H.modify_ _ { libraryError = Just ("Store import failed: " <> message err) }
+        Right input ->
+          case BookStore.parseStore input of
+            Left err ->
+              H.modify_ _ { libraryError = Just ("Store import failed: " <> err) }
+            Right imported -> do
+              st <- H.get
+              let
+                books = mergeImportedBooks st.books imported.books
+                edits = bookNameEditsFromBooks books
+              liftEffect (saveBooks books)
+              H.modify_
+                _
+                  { books = books
+                  , bookNameEdits = edits
+                  , libraryError = Nothing
+                  }
     ToggleLibraryBook bookId selected -> do
       st <- H.get
       let books = updateBook bookId (_ { selected = selected }) st.books
@@ -2526,6 +2649,43 @@ inspectorComponent initial =
                   expandPath rowId st.decodedTreeExpanded
             }
 
+  importLibraryBookText raw = do
+    let input = String.trim raw
+    if input == "" then
+      H.modify_ _ { libraryError = Just "Book input is empty." }
+    else do
+      parsed <- liftEffect (OverlayBook.parse input)
+      case parsed of
+        Left err ->
+          H.modify_ _ { libraryError = Just err }
+        Right book ->
+          appendLibraryBook input book
+
+  appendLibraryBook input book = do
+    st <- H.get
+    let
+      newBook =
+        { id: nextLocalBookId st.books
+        , name: book.title
+        , source: book.source
+        , raw: input
+        , parts: book.parts
+        , turtle: book.turtle
+        , selected: true
+        , seed: false
+        }
+      books = Array.snoc st.books newBook
+      edits = bookNameEditsFromBooks books
+    liftEffect (saveBooks books)
+    H.modify_
+      _
+        { books = books
+        , bookNameEdits = edits
+        , libraryInput = ""
+        , libraryUrl = ""
+        , libraryError = Nothing
+        }
+
   saveBooks books =
     BookStore.save { kind: BookStore.envelopeKind, books }
 
@@ -2533,13 +2693,40 @@ inspectorComponent initial =
     "local:" <> show (Array.foldl max 0 (Array.mapMaybe localBookNumber books) + 1)
 
   localBookNumber book =
+    localIdNumber book.id
+
+  localIdNumber value =
     let
       prefix = "local:"
     in
-      if StringCodeUnits.take (StringCodeUnits.length prefix) book.id == prefix then
-        Int.fromString (StringCodeUnits.drop (StringCodeUnits.length prefix) book.id)
+      if StringCodeUnits.take (StringCodeUnits.length prefix) value == prefix then
+        Int.fromString (StringCodeUnits.drop (StringCodeUnits.length prefix) value)
       else
         Nothing
+
+  mergeImportedBooks existing imported =
+    let
+      merged =
+        Array.foldl
+          ( \acc book ->
+              let
+                nextBook =
+                  if Array.elem book.id acc.ids then
+                    book { id = nextAvailableLocalId acc.ids }
+                  else
+                    book
+              in
+                { ids: Array.snoc acc.ids nextBook.id
+                , books: Array.snoc acc.books nextBook
+                }
+          )
+          { ids: map _.id existing, books: existing }
+          imported
+    in
+      merged.books
+
+  nextAvailableLocalId ids =
+    "local:" <> show (Array.foldl max 0 (Array.mapMaybe localIdNumber ids) + 1)
 
   updateBook bookId update books =
     map

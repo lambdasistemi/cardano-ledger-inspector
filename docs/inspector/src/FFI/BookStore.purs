@@ -5,6 +5,7 @@ module FFI.BookStore
   , envelopeKind
   , inspect
   , load
+  , parseStore
   , save
   , selectedBooks
   , serialize
