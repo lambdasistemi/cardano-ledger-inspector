@@ -794,6 +794,75 @@ test("selects Amaru overlay book parts into deterministic Turtle", async ({
   ).toBeVisible();
 });
 
+test("resolves decoded-tree address rows from selected Turtle overlay books", async ({
+  page,
+}) => {
+  await decodeFixture(page, conwayMainnetFixturePath);
+
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+
+  const addressRow = decodedPanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Address" })
+    .first();
+  await expect(addressRow).toBeVisible();
+
+  const rawAddress = await addressRow.locator(".decoded-tree-summary").innerText();
+  expect(rawAddress).toMatch(/^[0-9a-f]{32}$/);
+
+  const turtleText = await page.locator(".rdf-panel .rdf-turtle").innerText();
+  const address = await page.evaluate((graph) => {
+    const result = globalThis.rdfShapes.query(
+      graph,
+      `
+        PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+        SELECT ?bech32 WHERE {
+          ?transaction a cardano:Transaction ;
+            cardano:hasOutput ?output .
+          ?output cardano:hasIndex 0 ;
+            cardano:atAddress ?address .
+          ?address cardano:bech32 ?bech32 .
+        }
+        LIMIT 1
+      `,
+    );
+    return result.json.results.bindings[0].bech32.value;
+  }, turtleText);
+  expect(address).toMatch(/^addr1/);
+
+  const resolvedLabel = "Fixture decoded treasury address";
+  await expect(decodedPanel.getByText(resolvedLabel, { exact: true })).toHaveCount(0);
+  await expect(addressRow).toContainText(rawAddress);
+
+  const overlayTurtle = `
+@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix fixture: <https://example.test/cardano-ledger-inspector/fixture#> .
+
+fixture:decodedTreasuryAddress
+  rdfs:label "${resolvedLabel}" ;
+  cardano:bech32 "${address}" .
+`;
+
+  const overlayPanel = page.locator(".overlay-book-panel");
+  await overlayPanel.getByLabel(/Overlay Turtle.*JSON/).fill(overlayTurtle);
+  await overlayPanel.getByRole("button", { name: /Import .*book/ }).click();
+  await overlayPanel.getByLabel("Pasted Turtle").check();
+  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+
+  const resolvedAddressRow = decodedPanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Address" })
+    .filter({ hasText: resolvedLabel })
+    .first();
+  await expect(resolvedAddressRow).toContainText(resolvedLabel);
+  const resolvedRawAddress = await resolvedAddressRow
+    .locator(".decoded-tree-summary")
+    .innerText();
+  expect(resolvedRawAddress).toMatch(/^[0-9a-f]{32}$/);
+});
+
 test("imports a SundaeSwap blueprint book and applies typed RDF fields", async ({
   page,
 }) => {
