@@ -6,8 +6,8 @@
 
 ## Slice 1 - Generic Decoded-Tree Resolution
 
-- [ ] T1041 Add a Playwright RED test that loads a representative book and expects a decoded-tree opaque row to resolve from merged RDF.
-- [ ] T1042 Implement generic decoded-tree book resolution with raw fallback and no protocol-specific renderer logic.
+- [X] T1041 Add a Playwright RED test that loads a representative book and expects a decoded-tree opaque row to resolve from merged RDF.
+- [X] T1042 Implement generic decoded-tree book resolution with raw fallback and no protocol-specific renderer logic.
 
 ## Final Verification
 

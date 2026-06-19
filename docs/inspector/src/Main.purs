@@ -1851,7 +1851,7 @@ inspectorComponent initial =
     resolvedLabelsLens <-
       resolvedLabelsLensFromGraph graphTurtle
     typedFieldsLens <- typedFieldsLensFromGraph rdf.turtle
-    decodedTreeLens <- decodedTreeLensFromGraph rdf.turtle
+    decodedTreeLens <- decodedTreeLensFromGraph graphTurtle
     shaclConformance <- shaclConformanceFromGraph graphTurtle st
     pure
       { sparqlLens
@@ -1878,6 +1878,16 @@ inspectorComponent initial =
           shaclConformanceFromGraph
             (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
             st
+        else
+          pure Nothing
+      Nothing -> pure Nothing
+
+  decodedTreeLensForState st =
+    case st.rdf of
+      Just rdf ->
+        if rdf.valid then
+          decodedTreeLensFromGraph
+            (mergedRdfTurtle rdf.turtle (selectedOverlayTurtle st))
         else
           pure Nothing
       Nothing -> pure Nothing
@@ -1939,6 +1949,7 @@ inspectorComponent initial =
           st <- H.get
           let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
           resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          decodedTreeLens <- decodedTreeLensForState nextState
           shaclConformance <- shaclConformanceForState nextState
           H.modify_
             _
@@ -1946,6 +1957,7 @@ inspectorComponent initial =
               , selectedOverlayPartIds = []
               , overlayError = Nothing
               , resolvedLabelsLens = resolvedLabelsLens
+              , decodedTreeLens = decodedTreeLens
               , shaclConformance = shaclConformance
               }
     LoadAmaruOverlayBook -> do
@@ -1958,6 +1970,7 @@ inspectorComponent initial =
           st <- H.get
           let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
           resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          decodedTreeLens <- decodedTreeLensForState nextState
           shaclConformance <- shaclConformanceForState nextState
           H.modify_
             _
@@ -1966,6 +1979,7 @@ inspectorComponent initial =
               , selectedOverlayPartIds = []
               , overlayError = Nothing
               , resolvedLabelsLens = resolvedLabelsLens
+              , decodedTreeLens = decodedTreeLens
               , shaclConformance = shaclConformance
               }
     LoadSundaeSwapBlueprintBook -> do
@@ -1978,6 +1992,7 @@ inspectorComponent initial =
           st <- H.get
           let nextState = st { overlayParts = book.parts, selectedOverlayPartIds = [] }
           resolvedLabelsLens <- resolvedLabelsLensForState nextState
+          decodedTreeLens <- decodedTreeLensForState nextState
           shaclConformance <- shaclConformanceForState nextState
           H.modify_
             _
@@ -1986,6 +2001,7 @@ inspectorComponent initial =
               , selectedOverlayPartIds = []
               , overlayError = Nothing
               , resolvedLabelsLens = resolvedLabelsLens
+              , decodedTreeLens = decodedTreeLens
               , shaclConformance = shaclConformance
               }
     LoadShaclShapesBook -> do
@@ -2002,6 +2018,7 @@ inspectorComponent initial =
           ]
         nextState = st { overlayParts = parts, selectedOverlayPartIds = [] }
       resolvedLabelsLens <- resolvedLabelsLensForState nextState
+      decodedTreeLens <- decodedTreeLensForState nextState
       shaclConformance <- shaclConformanceForState nextState
       H.modify_
         _
@@ -2010,6 +2027,7 @@ inspectorComponent initial =
           , selectedOverlayPartIds = []
           , overlayError = Nothing
           , resolvedLabelsLens = resolvedLabelsLens
+          , decodedTreeLens = decodedTreeLens
           , shaclConformance = shaclConformance
           }
     ToggleOverlayPart partId selected -> do
@@ -2019,11 +2037,13 @@ inspectorComponent initial =
           toggleOverlayPartId partId selected st.selectedOverlayPartIds
         nextState = st { selectedOverlayPartIds = selectedOverlayPartIds }
       resolvedLabelsLens <- resolvedLabelsLensForState nextState
+      decodedTreeLens <- decodedTreeLensForState nextState
       shaclConformance <- shaclConformanceForState nextState
       H.modify_
         _
           { selectedOverlayPartIds = selectedOverlayPartIds
           , resolvedLabelsLens = resolvedLabelsLens
+          , decodedTreeLens = decodedTreeLens
           , shaclConformance = shaclConformance
           }
     ApplySelectedBooks -> do
@@ -2031,10 +2051,12 @@ inspectorComponent initial =
       case st.txCbor of
         Nothing -> do
           resolvedLabelsLens <- resolvedLabelsLensForState st
+          decodedTreeLens <- decodedTreeLensForState st
           shaclConformance <- shaclConformanceForState st
           H.modify_
             _
               { resolvedLabelsLens = resolvedLabelsLens
+              , decodedTreeLens = decodedTreeLens
               , shaclConformance = shaclConformance
               , overlayError = Nothing
               }

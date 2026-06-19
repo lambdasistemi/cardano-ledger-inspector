@@ -159,12 +159,15 @@ ORDER BY ?sort ?txIdHex ?index ?entity
 const decodedOutputsQuery = `
 PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?output ?index ?address ?lovelace ?datum ?datumRaw ?datumHash ?datumHashHex ?resolvedLabel ?resolvedType
+SELECT ?output ?index ?address ?addressBech32 ?lovelace ?datum ?datumRaw ?datumHash ?datumHashHex ?resolvedLabel ?resolvedType
 WHERE {
   ?transaction a cardano:Transaction ;
     cardano:hasOutput ?output .
   OPTIONAL { ?output cardano:hasIndex ?index . }
-  OPTIONAL { ?output cardano:atAddress ?address . }
+  OPTIONAL {
+    ?output cardano:atAddress ?address .
+    OPTIONAL { ?address cardano:bech32 ?addressBech32 . }
+  }
   OPTIONAL { ?output cardano:lovelace ?lovelace . }
   OPTIONAL {
     ?output cardano:hasDatum ?datum .
@@ -244,6 +247,25 @@ WHERE {
   OPTIONAL { ?metadata a ?resolvedType . }
 }
 ORDER BY ?label ?metadata ?text
+`;
+
+const decodedLabelMatchesQuery = `
+PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?entity ?label ?type ?bech32 ?bytesHex ?fromTxOutRef ?rawBytes ?datumHashHex
+WHERE {
+  ?entity rdfs:label ?label .
+  OPTIONAL { ?entity a ?type . }
+  OPTIONAL { ?entity cardano:bech32 ?bech32 . }
+  OPTIONAL { ?entity cardano:bytesHex ?bytesHex . }
+  OPTIONAL { ?entity cardano:fromTxOutRef ?fromTxOutRef . }
+  OPTIONAL { ?entity cardano:hasRawBytes ?rawBytes . }
+  OPTIONAL {
+    ?entity cardano:hasHash ?datumHash .
+    OPTIONAL { ?datumHash cardano:bytesHex ?datumHashHex . }
+  }
+}
+ORDER BY ?label ?entity
 `;
 
 const bindingValue = (binding) =>
@@ -357,6 +379,11 @@ const compact = (value, max = 72) => {
   return raw.length > max ? `${raw.slice(0, max - 1)}...` : raw;
 };
 
+const txOutRefFromUtxoUri = (value) => {
+  const match = String(value || "").match(/^urn:cardano:utxo:([0-9a-f]{64}):([0-9]+)$/i);
+  return match ? `${match[1]}#${match[2]}` : "";
+};
+
 const slug = (value) =>
   String(value || "row")
     .replace(/[^A-Za-z0-9]+/g, "-")
@@ -423,15 +450,70 @@ const appendLeaf = (rows, parentId, depth, order, label, kind, value, extra = {}
   );
 };
 
+const addMatchValue = (matches, value, row) => {
+  const key = String(value || "");
+  if (key !== "" && !matches.has(key)) matches.set(key, row);
+};
+
+const decodedLabelMatches = (graphTtl) => {
+  const matches = new Map();
+  let rows = [];
+  try {
+    rows = queryBindings(graphTtl, decodedLabelMatchesQuery);
+  } catch (_) {
+    return matches;
+  }
+
+  for (const row of rows) {
+    const match = {
+      resolvedLabel: bindingValue(row.label),
+      resolvedType: bindingValue(row.type),
+    };
+    addMatchValue(matches, bindingValue(row.entity), match);
+    addMatchValue(matches, bindingValue(row.bech32), match);
+    addMatchValue(matches, bindingValue(row.bytesHex), match);
+    addMatchValue(matches, bindingValue(row.fromTxOutRef), match);
+    addMatchValue(matches, bindingValue(row.rawBytes), match);
+    addMatchValue(matches, bindingValue(row.datumHashHex), match);
+  }
+
+  return matches;
+};
+
+const resolvedFrom = (matches, directLabel, directType, ...values) => {
+  const resolved = {
+    resolvedLabel: directLabel || "",
+    resolvedType: directType || "",
+  };
+  if (resolved.resolvedLabel !== "" || resolved.resolvedType !== "") {
+    return resolved;
+  }
+
+  for (const value of values) {
+    const match = matches.get(String(value || ""));
+    if (match) return match;
+  }
+
+  return resolved;
+};
+
 const countText = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 const normalizeDecodedTreeRows = (graphTtl) => {
   const roots = queryBindings(graphTtl, decodedTreeRootQuery);
   if (roots.length === 0) return [];
 
+  const labelMatches = decodedLabelMatches(graphTtl);
   const root = roots[0];
   const txId = firstBindingValue(root.txIdHex, root.txId, root.transaction);
   const transactionId = bindingValue(root.transaction);
+  const rootResolved = resolvedFrom(
+    labelMatches,
+    bindingValue(root.resolvedLabel),
+    bindingValue(root.resolvedType),
+    txId,
+    transactionId,
+  );
   const rows = [
     treeRow({
       id: "decoded-root",
@@ -442,8 +524,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       value: transactionId,
       summary: compact(transactionId),
       raw: txId,
-      resolvedLabel: bindingValue(root.resolvedLabel),
-      resolvedType: bindingValue(root.resolvedType),
+      resolvedLabel: rootResolved.resolvedLabel,
+      resolvedType: rootResolved.resolvedType,
     }),
   ];
 
@@ -457,6 +539,15 @@ const normalizeDecodedTreeRows = (graphTtl) => {
   if (bodyFields.length > 0) {
     addSection(rows, "decoded-body", "Body", 10, countText(bodyFields.length, "field"));
     bodyFields.forEach((field, index) => {
+      const raw = firstBindingValue(field.raw, field.value, field.entity);
+      const resolved = resolvedFrom(
+        labelMatches,
+        bindingValue(field.resolvedLabel),
+        bindingValue(field.resolvedType),
+        raw,
+        bindingValue(field.value),
+        bindingValue(field.entity),
+      );
       appendLeaf(
         rows,
         "decoded-body",
@@ -464,11 +555,11 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         index,
         bindingValue(field.label),
         bindingValue(field.kind),
-        firstBindingValue(field.raw, field.value, field.entity),
+        raw,
         {
-          raw: firstBindingValue(field.raw, field.value, field.entity),
-          resolvedLabel: bindingValue(field.resolvedLabel),
-          resolvedType: bindingValue(field.resolvedType),
+          raw,
+          resolvedLabel: resolved.resolvedLabel,
+          resolvedType: resolved.resolvedType,
         },
       );
     });
@@ -484,6 +575,14 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         tx === "" && inputIndex === ""
           ? bindingValue(input.entity)
           : `${compact(tx, 28)}#${inputIndex}`;
+      const raw = tx === "" ? bindingValue(input.entity) : `${tx}#${inputIndex}`;
+      const resolved = resolvedFrom(
+        labelMatches,
+        bindingValue(input.resolvedLabel),
+        bindingValue(input.resolvedType),
+        raw,
+        bindingValue(input.entity),
+      );
       appendLeaf(
         rows,
         "decoded-inputs",
@@ -493,9 +592,9 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         "tx-out-ref",
         value,
         {
-          raw: tx === "" ? bindingValue(input.entity) : `${tx}#${inputIndex}`,
-          resolvedLabel: bindingValue(input.resolvedLabel),
-          resolvedType: bindingValue(input.resolvedType),
+          raw,
+          resolvedLabel: resolved.resolvedLabel,
+          resolvedType: resolved.resolvedType,
         },
       );
     });
@@ -506,6 +605,14 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     outputs.forEach((output, index) => {
       const outputIndex = firstBindingValue(output.index, { value: String(index) });
       const outputId = `decoded-output-${slug(outputIndex)}-${index}`;
+      const outputValue = bindingValue(output.output);
+      const outputResolved = resolvedFrom(
+        labelMatches,
+        bindingValue(output.resolvedLabel),
+        bindingValue(output.resolvedType),
+        outputValue,
+        txOutRefFromUtxoUri(outputValue),
+      );
       rows.push(
         treeRow({
           id: outputId,
@@ -514,18 +621,48 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           order: index,
           label: `Output ${outputIndex}`,
           kind: "output",
-          value: bindingValue(output.output),
-          summary: compact(bindingValue(output.output)),
-          raw: bindingValue(output.output),
-          resolvedLabel: bindingValue(output.resolvedLabel),
-          resolvedType: bindingValue(output.resolvedType),
+          value: outputValue,
+          summary: compact(outputValue),
+          raw: outputValue,
+          resolvedLabel: outputResolved.resolvedLabel,
+          resolvedType: outputResolved.resolvedType,
         }),
       );
       appendLeaf(rows, outputId, 3, 10, "Index", "integer", outputIndex);
       appendLeaf(rows, outputId, 3, 20, "Lovelace", "lovelace", bindingValue(output.lovelace));
-      appendLeaf(rows, outputId, 3, 30, "Address", "address", bindingValue(output.address));
-      appendLeaf(rows, outputId, 3, 40, "Datum hash", "hash", firstBindingValue(output.datumHashHex, output.datumHash));
-      appendLeaf(rows, outputId, 3, 50, "Datum raw bytes", "raw-bytes", bindingValue(output.datumRaw));
+      appendLeaf(rows, outputId, 3, 30, "Address", "address", bindingValue(output.address), {
+        resolvedLabel: resolvedFrom(
+          labelMatches,
+          "",
+          "",
+          bindingValue(output.addressBech32),
+          bindingValue(output.address),
+        ).resolvedLabel,
+        resolvedType: resolvedFrom(
+          labelMatches,
+          "",
+          "",
+          bindingValue(output.addressBech32),
+          bindingValue(output.address),
+        ).resolvedType,
+      });
+      const datumHash = firstBindingValue(output.datumHashHex, output.datumHash);
+      const datumHashResolved = resolvedFrom(
+        labelMatches,
+        "",
+        "",
+        bindingValue(output.datumHashHex),
+        bindingValue(output.datumHash),
+      );
+      appendLeaf(rows, outputId, 3, 40, "Datum hash", "hash", datumHash, {
+        resolvedLabel: datumHashResolved.resolvedLabel,
+        resolvedType: datumHashResolved.resolvedType,
+      });
+      const datumRawResolved = resolvedFrom(labelMatches, "", "", bindingValue(output.datumRaw));
+      appendLeaf(rows, outputId, 3, 50, "Datum raw bytes", "raw-bytes", bindingValue(output.datumRaw), {
+        resolvedLabel: datumRawResolved.resolvedLabel,
+        resolvedType: datumRawResolved.resolvedType,
+      });
     });
   }
 
@@ -541,6 +678,14 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     addSection(rows, "decoded-witnesses", "Witnesses", 50, countText(witnesses.length, "key witness"));
     witnesses.forEach((witness, index) => {
       const witnessId = `decoded-key-witness-${index}`;
+      const witnessValue = firstBindingValue(witness.verificationKeyHex, witness.verificationKey, witness.witness);
+      const witnessResolved = resolvedFrom(
+        labelMatches,
+        bindingValue(witness.resolvedLabel),
+        bindingValue(witness.resolvedType),
+        witnessValue,
+        bindingValue(witness.witness),
+      );
       rows.push(
         treeRow({
           id: witnessId,
@@ -549,15 +694,24 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           order: index,
           label: `Key witness ${index}`,
           kind: "key-witness",
-          value: firstBindingValue(witness.verificationKeyHex, witness.verificationKey, witness.witness),
-          summary: compact(firstBindingValue(witness.verificationKeyHex, witness.verificationKey, witness.witness)),
+          value: witnessValue,
+          summary: compact(witnessValue),
           raw: bindingValue(witness.witness),
-          resolvedLabel: bindingValue(witness.resolvedLabel),
-          resolvedType: bindingValue(witness.resolvedType),
+          resolvedLabel: witnessResolved.resolvedLabel,
+          resolvedType: witnessResolved.resolvedType,
         }),
       );
-      appendLeaf(rows, witnessId, 3, 10, "Verification key", "key", firstBindingValue(witness.verificationKeyHex, witness.verificationKey));
-      appendLeaf(rows, witnessId, 3, 20, "Signature", "signature", bindingValue(witness.signature));
+      const keyValue = firstBindingValue(witness.verificationKeyHex, witness.verificationKey);
+      const keyResolved = resolvedFrom(labelMatches, "", "", keyValue);
+      appendLeaf(rows, witnessId, 3, 10, "Verification key", "key", keyValue, {
+        resolvedLabel: keyResolved.resolvedLabel,
+        resolvedType: keyResolved.resolvedType,
+      });
+      const signatureResolved = resolvedFrom(labelMatches, "", "", bindingValue(witness.signature));
+      appendLeaf(rows, witnessId, 3, 20, "Signature", "signature", bindingValue(witness.signature), {
+        resolvedLabel: signatureResolved.resolvedLabel,
+        resolvedType: signatureResolved.resolvedType,
+      });
     });
   }
 
@@ -567,6 +721,14 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       const redeemerId = `decoded-redeemer-${index}`;
       const purpose = bindingValue(redeemer.purpose);
       const redeemerIndex = bindingValue(redeemer.index);
+      const redeemerResolved = resolvedFrom(
+        labelMatches,
+        bindingValue(redeemer.resolvedLabel),
+        bindingValue(redeemer.resolvedType),
+        bindingValue(redeemer.redeemer),
+        bindingValue(redeemer.dataHashHex),
+        bindingValue(redeemer.dataRaw),
+      );
       rows.push(
         treeRow({
           id: redeemerId,
@@ -578,14 +740,29 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           value: bindingValue(redeemer.redeemer),
           summary: compact(firstBindingValue(redeemer.dataHashHex, redeemer.dataHash, redeemer.redeemer)),
           raw: bindingValue(redeemer.redeemer),
-          resolvedLabel: bindingValue(redeemer.resolvedLabel),
-          resolvedType: bindingValue(redeemer.resolvedType),
+          resolvedLabel: redeemerResolved.resolvedLabel,
+          resolvedType: redeemerResolved.resolvedType,
         }),
       );
       appendLeaf(rows, redeemerId, 3, 10, "Purpose", "purpose", purpose);
       appendLeaf(rows, redeemerId, 3, 20, "Index", "integer", redeemerIndex);
-      appendLeaf(rows, redeemerId, 3, 30, "Data hash", "hash", firstBindingValue(redeemer.dataHashHex, redeemer.dataHash));
-      appendLeaf(rows, redeemerId, 3, 40, "Data raw bytes", "raw-bytes", bindingValue(redeemer.dataRaw));
+      const dataHashValue = firstBindingValue(redeemer.dataHashHex, redeemer.dataHash);
+      const dataHashResolved = resolvedFrom(
+        labelMatches,
+        "",
+        "",
+        bindingValue(redeemer.dataHashHex),
+        bindingValue(redeemer.dataHash),
+      );
+      appendLeaf(rows, redeemerId, 3, 30, "Data hash", "hash", dataHashValue, {
+        resolvedLabel: dataHashResolved.resolvedLabel,
+        resolvedType: dataHashResolved.resolvedType,
+      });
+      const dataRawResolved = resolvedFrom(labelMatches, "", "", bindingValue(redeemer.dataRaw));
+      appendLeaf(rows, redeemerId, 3, 40, "Data raw bytes", "raw-bytes", bindingValue(redeemer.dataRaw), {
+        resolvedLabel: dataRawResolved.resolvedLabel,
+        resolvedType: dataRawResolved.resolvedType,
+      });
       appendLeaf(rows, redeemerId, 3, 50, "Memory units", "ex-units", bindingValue(redeemer.memory));
       appendLeaf(rows, redeemerId, 3, 60, "CPU units", "ex-units", bindingValue(redeemer.cpu));
     });
@@ -601,6 +778,13 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     addSection(rows, "decoded-metadata", "Metadata", 70, countText(metadataRows.length, "label"));
     metadataRows.forEach((meta, index) => {
       const metaId = `decoded-metadata-${slug(bindingValue(meta.label))}-${index}`;
+      const metaResolved = resolvedFrom(
+        labelMatches,
+        bindingValue(meta.resolvedLabel),
+        bindingValue(meta.resolvedType),
+        bindingValue(meta.raw),
+        bindingValue(meta.metadata),
+      );
       rows.push(
         treeRow({
           id: metaId,
@@ -612,8 +796,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           value: bindingValue(meta.metadata),
           summary: compact(firstBindingValue(meta.text, meta.raw, meta.metadata)),
           raw: firstBindingValue(meta.raw, meta.metadata),
-          resolvedLabel: bindingValue(meta.resolvedLabel),
-          resolvedType: bindingValue(meta.resolvedType),
+          resolvedLabel: metaResolved.resolvedLabel,
+          resolvedType: metaResolved.resolvedType,
         }),
       );
       appendLeaf(rows, metaId, 3, 10, "Metadata label", "integer", bindingValue(meta.label));
