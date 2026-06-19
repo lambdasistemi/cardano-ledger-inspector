@@ -43,9 +43,9 @@
 
 ## Finalization
 
-- [ ] T106-F1 Verify local acceptance commands and browser smoke evidence.
-- [ ] T106-F2 Update the draft PR body with delivered behavior and proof.
-- [ ] T106-F3 Verify CI green and preview published.
-- [ ] T106-F4 Browser-smoke the preview URL under `/inspector/`.
-- [ ] T106-F5 Drop `gate.sh` in the ready-for-review commit after all tasks
+- [X] T106-F1 Verify local acceptance commands and browser smoke evidence.
+- [X] T106-F2 Update the draft PR body with delivered behavior and proof.
+- [X] T106-F3 Verify CI green and preview published.
+- [X] T106-F4 Browser-smoke the preview URL under `/inspector/`.
+- [X] T106-F5 Drop `gate.sh` in the ready-for-review commit after all tasks
   are complete.
