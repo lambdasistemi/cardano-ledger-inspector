@@ -2,14 +2,14 @@
 
 ## Slice 1 - Store Foundation
 
-- [ ] T106-S1 Add a typed local book store module with seed loading,
+- [X] T106-S1 Add a typed local book store module with seed loading,
   parse/serialize helpers, stable ids, selected flags, and corrupt-store
   fallback.
-- [ ] T106-S1 Extend FFI only as needed for storage/remove/download/file/URL
+- [X] T106-S1 Extend FFI only as needed for storage/remove/download/file/URL
   primitives.
-- [ ] T106-S1 Add focused Playwright RED proof that seeded books persist and
+- [X] T106-S1 Add focused Playwright RED proof that seeded books persist and
   can be inspected from localStorage.
-- [ ] T106-S1 Run `./gate.sh` and commit `feat(inspector): add local book store foundation`.
+- [X] T106-S1 Run `./gate.sh` and commit `feat(inspector): add local book store foundation`.
 
 ## Slice 2 - Library CRUD
 

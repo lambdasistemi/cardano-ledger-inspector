@@ -13,6 +13,7 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (message)
 import FFI.Blockfrost (Network(..), networkName)
+import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
 import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
@@ -83,6 +84,7 @@ main = HA.runHalogenAff do
   route <- liftEffect Routing.currentRoute
   routeBase <- liftEffect Routing.currentBasePath
   theme <- liftEffect Shell.initialTheme
+  bookStore <- liftEffect BookStore.load
   let initialProv = case prov of
         "Koios"      -> Koios
         _            -> Blockfrost
@@ -103,6 +105,7 @@ main = HA.runHalogenAff do
         , route
         , routeBase
         , theme
+        , books: bookStore.books
         }
     ) unit mountTarget
 
@@ -133,6 +136,7 @@ type State =
   , typedFieldsLens :: Maybe TypedFieldsLens
   , decodedTreeLens :: Maybe DecodedTreeLens
   , shaclConformance :: Maybe ShaclConformance
+  , books :: Array BookStore.Book
   , overlayInput :: String
   , overlayParts :: Array OverlayPart
   , selectedOverlayPartIds :: Array String
@@ -190,6 +194,7 @@ type InitialKeys =
   , route :: Route
   , routeBase :: String
   , theme :: Theme.Theme
+  , books :: Array BookStore.Book
   }
 
 data Action
@@ -246,6 +251,7 @@ inspectorComponent initial =
         , typedFieldsLens: Nothing
         , decodedTreeLens: Nothing
         , shaclConformance: Nothing
+        , books: initial.books
         , overlayInput: ""
         , overlayParts: []
         , selectedOverlayPartIds: []
