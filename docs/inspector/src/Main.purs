@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, trim) as String
 import Data.String.CodeUnits as StringCodeUnits
@@ -35,6 +36,8 @@ import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 import Web.Event.Event as Event
 import Web.DOM.ParentNode (QuerySelector(..))
+import Web.HTML (window)
+import Web.HTML.Window as Window
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 
@@ -137,6 +140,9 @@ type State =
   , decodedTreeLens :: Maybe DecodedTreeLens
   , shaclConformance :: Maybe ShaclConformance
   , books :: Array BookStore.Book
+  , bookNameEdits :: Array BookNameEdit
+  , libraryInput :: String
+  , libraryError :: Maybe String
   , overlayInput :: String
   , overlayParts :: Array OverlayPart
   , selectedOverlayPartIds :: Array String
@@ -185,6 +191,11 @@ type ShaclConformance =
   , error :: Maybe String
   }
 
+type BookNameEdit =
+  { id :: String
+  , name :: String
+  }
+
 type InitialKeys =
   { bf :: String
   , koios :: String
@@ -206,6 +217,12 @@ data Action
   | SelectNetwork Network
   | SetTxHash String
   | SetTxHex String
+  | SetLibraryInput String
+  | AddLibraryBook
+  | ToggleLibraryBook String Boolean
+  | SetLibraryBookName String String
+  | SaveLibraryBookName String
+  | DeleteLibraryBook String
   | SetOverlayInput String
   | ImportOverlayBook
   | LoadAmaruOverlayBook
@@ -252,6 +269,9 @@ inspectorComponent initial =
         , decodedTreeLens: Nothing
         , shaclConformance: Nothing
         , books: initial.books
+        , bookNameEdits: bookNameEditsFromBooks initial.books
+        , libraryInput: ""
+        , libraryError: Nothing
         , overlayInput: ""
         , overlayParts: []
         , selectedOverlayPartIds: []
@@ -288,7 +308,7 @@ inspectorComponent initial =
           [ case state.route of
               RouteInspect -> renderInspector state
               RouteSettings -> renderSettings state
-              RouteLibrary -> Shell.placeholderPage "Library"
+              RouteLibrary -> renderLibrary state
           ]
       , Shell.siteFooter
       ]
@@ -345,6 +365,162 @@ inspectorComponent initial =
           [ classNames [ "settings-layout" ] ]
           [ renderProvider state ]
       ]
+
+  renderLibrary state =
+    let
+      inspection = BookStore.inspect { kind: BookStore.envelopeKind, books: state.books }
+    in
+      HH.div
+        [ classNames [ "app-shell", "library-page" ] ]
+        [ HH.section
+            [ classNames [ "intro-strip" ] ]
+            [ HH.div_
+                [ HH.h1_ [ HH.text "Library" ]
+                , HH.p_
+                    [ HH.text
+                        "Manage local RDF overlay and blueprint books stored in this browser."
+                    ]
+                ]
+            , HH.div
+                [ classNames [ "tech-pills" ] ]
+                [ HH.span_ [ HH.text (show inspection.count <> " books") ]
+                , HH.span_ [ HH.text (show inspection.selectedCount <> " selected") ]
+                , HH.span_ [ HH.text (show inspection.partCount <> " parts") ]
+                ]
+            ]
+        , HH.div
+            [ classNames [ "library-layout" ] ]
+            [ renderLibraryImport state
+            , renderLibraryBooks state
+            ]
+        ]
+
+  renderLibraryImport state =
+    HH.element (HH.ElemName "md-elevated-card")
+      [ classNames [ "panel", "library-import-panel" ]
+      , mdSurface "books"
+      ]
+      [ HH.div
+          [ classNames [ "panel-heading" ] ]
+          [ HH.div_
+              [ HH.h2_ [ HH.text "Add book" ]
+              , HH.p_ [ HH.text "Paste Turtle overlay content to add a selected local book." ]
+              ]
+          ]
+      , HH.label
+          [ classNames [ "field-stack" ] ]
+          [ HH.span
+              [ classNames [ "field-label" ] ]
+              [ HH.text "Book Turtle" ]
+          , HH.textarea
+              [ HP.value state.libraryInput
+              , HP.rows 8
+              , HH.attr (HH.AttrName "aria-label") "Book Turtle"
+              , HE.onValueInput SetLibraryInput
+              ]
+          ]
+      , case state.libraryError of
+          Just err ->
+            HH.div
+              [ classNames [ "sparql-lens-error" ] ]
+              [ HH.text ("Book import failed: " <> err) ]
+          Nothing -> HH.text ""
+      , HH.div
+          [ classNames [ "library-actions" ] ]
+          [ HH.element (HH.ElemName "md-filled-button")
+              [ classNames [ "primary-action" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , mdControl "primary"
+              , HP.disabled (String.trim state.libraryInput == "")
+              , HE.onClick (\_ -> AddLibraryBook)
+              ]
+              [ HH.text "Add book" ]
+          ]
+      ]
+
+  renderLibraryBooks state =
+    HH.div
+      [ classNames [ "library-book-list" ] ]
+      ( if Array.null state.books then
+          [ HH.div
+              [ classNames [ "empty-state" ] ]
+              [ HH.text "No books stored." ]
+          ]
+        else
+          map (renderLibraryBook state) state.books
+      )
+
+  renderLibraryBook state book =
+    let
+      editName = bookEditName state book
+      saveDisabled = String.trim editName == "" || editName == book.name
+    in
+      HH.element (HH.ElemName "md-elevated-card")
+        [ classNames [ "library-book" ]
+        , mdSurface "books"
+        ]
+        [ HH.div
+            [ classNames [ "library-book-heading" ] ]
+            [ HH.div_
+                [ HH.h2_ [ HH.text book.name ]
+                , HH.p_ [ HH.text (libraryBookSummary book) ]
+                ]
+            , HH.label
+                [ classNames [ "switch-row", "library-select-row" ] ]
+                [ HH.input
+                    [ HP.type_ HP.InputCheckbox
+                    , HP.checked book.selected
+                    , HH.attr (HH.AttrName "aria-label") ("Select " <> book.name)
+                    , HE.onChecked (ToggleLibraryBook book.id)
+                    ]
+                , HH.element (HH.ElemName "md-switch")
+                    [ classNames [ "persist-md-switch" ]
+                    , HH.attr (HH.AttrName "aria-hidden") "true"
+                    , HH.attr (HH.AttrName "tabindex") "-1"
+                    ]
+                    []
+                , HH.span_ [ HH.text "Selected" ]
+                ]
+            ]
+        , HH.div
+            [ classNames [ "library-book-meta" ] ]
+            [ HH.span_ [ HH.text (if book.seed then "seed" else "local") ]
+            , HH.span_ [ HH.text book.source ]
+            ]
+        , HH.div
+            [ classNames [ "library-book-controls" ] ]
+            [ HH.label
+                [ classNames [ "field-stack", "library-name-field" ] ]
+                [ HH.span
+                    [ classNames [ "field-label" ] ]
+                    [ HH.text "Name" ]
+                , HH.input
+                    [ HP.type_ HP.InputText
+                    , HP.value editName
+                    , HH.attr (HH.AttrName "aria-label") ("Rename " <> book.name)
+                    , HE.onValueInput (SetLibraryBookName book.id)
+                    ]
+                ]
+            , HH.div
+                [ classNames [ "library-row-actions" ] ]
+                [ HH.element (HH.ElemName "md-outlined-button")
+                    [ classNames [ "secondary-action" ]
+                    , HH.attr (HH.AttrName "role") "button"
+                    , mdControl "secondary"
+                    , HP.disabled saveDisabled
+                    , HE.onClick (\_ -> SaveLibraryBookName book.id)
+                    ]
+                    [ HH.text ("Save name for " <> book.name) ]
+                , HH.element (HH.ElemName "md-outlined-button")
+                    [ classNames [ "danger-action" ]
+                    , HH.attr (HH.AttrName "role") "button"
+                    , mdControl "secondary"
+                    , HE.onClick (\_ -> DeleteLibraryBook book.id)
+                    ]
+                    [ HH.text ("Delete " <> book.name) ]
+                ]
+            ]
+        ]
 
   renderSettingsSummary state =
     HH.element (HH.ElemName "md-elevated-card")
@@ -1944,6 +2120,68 @@ inspectorComponent initial =
       liftEffect (Storage.setItem networkKey (networkName n))
     SetTxHash s -> H.modify_ _ { txHash = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
     SetTxHex s -> H.modify_ _ { txHex = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
+    SetLibraryInput s -> H.modify_ _ { libraryInput = s, libraryError = Nothing }
+    AddLibraryBook -> do
+      st <- H.get
+      let input = String.trim st.libraryInput
+      parsed <- liftEffect (OverlayBook.parse input)
+      case parsed of
+        Left err ->
+          H.modify_ _ { libraryError = Just err }
+        Right book -> do
+          let
+            newBook =
+              { id: nextLocalBookId st.books
+              , name: book.title
+              , source: book.source
+              , raw: input
+              , parts: book.parts
+              , turtle: book.turtle
+              , selected: true
+              , seed: false
+              }
+            books = Array.snoc st.books newBook
+          liftEffect (saveBooks books)
+          H.modify_
+            _
+              { books = books
+              , bookNameEdits = Array.snoc st.bookNameEdits { id: newBook.id, name: newBook.name }
+              , libraryInput = ""
+              , libraryError = Nothing
+              }
+    ToggleLibraryBook bookId selected -> do
+      st <- H.get
+      let books = updateBook bookId (_ { selected = selected }) st.books
+      liftEffect (saveBooks books)
+      H.modify_ _ { books = books }
+    SetLibraryBookName bookId name ->
+      H.modify_ \st -> st { bookNameEdits = upsertBookNameEdit bookId name st.bookNameEdits }
+    SaveLibraryBookName bookId -> do
+      st <- H.get
+      let
+        nextName = String.trim (bookEditNameById bookId st)
+        books =
+          if nextName == "" then
+            st.books
+          else
+            updateBook bookId (_ { name = nextName }) st.books
+        edits = bookNameEditsFromBooks books
+      liftEffect (saveBooks books)
+      H.modify_ _ { books = books, bookNameEdits = edits }
+    DeleteLibraryBook bookId -> do
+      st <- H.get
+      case Array.find (\book -> book.id == bookId) st.books of
+        Nothing -> pure unit
+        Just book -> do
+          confirmed <- liftEffect do
+            win <- window
+            Window.confirm ("Delete " <> book.name <> "?") win
+          when confirmed do
+            let
+              books = Array.filter (\candidate -> candidate.id /= bookId) st.books
+              edits = Array.filter (\edit -> edit.id /= bookId) st.bookNameEdits
+            liftEffect (saveBooks books)
+            H.modify_ _ { books = books, bookNameEdits = edits }
     SetOverlayInput s -> H.modify_ _ { overlayInput = s, overlayError = Nothing }
     ImportOverlayBook -> do
       input <- H.gets _.overlayInput
@@ -2287,6 +2525,56 @@ inspectorComponent initial =
                 else
                   expandPath rowId st.decodedTreeExpanded
             }
+
+  saveBooks books =
+    BookStore.save { kind: BookStore.envelopeKind, books }
+
+  nextLocalBookId books =
+    "local:" <> show (Array.foldl max 0 (Array.mapMaybe localBookNumber books) + 1)
+
+  localBookNumber book =
+    let
+      prefix = "local:"
+    in
+      if StringCodeUnits.take (StringCodeUnits.length prefix) book.id == prefix then
+        Int.fromString (StringCodeUnits.drop (StringCodeUnits.length prefix) book.id)
+      else
+        Nothing
+
+  updateBook bookId update books =
+    map
+      (\book -> if book.id == bookId then update book else book)
+      books
+
+  bookNameEditsFromBooks books =
+    map (\book -> { id: book.id, name: book.name }) books
+
+  upsertBookNameEdit bookId name edits =
+    if Array.any (\edit -> edit.id == bookId) edits then
+      map
+        (\edit -> if edit.id == bookId then edit { name = name } else edit)
+        edits
+    else
+      Array.snoc edits { id: bookId, name }
+
+  bookEditName state book =
+    case Array.find (\edit -> edit.id == book.id) state.bookNameEdits of
+      Just edit -> edit.name
+      Nothing   -> book.name
+
+  bookEditNameById bookId state =
+    case Array.find (\edit -> edit.id == bookId) state.bookNameEdits of
+      Just edit -> edit.name
+      Nothing ->
+        case Array.find (\book -> book.id == bookId) state.books of
+          Just book -> book.name
+          Nothing   -> ""
+
+  libraryBookSummary book =
+    let
+      partCount = Array.length book.parts
+    in
+      show partCount <> if partCount == 1 then " part" else " parts"
 
   toggleOverlayPartId partId selected ids =
     if selected then

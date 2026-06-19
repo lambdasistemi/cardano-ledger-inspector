@@ -35,6 +35,16 @@ const packagedSiteDir = path.resolve(
 );
 const previewPrefix = "/lambdasistemi/cardano-ledger-inspector/pr-99/";
 const localBookStoreKey = "cardano-ledger-inspector.books.v1";
+const pastedTurtleBook = `
+@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-rdf/overlay/local#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+overlay:LocalTreasuryLabel
+  a cardano:OverlayBook ;
+  rdfs:label "Local treasury label" ;
+  cardano:bech32 "addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzersv8z3z2w8" .
+`;
 const violatingShaclShapes = `
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
@@ -327,6 +337,116 @@ test("local book store seeds parsed bundled books into localStorage", async ({
   expect(store.books[2].turtle).toContain("sh:NodeShape");
 });
 
+test("library page manages local books with persisted CRUD", async ({ page }) => {
+  await page.goto("/library");
+
+  await expect(page.getByText("Library placeholder", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
+
+  const library = page.locator(".library-page");
+  await expect(
+    library.getByRole("heading", { name: "Amaru treasury 2026 overlay" }),
+  ).toBeVisible();
+  await expect(
+    library.getByRole("heading", { name: "SundaeSwap V3 blueprint" }),
+  ).toBeVisible();
+  await expect(
+    library.getByRole("heading", { name: "Cardano RDF SHACL shapes" }),
+  ).toBeVisible();
+
+  await library.getByLabel("Book Turtle").fill(pastedTurtleBook);
+  await library.getByRole("button", { name: "Add book" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Pasted overlay Turtle" }),
+  ).toBeVisible();
+
+  const localBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await localBook.getByRole("checkbox", { name: "Select Pasted overlay Turtle" }).uncheck();
+  await localBook.getByLabel("Rename Pasted overlay Turtle").fill("Renamed local treasury label");
+  await localBook.getByRole("button", { name: "Save name for Pasted overlay Turtle" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Renamed local treasury label" }),
+  ).toBeVisible();
+
+  await page.reload();
+  const renamedBook = page.locator(".library-book", { hasText: "Renamed local treasury label" });
+  await expect(renamedBook).toBeVisible();
+  await expect(
+    renamedBook.getByRole("checkbox", { name: "Select Renamed local treasury label" }),
+  ).not.toBeChecked();
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("confirm");
+    expect(dialog.message()).toContain("Renamed local treasury label");
+    await dialog.accept();
+  });
+  await renamedBook.getByRole("button", { name: "Delete Renamed local treasury label" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Renamed local treasury label" }),
+  ).toHaveCount(0);
+
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const store = JSON.parse(rawStore);
+  expect(store.books.map((book) => book.name)).not.toContain("Renamed local treasury label");
+  expect(store.books).toHaveLength(3);
+});
+
+test("library page allocates unique local ids after deleting seed books", async ({
+  page,
+}) => {
+  await page.goto("/library");
+
+  const library = page.locator(".library-page");
+  await expect(
+    library.getByRole("heading", { name: "Amaru treasury 2026 overlay" }),
+  ).toBeVisible();
+
+  await library.getByLabel("Book Turtle").fill(pastedTurtleBook);
+  await library.getByRole("button", { name: "Add book" }).click();
+
+  const firstBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await firstBook.getByLabel("Rename Pasted overlay Turtle").fill("First local book");
+  await firstBook.getByRole("button", { name: "Save name for Pasted overlay Turtle" }).click();
+  await expect(library.getByRole("heading", { name: "First local book" })).toBeVisible();
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.type()).toBe("confirm");
+    expect(dialog.message()).toContain("Cardano RDF SHACL shapes");
+    await dialog.accept();
+  });
+  const seedBook = library.locator(".library-book", { hasText: "Cardano RDF SHACL shapes" });
+  await seedBook.getByRole("button", { name: "Delete Cardano RDF SHACL shapes" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Cardano RDF SHACL shapes" }),
+  ).toHaveCount(0);
+
+  await library.getByLabel("Book Turtle").fill(pastedTurtleBook);
+  await library.getByRole("button", { name: "Add book" }).click();
+  const secondBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await secondBook.getByRole("checkbox", { name: "Select Pasted overlay Turtle" }).uncheck();
+
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const store = JSON.parse(rawStore);
+  const ids = store.books.map((book) => book.id);
+  expect(new Set(ids).size).toBe(ids.length);
+
+  const localBooks = store.books.filter((book) => book.source === "paste");
+  expect(localBooks).toHaveLength(2);
+  expect(localBooks.map((book) => book.name)).toEqual([
+    "First local book",
+    "Pasted overlay Turtle",
+  ]);
+  expect(localBooks.filter((book) => !book.selected).map((book) => book.name)).toEqual([
+    "Pasted overlay Turtle",
+  ]);
+});
+
 test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await page.goto("/inspect");
 
@@ -374,7 +494,8 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await navigation.getByRole("link", { name: "Library" }).click();
   await expect(page).toHaveURL(/\/library$/);
   await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
-  await expect(page.getByText("Library placeholder", { exact: true })).toBeVisible();
+  await expect(page.locator(".library-page")).toBeVisible();
+  await expect(page.getByText("Library placeholder", { exact: true })).toHaveCount(0);
 });
 
 test("MD3 shell keeps route navigation inside deployed subpaths", async ({
@@ -391,7 +512,8 @@ test("MD3 shell keeps route navigation inside deployed subpaths", async ({
       } },
       { path: "library", assert: async () => {
         await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
-        await expect(page.getByText("Library placeholder", { exact: true })).toBeVisible();
+        await expect(page.locator(".library-page")).toBeVisible();
+        await expect(page.getByText("Library placeholder", { exact: true })).toHaveCount(0);
       } },
     ];
 
