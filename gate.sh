@@ -2,8 +2,7 @@
 set -euo pipefail
 
 git diff --check
-just format-check
-just hlint
-just ui-check
-just build-ui
-just test-playwright
+nix develop --quiet -c just format-check
+nix develop --quiet -c just hlint
+nix build .#packages.x86_64-linux.tx-inspector-ui
+nix develop --quiet -c just test-playwright
