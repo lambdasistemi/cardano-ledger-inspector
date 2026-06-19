@@ -385,6 +385,95 @@ fieldset {
   overflow: hidden;
 }
 
+.library-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.library-import-panel,
+.library-book {
+  display: grid;
+  gap: 14px;
+}
+
+.library-import-panel .panel-heading {
+  margin-bottom: 0;
+}
+
+.library-actions,
+.library-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.library-book-list {
+  display: grid;
+  gap: 12px;
+}
+
+.library-book {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 16px;
+}
+
+.library-book-heading,
+.library-book-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+}
+
+.library-book-heading h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.library-book-heading p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+}
+
+.library-select-row {
+  min-height: 42px;
+}
+
+.library-book-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.library-book-meta span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-container);
+  padding: 0.18rem 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.library-name-field {
+  min-width: min(100%, 360px);
+}
+
+.danger-action {
+  min-height: 42px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 0.62rem 0.9rem;
+  color: var(--danger);
+  font-weight: 700;
+  --md-outlined-button-container-shape: 8px;
+  --md-outlined-button-label-text-font: "Roboto Flex";
+}
+
 .decoded-structure-placeholder {
   min-height: 120px;
 }
@@ -1288,6 +1377,8 @@ pre {
 
   .browser-heading,
   .browser-row,
+  .library-book-heading,
+  .library-book-controls,
   .overlay-selection-grid,
   .sparql-lens-row {
     grid-template-columns: 1fr;
@@ -1312,8 +1403,13 @@ pre {
   }
 
   .primary-action,
-  .secondary-action {
+  .secondary-action,
+  .danger-action {
     width: 100%;
+  }
+
+  .library-row-actions {
+    display: grid;
   }
 
   .overlay-actions {

@@ -13,13 +13,13 @@
 
 ## Slice 2 - Library CRUD
 
-- [ ] T106-S2 Replace the `/library` placeholder with the local book store
+- [X] T106-S2 Replace the `/library` placeholder with the local book store
   list.
-- [ ] T106-S2 Implement paste add, rename, select/deselect, and guarded
+- [X] T106-S2 Implement paste add, rename, select/deselect, and guarded
   delete with persistent state.
-- [ ] T106-S2 Add Playwright coverage for list, add, select, rename,
+- [X] T106-S2 Add Playwright coverage for list, add, select, rename,
   delete, and reload persistence.
-- [ ] T106-S2 Run `./gate.sh` and commit `feat(inspector): manage books in the library`.
+- [X] T106-S2 Run `./gate.sh` and commit `feat(inspector): manage books in the library`.
 
 ## Slice 3 - Exchange Paths
 
