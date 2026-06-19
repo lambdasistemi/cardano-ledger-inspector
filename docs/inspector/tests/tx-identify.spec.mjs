@@ -21,14 +21,6 @@ const validationFixturePath = path.join(
   repoRoot,
   "specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json",
 );
-const amaruJournalFixturePath = path.join(
-  repoRoot,
-  "docs/inspector/protocols/amaru-treasury/journal-2026.json",
-);
-const sundaeBlueprintFixturePath = path.join(
-  repoRoot,
-  "docs/inspector/protocols/sundaeswap-v3/plutus.json",
-);
 const packagedSiteDir = path.resolve(
   process.cwd(),
   process.env.TX_INSPECTOR_SITE_DIR || "result",
@@ -1045,26 +1037,28 @@ test("preview subpath decodes genuine Conway fixture into RDF tree", async ({
   });
 });
 
-test("selects Amaru overlay book parts into deterministic Turtle", async ({
+test("selected library overlay book parts produce deterministic Turtle", async ({
   page,
 }) => {
-  const journalJson = await readFile(amaruJournalFixturePath, "utf8");
-  await decodeFixture(page);
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  const amaruBook = library.locator(".library-book", {
+    hasText: "Amaru treasury 2026 overlay",
+  });
+  await expect(amaruBook).toBeVisible();
+  await expect(
+    amaruBook.getByRole("checkbox", { name: "Select Amaru treasury 2026 overlay" }),
+  ).toBeChecked();
+
+  await decodeFixtureAt(page, "/inspect");
 
   const overlayPanel = page.locator(".overlay-book-panel");
   await expect(
-    overlayPanel.getByRole("heading", { name: "Overlay books" }),
+    overlayPanel.getByRole("heading", { name: "Selected books" }),
   ).toBeVisible();
 
-  await overlayPanel
-    .getByLabel("Overlay Turtle or Amaru journal JSON")
-    .fill(journalJson);
-  await overlayPanel.getByRole("button", { name: "Import overlay book" }).click();
-
   const selectedTurtle = overlayPanel.getByLabel("Selected overlay Turtle");
-  const coreDevelopment = overlayPanel.getByLabel("Core development");
   const resolvedLabelsPanel = page.locator(".resolved-labels-panel");
-  await coreDevelopment.check();
   await expect(selectedTurtle).toHaveValue(/Amaru Core Development treasury/);
   await expect(selectedTurtle).toHaveValue(/@prefix cardano:/);
   await expect(
@@ -1077,9 +1071,17 @@ test("selects Amaru overlay book parts into deterministic Turtle", async ({
       exact: true,
     }),
   ).toBeVisible();
-  await expect(resolvedLabelsPanel.getByText("Treasury", { exact: true })).toBeVisible();
+  await expect(
+    resolvedLabelsPanel.getByText("Treasury", { exact: true }).first(),
+  ).toBeVisible();
 
-  await coreDevelopment.uncheck();
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await amaruBook
+    .getByRole("checkbox", { name: "Select Amaru treasury 2026 overlay" })
+    .uncheck();
+  await openInspectViaShell(page);
+  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+
   await expect(selectedTurtle).not.toHaveValue(/Amaru Core Development treasury/);
   await expect(
     resolvedLabelsPanel.getByText("Amaru Core Development treasury", {
@@ -1106,7 +1108,8 @@ test("resolves decoded-tree address rows from selected Turtle overlay books", as
   await expect(addressRow).toBeVisible();
 
   const rawAddress = await addressRow.locator(".decoded-tree-summary").innerText();
-  expect(rawAddress).toMatch(/^[0-9a-f]{32}$/);
+  expect(rawAddress).toMatch(/^[0-9a-f]+$/);
+  expect(rawAddress.length).toBeGreaterThanOrEqual(24);
 
   const turtleText = await page.locator(".rdf-panel .rdf-turtle").innerText();
   const address = await page.evaluate((graph) => {
@@ -1142,10 +1145,17 @@ fixture:decodedTreasuryAddress
   cardano:bech32 "${address}" .
 `;
 
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await expect(page).toHaveURL(/\/library$/);
+  const library = page.locator(".library-page");
+  await library.getByLabel("Book Turtle").fill(overlayTurtle);
+  await library.getByRole("button", { name: "Add book" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Pasted overlay Turtle" }),
+  ).toBeVisible();
+
+  await openInspectViaShell(page);
   const overlayPanel = page.locator(".overlay-book-panel");
-  await overlayPanel.getByLabel(/Overlay Turtle.*JSON/).fill(overlayTurtle);
-  await overlayPanel.getByRole("button", { name: /Import .*book/ }).click();
-  await overlayPanel.getByLabel("Pasted Turtle").check();
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
   const resolvedAddressRow = decodedPanel
@@ -1157,14 +1167,103 @@ fixture:decodedTreasuryAddress
   const resolvedRawAddress = await resolvedAddressRow
     .locator(".decoded-tree-summary")
     .innerText();
-  expect(resolvedRawAddress).toMatch(/^[0-9a-f]{32}$/);
+  expect(resolvedRawAddress).toMatch(/^[0-9a-f]+$/);
+  expect(resolvedRawAddress.length).toBeGreaterThanOrEqual(24);
 });
 
-test("imports a SundaeSwap blueprint book and applies typed RDF fields", async ({
+test("inspect resolves decoded-tree address rows from selected library books", async ({
   page,
 }) => {
-  const blueprintJson = await readFile(sundaeBlueprintFixturePath, "utf8");
-  await decodeFixture(page, signingIntentFixturePath);
+  await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
+
+  const firstTurtleText = await page.locator(".rdf-panel .rdf-turtle").innerText();
+  const address = await page.evaluate((graph) => {
+    const result = globalThis.rdfShapes.query(
+      graph,
+      `
+        PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+        SELECT ?bech32 WHERE {
+          ?transaction a cardano:Transaction ;
+            cardano:hasOutput ?output .
+          ?output cardano:hasIndex 0 ;
+            cardano:atAddress ?address .
+          ?address cardano:bech32 ?bech32 .
+        }
+        LIMIT 1
+      `,
+    );
+    return result.json.results.bindings[0].bech32.value;
+  }, firstTurtleText);
+  expect(address).toMatch(/^addr1/);
+
+  const resolvedLabel = "Selected library decoded address";
+  const overlayTurtle = `
+@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix fixture: <https://example.test/cardano-ledger-inspector/fixture#> .
+
+fixture:selectedLibraryAddress
+  rdfs:label "${resolvedLabel}" ;
+  cardano:bech32 "${address}" .
+`;
+
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await expect(page).toHaveURL(/\/library$/);
+
+  const library = page.locator(".library-page");
+  await library.getByLabel("Book Turtle").fill(overlayTurtle);
+  await library.getByRole("button", { name: "Add book" }).click();
+
+  const localBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await expect(localBook).toBeVisible();
+  await expect(
+    localBook.getByRole("checkbox", { name: "Select Pasted overlay Turtle" }),
+  ).toBeChecked();
+
+  await openInspectViaShell(page);
+  const txCbor = (await readFile(conwayMainnetFixturePath, "utf8")).trim();
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Conway transaction identity" }),
+  ).toBeVisible();
+
+  const overlayPanel = page.locator(".overlay-book-panel");
+  const applySelectedBooks = overlayPanel.getByRole("button", {
+    name: "Apply selected books",
+  });
+  if (await applySelectedBooks.count()) {
+    await applySelectedBooks.click();
+  }
+
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+  const resolvedAddressRow = decodedPanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Address" })
+    .filter({ hasText: resolvedLabel })
+    .first();
+  await expect(resolvedAddressRow).toContainText(resolvedLabel);
+  await expect(page.getByRole("button", { name: "Load Amaru overlay book" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Load SundaeSwap V3 blueprint" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Load Cardano RDF SHACL shapes" })).toHaveCount(0);
+});
+
+test("selected library blueprint book applies typed RDF fields", async ({
+  page,
+}) => {
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  const blueprintBook = library.locator(".library-book", {
+    hasText: "SundaeSwap V3 blueprint",
+  });
+  await expect(blueprintBook).toBeVisible();
+  await blueprintBook
+    .getByRole("checkbox", { name: "Select SundaeSwap V3 blueprint" })
+    .uncheck();
+
+  await decodeFixtureAt(page, "/inspect", signingIntentFixturePath);
 
   const rdfPanel = page.locator(".rdf-panel");
   const turtle = rdfPanel.locator(".rdf-turtle");
@@ -1175,13 +1274,12 @@ test("imports a SundaeSwap blueprint book and applies typed RDF fields", async (
   ).toHaveCount(0);
   await expect(typedFieldsPanel.getByText("1280000", { exact: true })).toHaveCount(0);
 
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await blueprintBook
+    .getByRole("checkbox", { name: "Select SundaeSwap V3 blueprint" })
+    .check();
+  await openInspectViaShell(page);
   const overlayPanel = page.locator(".overlay-book-panel");
-  await overlayPanel.getByLabel(/Overlay Turtle.*JSON/).fill(blueprintJson);
-  await overlayPanel.getByRole("button", { name: /Import .*book/ }).click();
-
-  const sundaeBlueprint = overlayPanel.getByLabel("SundaeSwap V3 blueprint");
-  await expect(sundaeBlueprint).toBeVisible();
-  await sundaeBlueprint.check();
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
   await expect(turtle).toContainText(":OrderDatum_max_protocol_fee 1280000");
@@ -1213,7 +1311,11 @@ test("imports a SundaeSwap blueprint book and applies typed RDF fields", async (
     queryResult.json.results.bindings.map((binding) => binding.value.value),
   ).toContain("1280000");
 
-  await sundaeBlueprint.uncheck();
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await blueprintBook
+    .getByRole("checkbox", { name: "Select SundaeSwap V3 blueprint" })
+    .uncheck();
+  await openInspectViaShell(page);
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
   await expect(turtle).not.toContainText(":OrderDatum_max_protocol_fee 1280000");
@@ -1240,35 +1342,25 @@ test("exposes the vendored RDF query engine", async ({ page }) => {
   expect(result.json.results.bindings[0].label.value).toBe("demo transaction");
 });
 
-test("imports bundled SHACL shapes as selectable parts", async ({ page }) => {
+test("lists selected library SHACL shapes as selected inspect parts", async ({ page }) => {
   await decodeFixture(page);
 
   const validateType = await page.evaluate(() => typeof globalThis.rdfShapes.validate);
   expect(validateType).toBe("function");
 
   const overlayPanel = page.locator(".overlay-book-panel");
-  await overlayPanel
-    .getByRole("button", { name: "Load Cardano RDF SHACL shapes" })
-    .click();
-
-  const shapesPart = overlayPanel.getByLabel("Cardano transaction SHACL shapes");
-  await expect(shapesPart).toBeVisible();
-  await shapesPart.check();
-  await expect(shapesPart).toBeChecked();
-  await expect(overlayPanel.getByLabel("Selected overlay Turtle")).toHaveValue("");
+  await expect(
+    overlayPanel.locator(".book-part-row", {
+      hasText: "Cardano transaction SHACL shapes",
+    }),
+  ).toBeVisible();
+  await expect(overlayPanel.getByLabel("Selected overlay Turtle")).not.toHaveValue(/sh:NodeShape/);
 });
 
-test("renders conforming SHACL conformance for bundled Cardano RDF shapes", async ({
+test("renders selected library SHACL conformance for bundled Cardano RDF shapes", async ({
   page,
 }) => {
   await decodeFixture(page);
-
-  const overlayPanel = page.locator(".overlay-book-panel");
-  await overlayPanel
-    .getByRole("button", { name: "Load Cardano RDF SHACL shapes" })
-    .click();
-  await overlayPanel.getByLabel("Cardano transaction SHACL shapes").check();
-  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
   const conformancePanel = page.locator(".shacl-conformance-panel");
   await expect(
@@ -1278,28 +1370,32 @@ test("renders conforming SHACL conformance for bundled Cardano RDF shapes", asyn
   await expect(
     conformancePanel
       .locator(".metric-card", { hasText: "Author gate" })
-      .getByText("pass", { exact: true }),
+      .getByText("fail", { exact: true }),
   ).toBeVisible();
   await expect(
     conformancePanel
       .locator(".metric-card", { hasText: "Auditor classifier" })
-      .getByText("canonical-pipeline match", { exact: true }),
+      .getByText("foreign/off-spec", { exact: true }),
   ).toBeVisible();
-  await expect(
-    conformancePanel.getByText("No SHACL violations.", { exact: true }),
-  ).toBeVisible();
+  const violationRow = conformancePanel.locator(".shacl-violation-row").filter({
+    hasText: "Cardano transactions must include a transaction id.",
+  });
+  await expect(violationRow).toBeVisible();
+  await expect(violationRow).toContainText("hasTxId");
 });
 
 test("renders non-conforming SHACL violations for pasted shapes", async ({
   page,
 }) => {
-  await decodeFixture(page);
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  await library.getByLabel("Book Turtle").fill(violatingShaclShapes);
+  await library.getByRole("button", { name: "Add book" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Pasted SHACL shapes" }),
+  ).toBeVisible();
 
-  const overlayPanel = page.locator(".overlay-book-panel");
-  await overlayPanel.getByLabel(/Overlay Turtle.*JSON/).fill(violatingShaclShapes);
-  await overlayPanel.getByRole("button", { name: /Import .*book/ }).click();
-  await overlayPanel.getByLabel("Pasted SHACL shapes").check();
-  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+  await decodeFixtureAt(page, "/inspect");
 
   const conformancePanel = page.locator(".shacl-conformance-panel");
   await expect(

@@ -31,15 +31,15 @@
 
 ## Slice 4 - Inspect Wiring + Acceptance
 
-- [ ] T106-S4 Make the inspect Books panel read selected store books and
+- [X] T106-S4 Make the inspect Books panel read selected store books and
   merge them into the RDF/decoded-tree resolution path.
-- [ ] T106-S4 Remove inspect hardcoded bundled-book buttons; bundled books
+- [X] T106-S4 Remove inspect hardcoded bundled-book buttons; bundled books
   are seed store entries only.
-- [ ] T106-S4 Extend Playwright coverage for selected store book resolving a
+- [X] T106-S4 Extend Playwright coverage for selected store book resolving a
   decoded-tree node on a genuine fixture.
-- [ ] T106-S4 Keep the non-root subpath navigation, refresh, and deep-link
+- [X] T106-S4 Keep the non-root subpath navigation, refresh, and deep-link
   assertions green for `/inspect`, `/settings`, and `/library`.
-- [ ] T106-S4 Run `./gate.sh` and commit `feat(inspector): resolve inspected trees from selected books`.
+- [X] T106-S4 Run `./gate.sh` and commit `feat(inspector): resolve inspected trees from selected books`.
 
 ## Finalization
 
