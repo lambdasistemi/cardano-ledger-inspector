@@ -4,6 +4,7 @@ module FFI.BookStore
   , Store
   , envelopeKind
   , inspect
+  , annotationTurtle
   , load
   , parseStore
   , save
@@ -64,6 +65,14 @@ foreign import parseStoreImpl
 foreign import serializeImpl :: Store -> String
 
 foreign import inspectImpl :: Store -> BookStoreInspection
+
+foreign import annotationTurtle
+  :: { label :: String
+     , typeName :: String
+     , predicate :: String
+     , value :: String
+     }
+  -> String
 
 serialize :: Store -> String
 serialize = serializeImpl

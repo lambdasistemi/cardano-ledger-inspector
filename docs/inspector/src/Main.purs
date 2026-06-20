@@ -124,6 +124,7 @@ type State =
   , shaclConformance :: Maybe ShaclConformance
   , books :: Array BookStore.Book
   , bookNameEdits :: Array BookNameEdit
+  , annotationDraft :: Maybe AnnotationDraft
   , libraryInput :: String
   , libraryUrl :: String
   , libraryError :: Maybe String
@@ -176,6 +177,16 @@ type BookNameEdit =
   , name :: String
   }
 
+type AnnotationDraft =
+  { rowId :: String
+  , label :: String
+  , typeName :: String
+  , mode :: String
+  , bookId :: String
+  , newBookName :: String
+  , error :: Maybe String
+  }
+
 type InitialKeys =
   { bf :: String
   , koios :: String
@@ -210,6 +221,14 @@ data Action
   | SaveLibraryBookName String
   | DeleteLibraryBook String
   | ApplySelectedBooks
+  | StartDecodedTreeAnnotation RdfShapes.DecodedTreeRow
+  | SetDecodedTreeAnnotationLabel String
+  | SetDecodedTreeAnnotationType String
+  | SetDecodedTreeAnnotationMode String
+  | SetDecodedTreeAnnotationBookId String
+  | SetDecodedTreeAnnotationNewBookName String
+  | CancelDecodedTreeAnnotation
+  | SaveDecodedTreeAnnotation RdfShapes.DecodedTreeRow
   | Decode
   | Copy
   | CopyValue String String
@@ -250,6 +269,7 @@ inspectorComponent initial =
         , shaclConformance: Nothing
         , books: initial.books
         , bookNameEdits: bookNameEditsFromBooks initial.books
+        , annotationDraft: Nothing
         , libraryInput: ""
         , libraryUrl: ""
         , libraryError: Nothing
@@ -770,6 +790,7 @@ inspectorComponent initial =
                   HH.div
                     [ classNames [ "decoded-tree-meta" ] ]
                     [ HH.text metaText ]
+              , renderDecodedTreeAnnotation state row
               ]
           ]
       ] <> if expanded && hasChildren then
@@ -778,6 +799,145 @@ inspectorComponent initial =
             (renderDecodedTreeRows state row.id rows)
         ]
       else []
+
+  renderDecodedTreeAnnotation state row =
+    case state.annotationDraft of
+      Just draft | draft.rowId == row.id ->
+        renderDecodedTreeAnnotationDraft state row draft
+      _ ->
+        if row.resolvedLabel == "" && row.annotationPredicate /= "" && row.annotationValue /= "" then
+          HH.element (HH.ElemName "md-outlined-button")
+            [ classNames [ "inline-action", "decoded-tree-annotate" ]
+            , HH.attr (HH.AttrName "role") "button"
+            , mdControl "inline"
+            , HE.onClick (\_ -> StartDecodedTreeAnnotation row)
+            ]
+            [ HH.text "Label this as..." ]
+        else
+          HH.text ""
+
+  renderDecodedTreeAnnotationDraft state row draft =
+    let
+      localBooks = selectedLocalBooks state
+      hasLocalBooks = not (Array.null localBooks)
+      saveDisabled =
+        String.trim draft.label == ""
+          || row.annotationPredicate == ""
+          || row.annotationValue == ""
+          || (draft.mode == "new" && String.trim draft.newBookName == "")
+          || (draft.mode == "existing" && draft.bookId == "")
+    in
+      HH.div
+        [ classNames [ "decoded-tree-annotation-form" ] ]
+        [ HH.label
+            [ classNames [ "field-stack" ] ]
+            [ HH.span
+                [ classNames [ "field-label" ] ]
+                [ HH.text "Label" ]
+            , HH.input
+                [ HP.type_ HP.InputText
+                , HP.value draft.label
+                , HH.attr (HH.AttrName "aria-label") "Label"
+                , HE.onValueInput SetDecodedTreeAnnotationLabel
+                ]
+            ]
+        , HH.label
+            [ classNames [ "field-stack" ] ]
+            [ HH.span
+                [ classNames [ "field-label" ] ]
+                [ HH.text "Optional type" ]
+            , HH.input
+                [ HP.type_ HP.InputText
+                , HP.value draft.typeName
+                , HH.attr (HH.AttrName "aria-label") "Optional type"
+                , HE.onValueInput SetDecodedTreeAnnotationType
+                ]
+            ]
+        , HH.fieldset
+            [ classNames [ "annotation-book-mode" ] ]
+            [ HH.legend_ [ HH.text "Book" ]
+            , HH.label
+                [ choiceClass (draft.mode == "new") ]
+                [ HH.input
+                    [ HP.type_ HP.InputRadio
+                    , HP.name ("annotation-book-mode-" <> row.id)
+                    , HP.checked (draft.mode == "new")
+                    , HE.onChange (\_ -> SetDecodedTreeAnnotationMode "new")
+                    ]
+                , HH.span
+                    [ classNames [ "choice-title" ] ]
+                    [ HH.text "Create new local book" ]
+                ]
+            , HH.label
+                [ choiceClass (draft.mode == "existing") ]
+                [ HH.input
+                    [ HP.type_ HP.InputRadio
+                    , HP.name ("annotation-book-mode-" <> row.id)
+                    , HP.checked (draft.mode == "existing")
+                    , HP.disabled (not hasLocalBooks)
+                    , HE.onChange (\_ -> SetDecodedTreeAnnotationMode "existing")
+                    ]
+                , HH.span
+                    [ classNames [ "choice-title" ] ]
+                    [ HH.text "Append to existing book" ]
+                ]
+            ]
+        , if draft.mode == "existing" then
+            HH.label
+              [ classNames [ "field-stack" ] ]
+              [ HH.span
+                  [ classNames [ "field-label" ] ]
+                  [ HH.text "Target book" ]
+              , HH.select
+                  [ HP.value draft.bookId
+                  , HH.attr (HH.AttrName "aria-label") "Target book"
+                  , HE.onValueChange SetDecodedTreeAnnotationBookId
+                  ]
+                  (map renderAnnotationBookOption localBooks)
+              ]
+          else
+            HH.label
+              [ classNames [ "field-stack" ] ]
+              [ HH.span
+                  [ classNames [ "field-label" ] ]
+                  [ HH.text "New book name" ]
+              , HH.input
+                  [ HP.type_ HP.InputText
+                  , HP.value draft.newBookName
+                  , HH.attr (HH.AttrName "aria-label") "New book name"
+                  , HE.onValueInput SetDecodedTreeAnnotationNewBookName
+                  ]
+              ]
+        , case draft.error of
+            Just err ->
+              HH.div
+                [ classNames [ "sparql-lens-error" ] ]
+                [ HH.text err ]
+            Nothing -> HH.text ""
+        , HH.div
+            [ classNames [ "annotation-actions" ] ]
+            [ HH.element (HH.ElemName "md-filled-button")
+                [ classNames [ "primary-action" ]
+                , HH.attr (HH.AttrName "role") "button"
+                , mdControl "primary"
+                , HP.disabled saveDisabled
+                , HE.onClick (\_ -> SaveDecodedTreeAnnotation row)
+                ]
+                [ HH.text "Save label" ]
+            , HH.element (HH.ElemName "md-outlined-button")
+                [ classNames [ "secondary-action" ]
+                , HH.attr (HH.AttrName "role") "button"
+                , mdControl "secondary"
+                , HE.onClick (\_ -> CancelDecodedTreeAnnotation)
+                ]
+                [ HH.text "Cancel" ]
+            ]
+        ]
+
+  renderAnnotationBookOption book =
+    HH.option
+      [ HP.value book.id ]
+      [ HH.text book.name ]
 
   renderProvider state =
     HH.element (HH.ElemName "md-elevated-card")
@@ -1319,6 +1479,9 @@ inspectorComponent initial =
 
   selectedBooks state =
     BookStore.selectedBooks { kind: BookStore.envelopeKind, books: state.books }
+
+  selectedLocalBooks state =
+    Array.filter (\book -> book.selected && not book.seed) state.books
 
   selectedBookParts state =
     Array.concatMap _.parts (selectedBooks state)
@@ -2301,6 +2464,47 @@ inspectorComponent initial =
                           rdfResult.stderr
                       )
                 }
+    StartDecodedTreeAnnotation row -> do
+      st <- H.get
+      let
+        localBooks = selectedLocalBooks st
+        firstBookId =
+          case Array.head localBooks of
+            Just book -> book.id
+            Nothing   -> ""
+        mode =
+          if Array.null localBooks then "new" else "existing"
+      H.modify_
+        _
+          { annotationDraft =
+              Just
+                { rowId: row.id
+                , label: ""
+                , typeName: ""
+                , mode
+                , bookId: firstBookId
+                , newBookName: "Inline fixture annotations"
+                , error: Nothing
+                }
+          }
+    SetDecodedTreeAnnotationLabel value ->
+      updateAnnotationDraft \draft -> draft { label = value, error = Nothing }
+    SetDecodedTreeAnnotationType value ->
+      updateAnnotationDraft \draft -> draft { typeName = value, error = Nothing }
+    SetDecodedTreeAnnotationMode mode ->
+      updateAnnotationDraft \draft -> draft { mode = mode, error = Nothing }
+    SetDecodedTreeAnnotationBookId bookId ->
+      updateAnnotationDraft \draft -> draft { bookId = bookId, error = Nothing }
+    SetDecodedTreeAnnotationNewBookName value ->
+      updateAnnotationDraft \draft -> draft { newBookName = value, error = Nothing }
+    CancelDecodedTreeAnnotation ->
+      H.modify_ _ { annotationDraft = Nothing }
+    SaveDecodedTreeAnnotation row -> do
+      st <- H.get
+      case st.annotationDraft of
+        Nothing -> pure unit
+        Just draft ->
+          saveDecodedTreeAnnotation st row draft
     Decode -> do
       st <- H.get
       H.modify_
@@ -2323,6 +2527,7 @@ inspectorComponent initial =
           , browserNodes = []
           , expandedPaths = []
           , decodedTreeExpanded = []
+          , annotationDraft = Nothing
           , copied = false
           , copiedPath = Nothing
           , browserPath = "[]"
@@ -2486,6 +2691,99 @@ inspectorComponent initial =
                 else
                   expandPath rowId st.decodedTreeExpanded
             }
+
+  updateAnnotationDraft update =
+    H.modify_ \st -> st { annotationDraft = map update st.annotationDraft }
+
+  annotationError messageText =
+    updateAnnotationDraft \draft -> draft { error = Just messageText }
+
+  saveDecodedTreeAnnotation st row draft = do
+    let
+      label = String.trim draft.label
+      typeName = String.trim draft.typeName
+      targetName = String.trim draft.newBookName
+      turtle =
+        BookStore.annotationTurtle
+          { label
+          , typeName
+          , predicate: row.annotationPredicate
+          , value: row.annotationValue
+          }
+    if label == "" then
+      annotationError "Label is required."
+    else if row.annotationPredicate == "" || row.annotationValue == "" || turtle == "" then
+      annotationError "This decoded row does not expose a supported annotation identifier."
+    else if draft.mode == "existing" then
+      case Array.find (\book -> book.id == draft.bookId && book.selected && not book.seed) st.books of
+        Nothing ->
+          annotationError "Choose a selected local book."
+        Just targetBook -> do
+          let combined = appendTurtle targetBook.raw turtle
+          parsed <- liftEffect (OverlayBook.parse combined)
+          case parsed of
+            Left err ->
+              annotationError ("Generated Turtle did not parse: " <> err)
+            Right parsedBook -> do
+              let
+                books =
+                  updateBook
+                    targetBook.id
+                    ( \book ->
+                        book
+                          { raw = combined
+                          , parts = parsedBook.parts
+                          , turtle = parsedBook.turtle
+                          }
+                    )
+                    st.books
+              persistAnnotationBooks books
+    else if targetName == "" then
+      annotationError "New book name is required."
+    else do
+      parsed <- liftEffect (OverlayBook.parse turtle)
+      case parsed of
+        Left err ->
+          annotationError ("Generated Turtle did not parse: " <> err)
+        Right parsedBook -> do
+          let
+            newBook =
+              { id: nextLocalBookId st.books
+              , name: targetName
+              , source: "annotation"
+              , raw: turtle
+              , parts: parsedBook.parts
+              , turtle: parsedBook.turtle
+              , selected: true
+              , seed: false
+              }
+            books = Array.snoc st.books newBook
+          persistAnnotationBooks books
+
+  appendTurtle existing fragment =
+    if String.trim existing == "" then
+      String.trim fragment <> "\n"
+    else
+      String.trim existing <> "\n\n" <> String.trim fragment <> "\n"
+
+  persistAnnotationBooks books = do
+    let edits = bookNameEditsFromBooks books
+    liftEffect (saveBooks books)
+    st <- H.get
+    let stWithBooks = st { books = books, bookNameEdits = edits, annotationDraft = Nothing, libraryError = Nothing }
+    resolvedLabelsLens <- resolvedLabelsLensForState stWithBooks
+    decodedTreeLens <- decodedTreeLensForState stWithBooks
+    shaclConformance <- shaclConformanceForState stWithBooks
+    H.modify_
+      _
+        { books = books
+        , bookNameEdits = edits
+        , annotationDraft = Nothing
+        , libraryError = Nothing
+        , resolvedLabelsLens = resolvedLabelsLens
+        , decodedTreeLens = decodedTreeLens
+        , shaclConformance = shaclConformance
+        }
 
   importLibraryBookText raw = do
     let input = String.trim raw

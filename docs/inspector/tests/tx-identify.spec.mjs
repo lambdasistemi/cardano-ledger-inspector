@@ -1250,6 +1250,114 @@ fixture:selectedLibraryAddress
   await expect(page.getByRole("button", { name: "Load Cardano RDF SHACL shapes" })).toHaveCount(0);
 });
 
+test("labels decoded-tree nodes into local books and resolves immediately", async ({
+  page,
+}) => {
+  await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
+
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+
+  const addressRows = decodedPanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Address" });
+  await expect(addressRows.first()).toBeVisible();
+  expect(await addressRows.count()).toBeGreaterThan(1);
+
+  const firstAddressRow = addressRows.first();
+  const rawAddress = await firstAddressRow.locator(".decoded-tree-summary").innerText();
+  expect(rawAddress).toMatch(/^[0-9a-f]+$/);
+
+  const inlineLabel = "Inline annotated fixture address";
+  await expect(firstAddressRow).not.toContainText(inlineLabel);
+  await firstAddressRow
+    .getByRole("button", { name: "Label this as..." })
+    .click();
+  await firstAddressRow.getByLabel("Label").fill(inlineLabel);
+  await firstAddressRow.getByLabel("Optional type").fill("FixtureAddress");
+  await firstAddressRow.getByRole("radio", { name: "Create new local book" }).check();
+  await firstAddressRow.getByLabel("New book name").fill("Inline fixture annotations");
+  await firstAddressRow.getByRole("button", { name: "Save label" }).click();
+
+  await expect(firstAddressRow).toContainText(inlineLabel);
+
+  const datumHashRow = decodedPanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Datum hash" })
+    .first();
+  const appendedLabel = "Existing-book annotated fixture datum hash";
+  await datumHashRow
+    .getByRole("button", { name: "Label this as..." })
+    .click();
+  await datumHashRow.getByLabel("Label").fill(appendedLabel);
+  await datumHashRow.getByRole("radio", { name: "Append to existing book" }).check();
+  await datumHashRow.getByLabel("Target book").selectOption({
+    label: "Inline fixture annotations",
+  });
+  await datumHashRow.getByRole("button", { name: "Save label" }).click();
+
+  await expect(datumHashRow).toContainText(appendedLabel);
+
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const store = JSON.parse(rawStore);
+  const generatedBook = store.books.find(
+    (book) => book.name === "Inline fixture annotations",
+  );
+  expect(generatedBook).toBeTruthy();
+  expect(generatedBook.seed).toBe(false);
+  expect(generatedBook.selected).toBe(true);
+  expect(generatedBook.raw).toContain("@prefix cardano:");
+  expect(generatedBook.raw).toContain("@prefix rdfs:");
+  expect(generatedBook.raw).toContain("@prefix local:");
+  expect(generatedBook.raw).toContain("cardano:bech32");
+  expect(generatedBook.raw).toContain(inlineLabel);
+  expect(generatedBook.raw).toContain(appendedLabel);
+
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await expect(page).toHaveURL(/\/library$/);
+  const [selectedDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export selected books" }).click(),
+  ]);
+  const selectedPath = await selectedDownload.path();
+  expect(selectedPath).not.toBeNull();
+  const selectedJson = await readFile(selectedPath, "utf8");
+
+  const browser = page.context().browser();
+  expect(browser).not.toBeNull();
+  const cleanContext = await browser.newContext();
+  try {
+    const cleanPage = await cleanContext.newPage();
+    await cleanPage.goto("/library");
+    await cleanPage.getByLabel("Book store JSON file").setInputFiles({
+      name: "generated-annotations.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(selectedJson),
+    });
+    await expect(
+      cleanPage
+        .locator(".library-book", { hasText: "Inline fixture annotations" })
+        .getByRole("checkbox", { name: "Select Inline fixture annotations" }),
+    ).toBeChecked();
+
+    await decodeFixtureAt(cleanPage, "/inspect", conwayMainnetFixturePath);
+    const cleanDecodedPanel = cleanPage.locator(".decoded-structure-panel");
+    await cleanDecodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+    await expect(
+      cleanDecodedPanel
+        .locator(".decoded-tree-row")
+        .filter({ hasText: "Address" })
+        .filter({ hasText: inlineLabel })
+        .first(),
+    ).toContainText(inlineLabel);
+  } finally {
+    await cleanContext.close();
+  }
+});
+
 test("selected library blueprint book applies typed RDF fields", async ({
   page,
 }) => {

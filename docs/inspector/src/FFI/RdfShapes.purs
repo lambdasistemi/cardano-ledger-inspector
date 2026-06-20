@@ -32,6 +32,8 @@ type DecodedTreeRow =
   , raw :: String
   , resolvedLabel :: String
   , resolvedType :: String
+  , annotationPredicate :: String
+  , annotationValue :: String
   }
 
 type TransactionOutputRow =
