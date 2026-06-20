@@ -1133,6 +1133,11 @@ md-icon-button:focus-visible,
   min-width: 104px;
 }
 
+.decoded-tree-annotate {
+  justify-self: start;
+  max-width: 100%;
+}
+
 .decoded-tree-summary,
 .decoded-tree-meta {
   min-width: 0;
@@ -1143,6 +1148,45 @@ md-icon-button:focus-visible,
 
 .decoded-tree-meta {
   font-size: 0.78rem;
+}
+
+.decoded-tree-annotation-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.decoded-tree-annotation-form .field-stack,
+.decoded-tree-annotation-form input,
+.decoded-tree-annotation-form select {
+  min-width: 0;
+}
+
+.annotation-book-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.annotation-book-mode legend {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.annotation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .decoded-tree-children {
@@ -1429,6 +1473,7 @@ pre {
 
   .browser-heading,
   .browser-row,
+  .decoded-tree-annotation-form,
   .library-book-heading,
   .library-book-controls,
   .overlay-selection-grid,
@@ -1469,6 +1514,10 @@ pre {
   }
 
   .overlay-actions {
+    display: grid;
+  }
+
+  .annotation-actions {
     display: grid;
   }
 

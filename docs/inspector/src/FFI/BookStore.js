@@ -3,6 +3,8 @@ const STORE_KIND = "cardano-ledger-inspector.books.v1";
 const text = (value) =>
   value === null || value === undefined ? "" : String(value);
 
+const literal = (value) => JSON.stringify(text(value));
+
 const invalid = (message) => {
   throw new Error(message);
 };
@@ -91,4 +93,50 @@ export const inspectImpl = (store) => {
     selectedCount: normalized.books.filter((book) => book.selected).length,
     partCount: normalized.books.reduce((total, book) => total + book.parts.length, 0),
   };
+};
+
+const hashText = (raw) => {
+  let hash = 2166136261;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+const localToken = (value, fallback = "Annotation") => {
+  const token = text(value)
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (token === "") return fallback;
+  return /^[A-Za-z_]/.test(token) ? token : `${fallback}-${token}`;
+};
+
+const turtleType = (value) => {
+  const raw = text(value).trim();
+  if (raw === "") return "";
+  if (/^https?:\/\//.test(raw) || raw.startsWith("urn:")) return `<${raw}>`;
+  if (/^(cardano|rdfs|local):[A-Za-z_][A-Za-z0-9_-]*$/.test(raw)) return raw;
+  return `local:${localToken(raw, "Type")}`;
+};
+
+export const annotationTurtle = ({ label, typeName, predicate, value }) => {
+  const trimmedLabel = text(label).trim();
+  const trimmedPredicate = text(predicate).trim();
+  const trimmedValue = text(value).trim();
+  if (trimmedLabel === "" || trimmedPredicate === "" || trimmedValue === "") return "";
+
+  const subject = `local:annotation-${localToken(trimmedPredicate, "predicate").toLowerCase()}-${hashText(`${trimmedPredicate}\n${trimmedValue}`)}`;
+  const typeObject = turtleType(typeName);
+  const typeLine = typeObject === "" ? "" : `  a ${typeObject} ;\n`;
+
+  return `@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix local: <https://lambdasistemi.github.io/cardano-ledger-inspector/overlay/local#> .
+
+${subject}
+${typeLine}  rdfs:label ${literal(trimmedLabel)} ;
+  ${trimmedPredicate} ${literal(trimmedValue)} .
+`;
 };
