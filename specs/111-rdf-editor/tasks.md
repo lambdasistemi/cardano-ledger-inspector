@@ -19,12 +19,12 @@
 
 ## Slice 3 - validated save-back
 
-- [ ] T111-S3 Track editor drafts without mutating stored books while typing.
-- [ ] T111-S3 On save, validate edited content through `OverlayBook.parse`.
-- [ ] T111-S3 Persist only successful parse results, updating raw/source/parts/turtle fields consistently.
-- [ ] T111-S3 Reject invalid input with a clear visible error and leave localStorage unchanged.
-- [ ] T111-S3 Prove focused save-back behavior with build or browser smoke evidence.
-- [ ] T111-S3 Commit as `feat(ui): validate book editor save-back`.
+- [X] T111-S3 Track editor drafts without mutating stored books while typing.
+- [X] T111-S3 On save, validate edited content through `OverlayBook.parse`.
+- [X] T111-S3 Persist only successful parse results, updating raw/source/parts/turtle fields consistently.
+- [X] T111-S3 Reject invalid input with a clear visible error and leave localStorage unchanged.
+- [X] T111-S3 Prove focused save-back behavior with build or browser smoke evidence.
+- [X] T111-S3 Commit as `feat(ui): validate book editor save-back`.
 
 ## Slice 4 - acceptance hardening
 

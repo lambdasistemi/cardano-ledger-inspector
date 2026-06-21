@@ -501,6 +501,12 @@ fieldset {
   justify-content: end;
 }
 
+.inline-status {
+  color: var(--accent-strong);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 .rdf-editor-host {
   min-height: 280px;
   max-height: 58vh;

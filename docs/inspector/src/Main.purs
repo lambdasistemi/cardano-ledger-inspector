@@ -225,6 +225,7 @@ data Action
   | SaveLibraryBookName String
   | DeleteLibraryBook String
   | CopyLibraryBookSource String
+  | SaveLibraryBookSource String
   | ApplySelectedBooks
   | StartDecodedTreeAnnotation RdfShapes.DecodedTreeRow
   | SetDecodedTreeAnnotationLabel String
@@ -598,13 +599,15 @@ inspectorComponent initial =
                     [ HH.text ("Delete " <> book.name) ]
                 ]
             ]
-        , renderLibraryBookEditor book
+        , renderLibraryBookEditor state book
         ]
 
-  renderLibraryBookEditor book =
+  renderLibraryBookEditor state book =
     let
       sourceText = libraryBookSourceText book
       editorMode = libraryBookEditorMode book
+      saved = state.copiedPath == Just ("library:" <> book.id <> ":saved")
+      copied = state.copiedPath == Just ("library:" <> book.id)
     in
       HH.div
         [ classNames [ "library-source-panel" ] ]
@@ -612,7 +615,7 @@ inspectorComponent initial =
             [ classNames [ "library-source-heading" ] ]
             [ HH.div_
                 [ HH.h3_ [ HH.text "Source" ]
-                , HH.p_ [ HH.text "Draft edits stay local until save validation is added." ]
+                , HH.p_ [ HH.text "Draft edits stay local until you save." ]
                 ]
             , HH.div
                 [ classNames [ "library-row-actions", "library-source-actions" ] ]
@@ -622,14 +625,26 @@ inspectorComponent initial =
                     , mdControl "secondary"
                     , HE.onClick (\_ -> CopyLibraryBookSource book.id)
                     ]
-                    [ HH.text ("Copy " <> book.name <> " source") ]
+                    [ HH.text
+                        ( if copied then
+                            "Copied " <> book.name <> " source"
+                          else
+                            "Copy " <> book.name <> " source"
+                        )
+                    ]
                 , HH.element (HH.ElemName "md-outlined-button")
                     [ classNames [ "secondary-action" ]
                     , HH.attr (HH.AttrName "role") "button"
                     , mdControl "secondary"
-                    , HP.disabled true
+                    , HE.onClick (\_ -> SaveLibraryBookSource book.id)
                     ]
-                    [ HH.text "Save pending" ]
+                    [ HH.text ("Save " <> book.name <> " source") ]
+                , if saved then
+                    HH.span
+                      [ classNames [ "inline-status" ] ]
+                      [ HH.text ("Saved " <> book.name <> " source") ]
+                  else
+                    HH.text ""
                 ]
             ]
         , HH.slot_
@@ -2436,7 +2451,11 @@ inspectorComponent initial =
       liftEffect (saveBooks books)
       H.modify_ _ { books = books }
     SetLibraryBookName bookId name ->
-      H.modify_ \st -> st { bookNameEdits = upsertBookNameEdit bookId name st.bookNameEdits }
+      H.modify_ \st ->
+        st
+          { bookNameEdits = upsertBookNameEdit bookId name st.bookNameEdits
+          , copiedPath = Nothing
+          }
     SaveLibraryBookName bookId -> do
       st <- H.get
       let
@@ -2477,6 +2496,49 @@ inspectorComponent initial =
                 )
             )
           H.modify_ _ { copiedPath = Just ("library:" <> bookId) }
+    SaveLibraryBookSource bookId -> do
+      st <- H.get
+      case Array.find (\book -> book.id == bookId) st.books of
+        Nothing -> pure unit
+        Just book -> do
+          draft <- H.request _libraryEditor bookId GetLibraryEditorValue
+          case draft of
+            Nothing ->
+              H.modify_
+                _
+                  { libraryError = Just ("Could not read editor draft for " <> book.name <> ".")
+                  , copiedPath = Nothing
+                  }
+            Just value -> do
+              parsed <- liftEffect (OverlayBook.parse value)
+              case parsed of
+                Left err ->
+                  H.modify_
+                    _
+                      { libraryError = Just ("Save failed for " <> book.name <> ": " <> err)
+                      , copiedPath = Nothing
+                      }
+                Right parsedBook -> do
+                  let
+                    books =
+                      updateBook bookId
+                        ( _
+                            { raw = value
+                            , source = parsedBook.source
+                            , parts = parsedBook.parts
+                            , turtle = parsedBook.turtle
+                            }
+                        )
+                        st.books
+                    edits = bookNameEditsFromBooks books
+                  liftEffect (saveBooks books)
+                  H.modify_
+                    _
+                      { books = books
+                      , bookNameEdits = edits
+                      , libraryError = Nothing
+                      , copiedPath = Just ("library:" <> bookId <> ":saved")
+                      }
     ApplySelectedBooks -> do
       st <- H.get
       case st.txCbor of
