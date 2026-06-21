@@ -15,6 +15,7 @@
             "halogen",
             "maybe",
             "prelude",
+            "rdf-editor",
             "strings",
             "web-events",
             "web-html"
@@ -616,7 +617,11 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "rdf-editor": {
+        "path": "../../packages/purescript-rdf-editor"
+      }
+    }
   },
   "packages": {
     "aff": {
@@ -1306,6 +1311,14 @@
         "newtype",
         "prelude",
         "tuples"
+      ]
+    },
+    "rdf-editor": {
+      "type": "local",
+      "path": "../../packages/purescript-rdf-editor",
+      "dependencies": [
+        "effect",
+        "prelude"
       ]
     },
     "refs": {

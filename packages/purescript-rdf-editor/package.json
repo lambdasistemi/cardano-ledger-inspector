@@ -1,9 +1,9 @@
 {
-  "name": "tx-inspector-ui",
+  "name": "purescript-rdf-editor",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "@bjorn3/browser_wasi_shim": "^0.4.2",
     "@codemirror/commands": "6.10.3",
     "@codemirror/lang-json": "6.0.2",
     "@codemirror/language": "6.12.3",
