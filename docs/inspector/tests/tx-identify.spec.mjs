@@ -285,6 +285,23 @@ async function installClipboardMock(page) {
   });
 }
 
+async function storedBooks(page) {
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  expect(rawStore).not.toBeNull();
+  return JSON.parse(rawStore);
+}
+
+async function replaceCodeMirrorText(page, scope, text) {
+  const editor = scope.locator(".cm-content").first();
+  await expect(editor).toBeVisible();
+  await editor.click();
+  await editor.press("Control+A");
+  await page.keyboard.insertText(text);
+}
+
 test("local book store seeds parsed bundled books into localStorage", async ({
   page,
 }) => {
@@ -384,6 +401,93 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
   const store = JSON.parse(rawStore);
   expect(store.books.map((book) => book.name)).not.toContain("Renamed local treasury label");
   expect(store.books).toHaveLength(3);
+});
+
+test("library editor saves validated drafts and rejects invalid source without mutating storage", async ({
+  page,
+}) => {
+  await installClipboardMock(page);
+  await page.goto("/library");
+
+  const library = page.locator(".library-page");
+  const seedBook = library.locator(".library-book", {
+    hasText: "Amaru treasury 2026 overlay",
+  });
+  await expect(seedBook.locator(".cm-content").first()).toBeVisible();
+
+  await library.getByLabel("Book Turtle").fill(pastedTurtleBook);
+  await library.getByRole("button", { name: "Add book" }).click();
+  const localBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await expect(localBook.locator(".cm-content").first()).toBeVisible();
+
+  const beforeEditRawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const beforeEditStore = JSON.parse(beforeEditRawStore);
+  const beforeEditBook = beforeEditStore.books.find(
+    (book) => book.name === "Pasted overlay Turtle",
+  );
+  expect(beforeEditBook).toBeTruthy();
+
+  const updatedTurtleBook = pastedTurtleBook.replace(
+    "Local treasury label",
+    "Edited treasury label",
+  );
+  await replaceCodeMirrorText(page, localBook, updatedTurtleBook);
+
+  const unsavedRawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  expect(unsavedRawStore).toBe(beforeEditRawStore);
+
+  await localBook
+    .getByRole("button", { name: "Copy Pasted overlay Turtle source" })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(updatedTurtleBook);
+
+  await localBook
+    .getByRole("button", { name: "Save Pasted overlay Turtle source" })
+    .click();
+  await expect(
+    localBook.getByText("Saved Pasted overlay Turtle source", { exact: true }),
+  ).toBeVisible();
+
+  const savedStore = await storedBooks(page);
+  const savedBook = savedStore.books.find(
+    (book) => book.id === beforeEditBook.id,
+  );
+  expect(savedBook).toMatchObject({
+    id: beforeEditBook.id,
+    name: beforeEditBook.name,
+    selected: beforeEditBook.selected,
+    seed: beforeEditBook.seed,
+  });
+  expect(savedBook.raw).toBe(updatedTurtleBook);
+  expect(savedBook.source).toBe("paste");
+  expect(savedBook.turtle).toContain("Edited treasury label");
+  expect(savedBook.parts.length).toBeGreaterThan(0);
+
+  const savedRawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  await replaceCodeMirrorText(page, localBook, "{ invalid json");
+  await localBook
+    .getByRole("button", { name: "Save Pasted overlay Turtle source" })
+    .click();
+  await expect(
+    library.getByText(/Book save failed: Save failed for Pasted overlay Turtle:/),
+  ).toBeVisible();
+
+  const afterRejectedRawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  expect(afterRejectedRawStore).toBe(savedRawStore);
 });
 
 test("library page allocates unique local ids after deleting seed books", async ({
@@ -635,6 +739,7 @@ test("MD3 shell keeps route navigation inside deployed subpaths", async ({
       { path: "library", assert: async () => {
         await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
         await expect(page.locator(".library-page")).toBeVisible();
+        await expect(page.locator(".library-book .cm-content").first()).toBeVisible();
         await expect(page.getByText("Library placeholder", { exact: true })).toHaveCount(0);
       } },
     ];
