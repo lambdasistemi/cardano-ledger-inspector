@@ -512,9 +512,18 @@ inspectorComponent initial =
           Just err ->
             HH.div
               [ classNames [ "sparql-lens-error" ] ]
-              [ HH.text ("Book import failed: " <> err) ]
+              [ HH.text (libraryErrorPrefix err <> err) ]
           Nothing -> HH.text ""
       ]
+
+  libraryErrorPrefix err =
+    if
+      StringCodeUnits.contains (String.Pattern "Save failed") err
+        || StringCodeUnits.contains (String.Pattern "Could not read editor draft") err
+    then
+      "Book save failed: "
+    else
+      "Book import failed: "
 
   renderLibraryBooks state =
     HH.div

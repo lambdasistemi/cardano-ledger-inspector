@@ -28,11 +28,11 @@
 
 ## Slice 4 - acceptance hardening
 
-- [ ] T111-S4 Add `docs/inspector/SECURITY.md` documenting the CodeMirror security tradeoff and constraints.
-- [ ] T111-S4 Add Playwright coverage for open/edit/save, copy, and reject-invalid.
-- [ ] T111-S4 Keep the deployed non-root subpath route coverage green for `/inspect`, `/settings`, and `/library`.
-- [ ] T111-S4 Run `./gate.sh final` locally and record evidence.
-- [ ] T111-S4 Commit as `test(ui): cover validated library editor`.
+- [X] T111-S4 Add `docs/inspector/SECURITY.md` documenting the CodeMirror security tradeoff and constraints.
+- [X] T111-S4 Add Playwright coverage for open/edit/save, copy, and reject-invalid.
+- [X] T111-S4 Keep the deployed non-root subpath route coverage green for `/inspect`, `/settings`, and `/library`.
+- [X] T111-S4 Run `./gate.sh final` locally and record evidence.
+- [X] T111-S4 Commit as `test(ui): cover validated library editor`.
 
 ## Finalization
 
