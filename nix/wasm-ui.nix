@@ -20,6 +20,7 @@
 , wasmArtifact        # derivation whose $out/<name>.wasm is the embedded binary
 , wasmArtifactName    # e.g. "wasm-ledger-smoke"  (used to pick <name>.wasm)
 , rdfShapesWasmPkg    # wasm-bindgen web bundle from lambdasistemi/rdf-shapes-wasm
+, editorPackageSrc ? null
 , src                 # PS project tree (./docs/inspector relative to flake root)
 }:
 
@@ -37,6 +38,22 @@ let
     nodejs = pkgs.nodejs_20;
   };
 
+  editorPackageSetup = if editorPackageSrc == null then "" else ''
+    mkdir -p ../packages
+    cp -R ${editorPackageSrc} ../packages/purescript-rdf-editor
+    chmod -R u+w ../packages/purescript-rdf-editor
+    substituteInPlace spago.yaml \
+      --replace-fail "path: ../../packages/purescript-rdf-editor" \
+                     "path: ../packages/purescript-rdf-editor"
+    substituteInPlace spago.lock \
+      --replace-fail '"path": "../../packages/purescript-rdf-editor"' \
+                     '"path": "../packages/purescript-rdf-editor"'
+  '';
+
+  editorPackageEsbuildArgs =
+    if editorPackageSrc == null then "" else
+      "--alias:purescript-rdf-editor=../packages/purescript-rdf-editor/index.js";
+
 in
 pkgs.mkSpagoDerivation {
   pname = "tx-inspector-ui";
@@ -53,7 +70,10 @@ pkgs.mkSpagoDerivation {
   ];
 
   buildPhase = ''
+    ${editorPackageSetup}
+
     ln -s ${nodeModules}/node_modules node_modules
+    ln -s ${nodeModules}/node_modules ../node_modules
 
     # Copy the WASM binary into the src tree so esbuild's --loader:.wasm=binary
     # can embed it at bundle time.
@@ -69,6 +89,7 @@ pkgs.mkSpagoDerivation {
       --outfile=dist/deps.js \
       --format=iife \
       --platform=browser \
+      ${editorPackageEsbuildArgs} \
       --loader:.wasm=binary \
       --minify
 

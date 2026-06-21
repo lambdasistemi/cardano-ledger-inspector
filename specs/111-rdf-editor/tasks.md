@@ -2,11 +2,11 @@
 
 ## Slice 1 - reusable editor package and build wiring
 
-- [ ] T111-S1 Create `packages/purescript-rdf-editor/` as a standalone Spago package with documented generic API.
-- [ ] T111-S1 Implement CodeMirror 6 FFI for mount/getValue/setValue/onChange/setMode/validate/dispose with Turtle and JSON modes.
-- [ ] T111-S1 Wire the inspector Spago workspace and bootstrap/npm lock to consume the package through its public API only.
-- [ ] T111-S1 Prove `spago build` and `nix build .#packages.x86_64-linux.tx-inspector-ui` pass.
-- [ ] T111-S1 Commit as `feat(ui): add reusable RDF editor package`.
+- [X] T111-S1 Create `packages/purescript-rdf-editor/` as a standalone Spago package with documented generic API.
+- [X] T111-S1 Implement CodeMirror 6 FFI for mount/getValue/setValue/onChange/setMode/validate/dispose with Turtle and JSON modes.
+- [X] T111-S1 Wire the inspector Spago workspace and bootstrap/npm lock to consume the package through its public API only.
+- [X] T111-S1 Prove `spago build` and `nix build .#packages.x86_64-linux.tx-inspector-ui` pass.
+- [X] T111-S1 Commit as `feat(ui): add reusable RDF editor package`.
 
 ## Slice 2 - library editor view and copy action
 

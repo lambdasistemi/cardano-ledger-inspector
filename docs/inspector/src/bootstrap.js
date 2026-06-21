@@ -9,6 +9,7 @@ import * as rdfShapes from "./assets/rdf_shapes_wasm.js";
 import wasmBytes from "./assets/inspector.wasm";
 import rdfShapesWasmBytes from "./assets/rdf_shapes_wasm_bg.wasm";
 import sundaeSwapV3Blueprint from "../protocols/sundaeswap-v3/plutus.json";
+import * as rdfEditor from "purescript-rdf-editor";
 
 const compiledModulePromise = WebAssembly.compile(wasmBytes);
 
@@ -17,6 +18,7 @@ rdfShapes.initSync({
 });
 
 globalThis.rdfShapes = rdfShapes;
+globalThis.rdfEditor = rdfEditor;
 globalThis.sundaeSwapV3BlueprintJson = JSON.stringify(sundaeSwapV3Blueprint, null, 2);
 
 globalThis.runInspector = async (stdinText) => {

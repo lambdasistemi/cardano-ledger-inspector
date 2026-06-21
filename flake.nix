@@ -173,6 +173,7 @@
             wasmArtifact = wasmTargets.wasm-tx-inspector;
             wasmArtifactName = "wasm-tx-inspector";
             rdfShapesWasmPkg = rdf-shapes-wasm.packages.${system}.wasm-pkg;
+            editorPackageSrc = ./packages/purescript-rdf-editor;
             src = ./docs/inspector;
           };
 
