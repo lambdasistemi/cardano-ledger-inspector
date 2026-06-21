@@ -33,6 +33,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Rdf.Editor as RdfEditor
+import Type.Proxy (Proxy(..))
+import Unsafe.Coerce (unsafeCoerce)
 import Web.Event.Event as Event
 import Web.DOM.ParentNode (QuerySelector(..))
 import Web.HTML (window)
@@ -200,7 +203,8 @@ type InitialKeys =
   }
 
 data Action
-  = SetBlockfrostKey String
+  = Initialize
+  | SetBlockfrostKey String
   | SetKoiosBearer String
   | SelectProvider Provider
   | TogglePersist Boolean
@@ -220,6 +224,7 @@ data Action
   | SetLibraryBookName String String
   | SaveLibraryBookName String
   | DeleteLibraryBook String
+  | CopyLibraryBookSource String
   | ApplySelectedBooks
   | StartDecodedTreeAnnotation RdfShapes.DecodedTreeRow
   | SetDecodedTreeAnnotationLabel String
@@ -286,7 +291,7 @@ inspectorComponent initial =
         , theme: initial.theme
         }
     , render
-    , eval: H.mkEval H.defaultEval { handleAction = handleAction }
+    , eval: H.mkEval H.defaultEval { handleAction = handleAction, initialize = Just Initialize }
     }
   where
 
@@ -558,6 +563,7 @@ inspectorComponent initial =
             [ classNames [ "library-book-meta" ] ]
             [ HH.span_ [ HH.text (if book.seed then "seed" else "local") ]
             , HH.span_ [ HH.text book.source ]
+            , HH.span_ [ HH.text (libraryEditorModeLabel (libraryBookEditorMode book) <> " editor") ]
             ]
         , HH.div
             [ classNames [ "library-book-controls" ] ]
@@ -592,6 +598,47 @@ inspectorComponent initial =
                     [ HH.text ("Delete " <> book.name) ]
                 ]
             ]
+        , renderLibraryBookEditor book
+        ]
+
+  renderLibraryBookEditor book =
+    let
+      sourceText = libraryBookSourceText book
+      editorMode = libraryBookEditorMode book
+    in
+      HH.div
+        [ classNames [ "library-source-panel" ] ]
+        [ HH.div
+            [ classNames [ "library-source-heading" ] ]
+            [ HH.div_
+                [ HH.h3_ [ HH.text "Source" ]
+                , HH.p_ [ HH.text "Draft edits stay local until save validation is added." ]
+                ]
+            , HH.div
+                [ classNames [ "library-row-actions", "library-source-actions" ] ]
+                [ HH.element (HH.ElemName "md-outlined-button")
+                    [ classNames [ "secondary-action" ]
+                    , HH.attr (HH.AttrName "role") "button"
+                    , mdControl "secondary"
+                    , HE.onClick (\_ -> CopyLibraryBookSource book.id)
+                    ]
+                    [ HH.text ("Copy " <> book.name <> " source") ]
+                , HH.element (HH.ElemName "md-outlined-button")
+                    [ classNames [ "secondary-action" ]
+                    , HH.attr (HH.AttrName "role") "button"
+                    , mdControl "secondary"
+                    , HP.disabled true
+                    ]
+                    [ HH.text "Save pending" ]
+                ]
+            ]
+        , HH.slot_
+            _libraryEditor
+            book.id
+            libraryEditorComponent
+            { value: sourceText
+            , mode: editorMode
+            }
         ]
 
   renderSettingsSummary state =
@@ -2268,6 +2315,7 @@ inspectorComponent initial =
       Nothing -> pure Nothing
 
   handleAction = case _ of
+    Initialize -> pure unit
     Navigate route event -> do
       routeBase <- H.gets _.routeBase
       liftEffect do
@@ -2415,6 +2463,20 @@ inspectorComponent initial =
               edits = Array.filter (\edit -> edit.id /= bookId) st.bookNameEdits
             liftEffect (saveBooks books)
             H.modify_ _ { books = books, bookNameEdits = edits }
+    CopyLibraryBookSource bookId -> do
+      st <- H.get
+      case Array.find (\book -> book.id == bookId) st.books of
+        Nothing -> pure unit
+        Just book -> do
+          draft <- H.request _libraryEditor bookId GetLibraryEditorValue
+          H.liftAff
+            ( Clipboard.copy
+                ( case draft of
+                    Just value -> value
+                    Nothing    -> libraryBookSourceText book
+                )
+            )
+          H.modify_ _ { copiedPath = Just ("library:" <> bookId) }
     ApplySelectedBooks -> do
       st <- H.get
       case st.txCbor of
@@ -2898,3 +2960,131 @@ inspectorComponent initial =
       partCount = Array.length book.parts
     in
       show partCount <> if partCount == 1 then " part" else " parts"
+
+  libraryBookSourceText book =
+    if String.trim book.raw == "" then book.source else book.raw
+
+  libraryBookEditorMode book =
+    let
+      source = String.trim (libraryBookSourceText book)
+      first = StringCodeUnits.take 1 source
+    in
+      if first == "{" || first == "[" then RdfEditor.Json else RdfEditor.Turtle
+
+  libraryEditorModeLabel = case _ of
+    RdfEditor.Json -> "JSON"
+    RdfEditor.Turtle -> "Turtle"
+
+_libraryEditor :: Proxy "libraryEditor"
+_libraryEditor = Proxy
+
+type LibraryEditorInput =
+  { value :: String
+  , mode :: RdfEditor.Mode
+  }
+
+type LibraryEditorState =
+  { value :: String
+  , mode :: RdfEditor.Mode
+  , handle :: Maybe RdfEditor.Handle
+  }
+
+data LibraryEditorAction
+  = InitializeLibraryEditor
+  | ReceiveLibraryEditorInput LibraryEditorInput
+  | FinalizeLibraryEditor
+
+data LibraryEditorQuery a
+  = GetLibraryEditorValue (String -> a)
+
+libraryEditorComponent
+  :: forall m
+   . MonadAff m
+  => H.Component LibraryEditorQuery LibraryEditorInput Void m
+libraryEditorComponent =
+  H.mkComponent
+    { initialState: \input ->
+        { value: input.value
+        , mode: input.mode
+        , handle: Nothing
+        }
+    , render: renderLibraryEditor
+    , eval:
+        H.mkEval
+          H.defaultEval
+            { handleAction = handleLibraryEditorAction
+            , handleQuery = handleLibraryEditorQuery
+            , initialize = Just InitializeLibraryEditor
+            , receive = Just <<< ReceiveLibraryEditorInput
+            , finalize = Just FinalizeLibraryEditor
+            }
+    }
+
+renderLibraryEditor
+  :: forall m
+   . LibraryEditorState
+  -> H.ComponentHTML LibraryEditorAction () m
+renderLibraryEditor _ =
+  HH.div
+    [ HP.classes [ HH.ClassName "rdf-editor-host" ]
+    , HP.ref (H.RefLabel "rdf-editor-host")
+    ]
+    []
+
+handleLibraryEditorAction
+  :: forall m
+   . MonadAff m
+  => LibraryEditorAction
+  -> H.HalogenM LibraryEditorState LibraryEditorAction () Void m Unit
+handleLibraryEditorAction = case _ of
+  InitializeLibraryEditor -> do
+    st <- H.get
+    target <- H.getHTMLElementRef (H.RefLabel "rdf-editor-host")
+    case target of
+      Nothing -> pure unit
+      Just element -> do
+        handle <-
+          liftEffect
+            ( RdfEditor.mount
+                (unsafeCoerce element)
+                { value: st.value
+                , mode: st.mode
+                }
+            )
+        H.modify_ _ { handle = Just handle }
+  ReceiveLibraryEditorInput input -> do
+    st <- H.get
+    case st.handle of
+      Nothing ->
+        H.modify_ _ { value = input.value, mode = input.mode }
+      Just handle -> do
+        when (st.value /= input.value) do
+          liftEffect (RdfEditor.setValue handle input.value)
+        when (not (sameLibraryEditorMode st.mode input.mode)) do
+          liftEffect (RdfEditor.setMode handle input.mode)
+        H.modify_ _ { value = input.value, mode = input.mode }
+  FinalizeLibraryEditor -> do
+    st <- H.get
+    case st.handle of
+      Nothing -> pure unit
+      Just handle -> do
+        liftEffect (RdfEditor.dispose handle)
+        H.modify_ _ { handle = Nothing }
+
+handleLibraryEditorQuery
+  :: forall a m
+   . MonadAff m
+  => LibraryEditorQuery a
+  -> H.HalogenM LibraryEditorState LibraryEditorAction () Void m (Maybe a)
+handleLibraryEditorQuery = case _ of
+  GetLibraryEditorValue reply -> do
+    st <- H.get
+    value <- case st.handle of
+      Just handle -> liftEffect (RdfEditor.getValue handle)
+      Nothing     -> pure st.value
+    pure (Just (reply value))
+
+sameLibraryEditorMode :: RdfEditor.Mode -> RdfEditor.Mode -> Boolean
+sameLibraryEditorMode RdfEditor.Json RdfEditor.Json = true
+sameLibraryEditorMode RdfEditor.Turtle RdfEditor.Turtle = true
+sameLibraryEditorMode _ _ = false

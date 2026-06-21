@@ -10,12 +10,12 @@
 
 ## Slice 2 - library editor view and copy action
 
-- [ ] T111-S2 Render a `/library` editor surface for stored books using the reusable package API.
-- [ ] T111-S2 Select Turtle or JSON mode from the stored book source/raw content.
-- [ ] T111-S2 Add per-book Copy through `FFI.Clipboard.copy`.
-- [ ] T111-S2 Keep Material styling consistent and responsive.
-- [ ] T111-S2 Prove the focused UI build passes.
-- [ ] T111-S2 Commit as `feat(ui): expose book source editor in library`.
+- [X] T111-S2 Render a `/library` editor surface for stored books using the reusable package API.
+- [X] T111-S2 Select Turtle or JSON mode from the stored book source/raw content.
+- [X] T111-S2 Add per-book Copy through `FFI.Clipboard.copy`.
+- [X] T111-S2 Keep Material styling consistent and responsive.
+- [X] T111-S2 Prove the focused UI build passes.
+- [X] T111-S2 Commit as `feat(ui): expose book source editor in library`.
 
 ## Slice 3 - validated save-back
 
