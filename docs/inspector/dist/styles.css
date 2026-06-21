@@ -470,6 +470,59 @@ fieldset {
   align-items: start;
 }
 
+.library-source-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-low);
+  padding: 12px;
+}
+
+.library-source-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+}
+
+.library-source-heading h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.library-source-heading p {
+  margin: 0.18rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.library-source-actions {
+  justify-content: end;
+}
+
+.rdf-editor-host {
+  min-height: 280px;
+  max-height: 58vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.rdf-editor-host .cm-editor {
+  min-height: 280px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.rdf-editor-host .cm-gutters {
+  background: var(--md-sys-color-surface-container);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
 .library-book-heading h2 {
   margin: 0;
   font-size: 1.05rem;
@@ -1476,6 +1529,7 @@ pre {
   .decoded-tree-annotation-form,
   .library-book-heading,
   .library-book-controls,
+  .library-source-heading,
   .overlay-selection-grid,
   .sparql-lens-row {
     grid-template-columns: 1fr;
@@ -1507,6 +1561,15 @@ pre {
 
   .library-row-actions {
     display: grid;
+  }
+
+  .library-source-actions {
+    justify-content: stretch;
+  }
+
+  .rdf-editor-host,
+  .rdf-editor-host .cm-editor {
+    min-height: 220px;
   }
 
   .books-actions {
