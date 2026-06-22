@@ -6,13 +6,14 @@
 # Pattern ported from the /purescript skill (graph-browser, cardano-mpfs-browser):
 #   1. importNpmLock.buildNodeModules → reproducible node_modules from committed
 #      package-lock.json
-#   2. esbuild bundles src/bootstrap.js (npm deps + WASM bytes as binary loader)
-#      → dist/deps.js
+#   2. esbuild bundles src/bootstrap.js and emits WASM assets with hashed names
+#      → dist/deps.js + dist/*.wasm
 #   3. spago bundle --offline --module Main → dist/index.js
 #   4. Concatenate deps + app → final dist/index.js
 #
 # The inspector's .wasm is pulled in as a build-time input and copied into the
-# src tree before bundling, so esbuild's `--loader:.wasm=binary` embeds it.
+# src tree before bundling, so esbuild's `--loader:.wasm=file` emits it as a
+# cacheable browser asset.
 { system
 , nixpkgs
 , purescript-overlay
@@ -67,6 +68,8 @@ pkgs.mkSpagoDerivation {
     pkgs.spago-unstable
     pkgs.esbuild
     pkgs.nodejs_20
+    pkgs.gzip
+    pkgs.brotli
   ];
 
   buildPhase = ''
@@ -75,22 +78,24 @@ pkgs.mkSpagoDerivation {
     ln -s ${nodeModules}/node_modules node_modules
     ln -s ${nodeModules}/node_modules ../node_modules
 
-    # Copy the WASM binary into the src tree so esbuild's --loader:.wasm=binary
-    # can embed it at bundle time.
+    # Copy the WASM binaries into the src tree so esbuild's --loader:.wasm=file
+    # can emit hashed browser assets at bundle time.
     mkdir -p src/assets
     cp ${wasmArtifact}/${wasmArtifactName}.wasm src/assets/inspector.wasm
     cp ${rdfShapesWasmPkg}/rdf_shapes_wasm.js src/assets/rdf_shapes_wasm.js
     cp ${rdfShapesWasmPkg}/rdf_shapes_wasm_bg.wasm src/assets/rdf_shapes_wasm_bg.wasm
     chmod -R u+w src/assets
 
-    # 1. npm deps + WASM bytes → dist/deps.js (IIFE)
+    # 1. npm deps + WASM asset URLs → dist/deps.js (IIFE) + dist/*.wasm
     esbuild src/bootstrap.js \
       --bundle \
       --outfile=dist/deps.js \
       --format=iife \
       --platform=browser \
       ${editorPackageEsbuildArgs} \
-      --loader:.wasm=binary \
+      --loader:.wasm=file \
+      --asset-names='[name].[hash]' \
+      --public-path=. \
       --minify
 
     # 2. PureScript → dist/index.js
@@ -108,14 +113,23 @@ pkgs.mkSpagoDerivation {
     cp dist/index.js $out/
     cp dist/styles.css $out/
     cp dist/material.js $out/
+    cp dist/*.wasm $out/
 
     for route in inspect settings library; do
       mkdir -p "$out/$route"
-      cp dist/index.html "$out/$route/"
-      cp dist/index.js "$out/$route/"
-      cp dist/styles.css "$out/$route/"
-      cp dist/material.js "$out/$route/"
+      sed \
+        -e 's#href="./styles.css"#href="../styles.css"#' \
+        -e 's#src="./material.js"#src="../material.js"#' \
+        -e 's#src="./index.js#src="../index.js#' \
+        dist/index.html > "$out/$route/index.html"
     done
+
+    while IFS= read -r -d "" asset; do
+      gzip -9 -n -k "$asset"
+      brotli --best --keep "$asset"
+    done < <(find "$out" -type f \
+      \( -name '*.html' -o -name '*.js' -o -name '*.css' -o -name '*.wasm' \) \
+      -print0)
   '';
 
   passthru = { inherit nodeModules pkgs; };

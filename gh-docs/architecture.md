@@ -47,8 +47,10 @@ the same dispatcher and gets the same JSON contract.
 
 `docs/inspector/` contains the PureScript workbench. It is responsible for
 fetching or accepting transaction CBOR, managing local browser state, invoking
-the WASI module, and presenting operation results. The browser bundle embeds
-the built `wasm-tx-inspector.wasm` artifact at build time.
+the WASI module, and presenting operation results. The browser package emits
+the built `wasm-tx-inspector.wasm` and RDF shapes wasm as separate hashed
+assets, then loads them with WebAssembly streaming APIs and non-streaming
+fallbacks for hosts that do not serve `application/wasm`.
 
 ### Inspector library
 
@@ -154,7 +156,7 @@ per-system `pkgs`, `ghc-wasm-meta`, CHaP source, and target source tree into
 | `packages.<system>.tx-deep-diagnosis` | Native executable `tx-deep-diagnosis` | Native CLI that links the inspector library, resolves inputs via Blockfrost, and labels script hashes against vendored blueprints + the Amaru journal. Produces a layered diagnosis report. |
 | `packages.<system>.tx-deep-diagnosis-render-snapshot` | Native executable `tx-deep-diagnosis-render-snapshot` | Golden-file snapshot harness for the explain-artifact renderers; `--write` regenerates the expected files under `apps/tx-deep-diagnosis/test/golden/`. |
 | `packages.<system>.libextism` | Native `libextism` library and headers | Prebuilt Extism runtime used by the native host package. |
-| `packages.<system>.tx-inspector-ui` | `index.html`, `index.js` | Browser workbench bundle. The WASI inspector bytes are embedded during the PureScript/esbuild build. |
+| `packages.<system>.tx-inspector-ui` | `index.html`, `index.js`, shared hashed wasm assets, precompressed `.gz`/`.br` copies | Browser workbench bundle. The WASI inspector and RDF shapes wasm files are emitted as cacheable assets during the PureScript/esbuild build. |
 | `packages.<system>.ledger-functional-openapi-generated` | Generated `cardano-ledger-functional.openapi.json` | Deterministic OpenAPI JSON generated from the Nix source definition. |
 | `packages.<system>.ledger-functional-openapi` | OpenAPI JSON plus referenced schema JSON files | Publishable API bundle for docs and CI artifacts. |
 | `packages.<system>.ledger-functional-swagger` | Alias of `ledger-functional-openapi` | Compatibility output for consumers that still look for the Swagger name. |

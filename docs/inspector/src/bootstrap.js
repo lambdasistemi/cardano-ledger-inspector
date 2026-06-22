@@ -1,23 +1,28 @@
-// Bootstrap: load @bjorn3/browser_wasi_shim, instantiate the inspector WASM
-// (copied into src/assets/inspector.wasm at Nix build time via --loader:.wasm=binary),
-// and expose a `runInspector(stdin: string) -> Promise<{ stdout, stderr, exitOk }>`
-// on globalThis. The PureScript FFI then wraps this global in Aff.
+// Bootstrap: load @bjorn3/browser_wasi_shim, fetch the inspector WASM as a
+// cacheable asset, and expose `runInspector(stdin: string) -> Promise<...>` on
+// globalThis. The PureScript FFI then wraps this global in Aff.
 
 import { WASI, File, OpenFile, ConsoleStdout }
   from "@bjorn3/browser_wasi_shim";
 import * as rdfShapes from "./assets/rdf_shapes_wasm.js";
-import wasmBytes from "./assets/inspector.wasm";
-import rdfShapesWasmBytes from "./assets/rdf_shapes_wasm_bg.wasm";
+import inspectorWasmAssetUrl from "./assets/inspector.wasm";
+import rdfShapesWasmAssetUrl from "./assets/rdf_shapes_wasm_bg.wasm";
 import sundaeSwapV3Blueprint from "../protocols/sundaeswap-v3/plutus.json";
 import * as rdfEditor from "purescript-rdf-editor";
 
-const compiledModulePromise = WebAssembly.compile(wasmBytes);
+const scriptBaseUrl = new URL(
+  globalThis.document?.currentScript?.src ??
+    globalThis.document?.baseURI ??
+    globalThis.location?.href ??
+    "http://localhost/"
+);
+const inspectorWasmUrl = resolveAssetUrl(inspectorWasmAssetUrl);
+const rdfShapesWasmUrl = resolveAssetUrl(rdfShapesWasmAssetUrl);
 
-rdfShapes.initSync({
-  module: new WebAssembly.Module(rdfShapesWasmBytes),
-});
+let compiledModulePromise = null;
 
 globalThis.rdfShapes = rdfShapes;
+globalThis.rdfShapesReady = rdfShapes.default(rdfShapesWasmUrl);
 globalThis.rdfEditor = rdfEditor;
 globalThis.sundaeSwapV3BlueprintJson = JSON.stringify(sundaeSwapV3Blueprint, null, 2);
 
@@ -31,8 +36,7 @@ globalThis.runInspector = async (stdinText) => {
   const stderr = ConsoleStdout.lineBuffered((l) => stderrLines.push(l));
 
   const wasi = new WASI([], [], [stdin, stdout, stderr]);
-  const mod = await compiledModulePromise;
-  const inst = await WebAssembly.instantiate(mod, {
+  const inst = await instantiateInspector({
     wasi_snapshot_preview1: wasi.wasiImport,
   });
 
@@ -46,9 +50,64 @@ globalThis.runInspector = async (stdinText) => {
     stderrLines.push(String(err));
   }
 
+  await globalThis.rdfShapesReady;
+
   return {
     stdout: stdoutLines.join("\n"),
     stderr: stderrLines.join("\n"),
     exitOk,
   };
 };
+
+function resolveAssetUrl(assetUrl) {
+  return new URL(assetUrl, scriptBaseUrl).toString();
+}
+
+async function instantiateInspector(imports) {
+  if (compiledModulePromise !== null) {
+    const mod = await compiledModulePromise;
+    return WebAssembly.instantiate(mod, imports);
+  }
+
+  if (WebAssembly.instantiateStreaming) {
+    try {
+      const result = await WebAssembly.instantiateStreaming(
+        fetchInspectorWasm(),
+        imports
+      );
+      compiledModulePromise = Promise.resolve(result.module);
+      return result.instance;
+    } catch (_err) {
+      compiledModulePromise = compileInspectorWasm();
+      const mod = await compiledModulePromise;
+      return WebAssembly.instantiate(mod, imports);
+    }
+  }
+
+  compiledModulePromise = compileInspectorWasm();
+  const mod = await compiledModulePromise;
+  return WebAssembly.instantiate(mod, imports);
+}
+
+async function compileInspectorWasm() {
+  if (WebAssembly.compileStreaming) {
+    try {
+      return await WebAssembly.compileStreaming(fetchInspectorWasm());
+    } catch (_err) {
+      // Fall back for hosts that do not serve application/wasm.
+    }
+  }
+
+  const response = await fetchInspectorWasm();
+  return WebAssembly.compile(await response.arrayBuffer());
+}
+
+async function fetchInspectorWasm() {
+  const response = await fetch(inspectorWasmUrl);
+  if (!response.ok) {
+    throw new Error(
+      `failed to fetch inspector wasm: HTTP ${response.status}`
+    );
+  }
+  return response;
+}

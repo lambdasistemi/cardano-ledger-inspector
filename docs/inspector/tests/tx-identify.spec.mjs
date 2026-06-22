@@ -1209,6 +1209,53 @@ test("preview subpath decodes genuine Conway fixture into RDF tree", async ({
   });
 });
 
+test("preview subpath fetches split wasm assets while decode and RDF still work", async ({
+  page,
+}) => {
+  const wasmResponses = [];
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname.endsWith(".wasm")) {
+      wasmResponses.push(response);
+    }
+  });
+
+  await withPrefixedInspectorSite(async (baseUrl) => {
+    await decodeFixtureAt(page, `${baseUrl}inspect/`, conwayMainnetFixturePath);
+    await selectResultTab(page, "Graph / RDF");
+
+    await expect(
+      page
+        .getByRole("tabpanel", { name: "Graph / RDF" })
+        .getByRole("heading", { name: "Transaction RDF graph" }),
+    ).toBeVisible();
+  });
+
+  await expect.poll(() => wasmResponses.length).toBeGreaterThanOrEqual(2);
+
+  const observed = await Promise.all(
+    wasmResponses.map(async (response) => ({
+      fileName: path.basename(new URL(response.url()).pathname),
+      status: response.status(),
+      contentType: await response.headerValue("content-type"),
+    })),
+  );
+
+  expect(observed).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        fileName: expect.stringMatching(/^inspector\.[A-Za-z0-9_-]+\.wasm$/),
+        status: 200,
+        contentType: expect.stringContaining("application/wasm"),
+      }),
+      expect.objectContaining({
+        fileName: expect.stringMatching(/^rdf_shapes_wasm_bg\.[A-Za-z0-9_-]+\.wasm$/),
+        status: 200,
+        contentType: expect.stringContaining("application/wasm"),
+      }),
+    ]),
+  );
+});
+
 test("inspect result is tree-primary tabs after genuine decode", async ({ page }) => {
   await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
   await expectTabbedInspectResult(page);

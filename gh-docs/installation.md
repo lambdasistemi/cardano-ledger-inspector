@@ -49,3 +49,16 @@ anything you depend on. See
 
 The transaction inspector needs no installation; it runs in the browser at
 <https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>.
+
+The browser package loads the large inspector and RDF shapes WebAssembly
+modules as separate hashed assets, so repeat visits can reuse the browser HTTP
+cache instead of downloading those bytes inside `index.js`. The Nix-built
+package also includes `.gz` and `.br` precompressed copies of HTML,
+JavaScript, CSS, and wasm files, including both hashed wasm assets.
+
+GitHub Pages and the shared PR preview host may serve the uncompressed files
+and ordinary cache headers until their host configuration supports static
+brotli/gzip siblings and immutable cache policy for hashed assets. The
+repository package still contains the precompressed files, so hosts with
+`brotli_static`/`gzip_static`-style support can serve them without rebuilding
+the UI.
