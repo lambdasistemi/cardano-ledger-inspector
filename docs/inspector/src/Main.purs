@@ -325,24 +325,8 @@ inspectorComponent initial =
 
   renderInspector state =
     HH.div
-      [ classNames [ "app-shell" ] ]
-      [ HH.section
-          [ classNames [ "intro-strip" ] ]
-          [ HH.div_
-              [ HH.h1_ [ HH.text "Conway tx inspector" ]
-              , HH.p_
-                  [ HH.text
-                      "Decode, inspect, and validate Conway transaction CBOR with explicit chain-data context."
-                  ]
-              ]
-          , HH.div
-              [ classNames [ "tech-pills" ] ]
-              [ HH.span_ [ HH.text "CBOR" ]
-              , HH.span_ [ HH.text "context-aware" ]
-              , HH.span_ [ HH.text "RDF views" ]
-              ]
-          ]
-      , HH.div
+      [ classNames [ "app-shell", "inspect-shell" ] ]
+      [ HH.div
           [ classNames [ "workspace" ] ]
           [ HH.div
               [ classNames [ "workspace-left" ] ]
@@ -679,10 +663,16 @@ inspectorComponent initial =
           [ classNames [ "settings-summary-copy" ] ]
           [ HH.span
               [ classNames [ "identity-section-title" ] ]
-              [ HH.text "Active chain data" ]
+              [ HH.text "Chain data" ]
           , HH.strong_
               [ HH.text
                   (Provider.providerName state.provider <> " / " <> networkName state.network)
+              ]
+          , HH.div
+              [ classNames [ "settings-meta-row" ] ]
+              [ HH.span_ [ HH.text "Provider" ]
+              , HH.span_ [ HH.text "Network" ]
+              , HH.span_ [ HH.text "Key setting" ]
               ]
           ]
       , HH.a
@@ -709,7 +699,7 @@ inspectorComponent initial =
           [ classNames [ "panel-heading" ] ]
           [ HH.div_
               [ HH.h2_ [ HH.text "Books" ]
-              , HH.p_ [ HH.text "Selected library books resolve labels, blueprints, and SHACL checks." ]
+              , HH.p_ [ HH.text "Selected overlay, blueprint, and SHACL sources." ]
               ]
           ]
       , HH.div
@@ -1153,7 +1143,7 @@ inspectorComponent initial =
       ]
       [ HH.div
           [ classNames [ "panel-heading" ] ]
-          [ HH.h2_ [ HH.text "Input" ]
+          [ HH.h2_ [ HH.text "Paste here" ]
           , HH.p_ [ HH.text "Fetch by transaction hash or paste raw CBOR hex." ]
           ]
       , HH.fieldset
@@ -1240,7 +1230,7 @@ inspectorComponent initial =
             ]
             [ HH.div
                 [ classNames [ "panel-heading" ] ]
-                [ HH.h2_ [ HH.text "Decoded JSON" ] ]
+                [ HH.h2_ [ HH.text "Decoded structure" ] ]
             , HH.div
                 [ classNames [ "empty-state" ] ]
                 [ HH.text "No result yet." ]
@@ -1256,9 +1246,9 @@ inspectorComponent initial =
               ( [ HH.div
                     [ classNames [ "panel-heading", "result-heading" ] ]
                     [ HH.div_
-                        [ HH.h2_ [ HH.text (if r.exitOk then "Inspection" else "Error") ]
+                        [ HH.h2_ [ HH.text (if r.exitOk then "Decoded structure" else "Error") ]
                         , if r.exitOk && summary.valid
-                            then HH.p_ [ HH.text summary.title ]
+                            then HH.p_ [ HH.text "Decoded transaction" ]
                             else HH.text ""
                         ]
                     , if r.exitOk
@@ -1273,10 +1263,6 @@ inspectorComponent initial =
                         else HH.text ""
                     ]
                 ]
-              <> ( if r.exitOk && summary.valid
-                     then [ renderResultSummary state summary ]
-                     else []
-                 )
               <> ( if r.exitOk then
                      [ renderResultTabs state
                      , renderSelectedResultTab state r.stdout
@@ -1435,6 +1421,7 @@ inspectorComponent initial =
       ( case state.resultTab of
           StructureTab ->
             [ renderDecodedStructure state ]
+              <> renderCompactIdentificationMaybe state
           WitnessTab ->
             renderIntentMaybe state
               <> renderWitnessPlanMaybe state
@@ -1442,7 +1429,8 @@ inspectorComponent initial =
             renderValidationMaybe state
               <> renderShaclConformanceMaybe state.shaclConformance
           GraphRdfTab ->
-            renderGraphRdfMaybe state
+            renderCompactIdentificationMaybe state
+              <> renderGraphRdfMaybe state
               <> renderBrowserMaybe state true
               <> [ renderRawJson stdout ]
       )
@@ -1464,6 +1452,28 @@ inspectorComponent initial =
       WitnessTab -> "Witness"
       ValidationTab -> "Validation"
       GraphRdfTab -> "Graph / RDF"
+
+  renderCompactIdentificationMaybe state =
+    case state.identification of
+      Just identification | identification.valid -> [ renderCompactIdentification state identification ]
+      _ -> []
+
+  renderCompactIdentification state identification =
+    HH.div
+      [ classNames [ "identity-panel", "compact-identity-panel" ]
+      , mdSurface "decoded"
+      ]
+      [ HH.div
+          [ classNames [ "identity-heading" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "Identity metadata" ]
+              , HH.p_ [ HH.text identification.subtitle ]
+              ]
+          ]
+      , HH.div
+          [ classNames [ "identity-grid" ] ]
+          (map (renderIdentityRow state) identification.primary)
+      ]
 
   renderInspection summary =
     [ HH.div

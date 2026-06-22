@@ -268,6 +268,74 @@ async function expectTabbedInspectResult(page) {
   await expect(graphPanel.getByText("Raw JSON", { exact: true })).toBeVisible();
 }
 
+async function expectCQuisitorInspectSurface(page, route) {
+  await decodeFixtureAt(page, route, conwayMainnetFixturePath);
+
+  const topbar = page.getByRole("banner");
+  await expect(topbar.getByText("CQuisitor", { exact: true })).toBeVisible();
+  await expect(topbar.getByRole("navigation").getByRole("link", { name: "Inspect" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  const workspace = page.locator(".workspace");
+  const leftPane = page.locator(".workspace-left");
+  const rightPane = page.locator(".workspace-right");
+  const leftBox = await leftPane.boundingBox();
+  const rightBox = await rightPane.boundingBox();
+  const workspaceBox = await workspace.boundingBox();
+  expect(leftBox).not.toBeNull();
+  expect(rightBox).not.toBeNull();
+  expect(workspaceBox).not.toBeNull();
+
+  const leftRatio = leftBox.width / workspaceBox.width;
+  const rightRatio = rightBox.width / workspaceBox.width;
+  expect(leftRatio).toBeGreaterThan(0.46);
+  expect(leftRatio).toBeLessThan(0.54);
+  expect(rightRatio).toBeGreaterThan(0.46);
+  expect(rightRatio).toBeLessThan(0.54);
+  expect(Math.abs(leftBox.y - rightBox.y)).toBeLessThan(4);
+  expect(rightBox.x - (leftBox.x + leftBox.width)).toBeLessThanOrEqual(16);
+  await expect(rightPane).toHaveCSS("border-left-width", /[1-9]px/);
+
+  await expect(leftPane.locator(".settings-summary")).toContainText(/Blockfrost|Koios/);
+  await expect(leftPane.locator(".books-panel")).toContainText(/selected|parts/);
+  const pasteInput = leftPane.getByPlaceholder("Conway tx CBOR hex...");
+  await expect(pasteInput).toBeVisible();
+  const pasteBox = await pasteInput.boundingBox();
+  expect(pasteBox.height).toBeGreaterThan(170);
+  await expect(leftPane.getByRole("button", { name: "Decode" })).toBeVisible();
+
+  const resultPanel = rightPane.locator(".result-panel");
+  const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
+  await expect(tabs.getByRole("tab", { name: "Structure" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const decodedPanel = resultPanel.locator(".decoded-structure-panel");
+  await expect(decodedPanel).toBeVisible();
+  await expect(decodedPanel.getByRole("heading", { name: "Decoded structure" })).toBeVisible();
+  const transactionRow = decodedPanel.locator(".decoded-tree-row", {
+    hasText: "Transaction",
+  }).first();
+  await expect(transactionRow).toBeVisible();
+  await expect(resultPanel.getByRole("heading", { name: "Conway transaction identity" })).toHaveCount(0);
+  await expect(resultPanel.locator(".summary-identity-grid")).toHaveCount(0);
+
+  const positions = await resultPanel.evaluate((panel) => {
+    const tree = panel.querySelector(".decoded-structure-panel .decoded-tree-row");
+    const identity = panel.querySelector(".identity-panel, .summary-identity-grid");
+    return {
+      treeTop: tree?.getBoundingClientRect().top ?? null,
+      identityTop: identity?.getBoundingClientRect().top ?? null,
+    };
+  });
+  expect(positions.treeTop).not.toBeNull();
+  if (positions.identityTop !== null) {
+    expect(positions.treeTop).toBeLessThan(positions.identityTop);
+  }
+}
+
 async function selectResultTab(page, name) {
   const resultPanel = page.locator(".result-panel");
   await resultPanel.getByRole("tab", { name }).click();
@@ -757,7 +825,7 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   expect(indexHtml).toContain("Roboto+Mono");
 
   await expect(
-    topbar.getByText("Cardano transaction inspector", { exact: true }),
+    topbar.getByText("CQuisitor", { exact: true }),
   ).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Inspect" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Settings" })).toBeVisible();
@@ -932,14 +1000,16 @@ test("inspect keeps chain-data settings compact and gives input/results the work
   await expect(settingsSummary.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(inputPanel).toBeVisible();
   await expect(leftPane.getByRole("heading", { name: "Books" })).toBeVisible();
-  await expect(resultPanel.getByRole("heading", { name: "Decoded JSON" })).toBeVisible();
+  await expect(resultPanel.getByRole("heading", { name: "Decoded structure" })).toBeVisible();
   await expect(rightPane.locator(".decoded-structure-panel")).toHaveCount(0);
 
   const workspaceBox = await page.locator(".workspace").boundingBox();
   const leftBox = await leftPane.boundingBox();
   const rightBox = await rightPane.boundingBox();
-  expect(leftBox.width).toBeLessThan(workspaceBox.width * 0.52);
-  expect(rightBox.width).toBeGreaterThan(workspaceBox.width * 0.52);
+  expect(leftBox.width).toBeGreaterThan(workspaceBox.width * 0.46);
+  expect(leftBox.width).toBeLessThan(workspaceBox.width * 0.54);
+  expect(rightBox.width).toBeGreaterThan(workspaceBox.width * 0.46);
+  expect(rightBox.width).toBeLessThan(workspaceBox.width * 0.54);
   expect(Math.abs(leftBox.y - rightBox.y)).toBeLessThan(8);
 });
 
@@ -1007,7 +1077,7 @@ test("settings changes provider state used by inspect hash decode", async ({ pag
   await page.getByRole("button", { name: "Fetch and decode" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Conway transaction identity" }),
+    page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
   expect(requestedHashes).toContain("0".repeat(64));
   expect(tipRequests).toBe(1);
@@ -1021,9 +1091,8 @@ test("decodes a Conway transaction and exposes compact identity values", async (
 
   await expect(page.getByText("Transaction ID", { exact: true })).toBeVisible();
   await expect(page.getByText("Body hash", { exact: true })).toBeVisible();
-  await expect(page.locator(".identity-panel:not(.witness-plan):not(.validation-panel)")).toHaveCount(0);
 
-  const summaryIdentity = page.locator(".summary-identity-grid");
+  const summaryIdentity = page.locator(".compact-identity-panel .identity-grid");
   const txIdRow = summaryIdentity.locator(".identity-row", { hasText: "Transaction ID" });
   const txId = await txIdRow.locator("code").innerText();
   await txIdRow.locator("code").click();
@@ -1155,11 +1224,11 @@ test("decodes genuine Conway fixture into RDF tree", async ({
 
   const body = page.locator("body");
   await expect(
-    page.getByRole("heading", { name: /Conway transaction identity|stderr/ }),
+    page.getByRole("heading", { name: /Decoded structure|stderr/ }),
   ).toBeVisible();
   await expect(body).not.toContainText(/malformed_cbor|DeserialiseFailure/);
   await expect(
-    page.getByRole("heading", { name: "Conway transaction identity" }),
+    page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
 
   const decodedPanel = page.locator(".decoded-structure-panel");
@@ -1263,6 +1332,16 @@ test("inspect result is tree-primary tabs after genuine decode", async ({ page }
   await withPrefixedInspectorSite(async (baseUrl) => {
     await decodeFixtureAt(page, `${baseUrl}inspect/`, conwayMainnetFixturePath);
     await expectTabbedInspectResult(page);
+  });
+});
+
+test("CQuisitor inspect layout keeps decoded tree primary after genuine decode and subpath", async ({
+  page,
+}) => {
+  await expectCQuisitorInspectSurface(page, "/inspect");
+
+  await withPrefixedInspectorSite(async (baseUrl) => {
+    await expectCQuisitorInspectSurface(page, `${baseUrl}inspect/`);
   });
 });
 
@@ -1462,7 +1541,7 @@ fixture:selectedLibraryAddress
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
   await expect(
-    page.getByRole("heading", { name: "Conway transaction identity" }),
+    page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
 
   await selectResultTab(page, "Graph / RDF");
@@ -1956,6 +2035,7 @@ test("passes producer transaction CBOR into witness planning", async ({
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
+  await selectResultTab(page, "Witness");
   await expect(
     page.getByText("Producer transaction CBOR resolved every visible transaction input"),
   ).toBeVisible();
@@ -2160,6 +2240,7 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
+  await selectResultTab(page, "Witness");
   await expect(
     page.getByText("Producer transaction CBOR resolved every visible transaction input"),
   ).toBeVisible();
@@ -2207,9 +2288,9 @@ test("opens browser rows in place without losing identity context", async ({
 
   await expect(page.locator(".browser-children").first()).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Conway transaction identity" }),
+    page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
-  await expect(page.locator(".summary-identity-grid")).toBeVisible();
+  await expect(page.locator(".compact-identity-panel .identity-grid")).toBeVisible();
 });
 
 test("keeps decoded transaction layout within the viewport", async ({ page }) => {
