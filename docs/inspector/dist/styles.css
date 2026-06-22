@@ -1409,7 +1409,11 @@ md-icon-button:focus-visible,
 
 .decoded-tree-annotate {
   justify-self: start;
+  width: 32px;
+  height: 32px;
   max-width: 100%;
+  --md-icon-button-state-layer-width: 32px;
+  --md-icon-button-state-layer-height: 32px;
 }
 
 .decoded-tree-summary,
@@ -1422,6 +1426,31 @@ md-icon-button:focus-visible,
 
 .decoded-tree-meta {
   font-size: 0.78rem;
+}
+
+.decoded-tree-iri {
+  color: var(--accent-strong);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.decoded-tree-iri:hover {
+  text-decoration: underline;
+}
+
+.decoded-tree-subject {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: copy;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.decoded-tree-subject:hover {
+  color: var(--accent-strong);
 }
 
 .decoded-tree-annotation-form {

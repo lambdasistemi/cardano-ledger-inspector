@@ -927,8 +927,7 @@ inspectorComponent initial =
         if row.summary == "" then row.value else row.summary
       metaText =
         if row.resolvedLabel /= "" then row.resolvedLabel
-        else if row.resolvedType /= "" then row.resolvedType
-        else row.kind
+        else ""
     in
       [ HH.div
           [ classNames rowClasses ]
@@ -951,14 +950,14 @@ inspectorComponent initial =
                       HH.strong_ [ HH.text row.label ]
                   , HH.span
                       [ classNames [ "kind-badge" ] ]
-                      [ HH.text row.kind ]
+                      [ renderDecodedTreeKind row ]
                   ]
               , if summaryText == "" then
                   HH.text ""
                 else
                   HH.div
-                    [ classNames [ "decoded-tree-summary" ] ]
-                    [ HH.text summaryText ]
+                    (decodedTreeSummaryAttrs row summaryText)
+                    [ renderDecodedTreeSummary row summaryText ]
               , if metaText == "" then
                   HH.text ""
                 else
@@ -975,19 +974,114 @@ inspectorComponent initial =
         ]
       else []
 
+  renderDecodedTreeKind row =
+    if row.resolvedType == "" then
+      HH.text row.kind
+    else
+      renderDecodedTreeIri row.resolvedType
+
+  renderDecodedTreeSummary row summaryText =
+    let
+      fullSubject = decodedTreeFullSubject row summaryText
+    in
+      if fullSubject /= "" then
+        HH.button
+          [ classNames [ "decoded-tree-subject", "summary-copy-target" ]
+          , HP.title fullSubject
+          , HH.attr (HH.AttrName "aria-label") ("Copy " <> row.label)
+          , HE.onClick (\_ -> CopyValue row.id fullSubject)
+          ]
+          [ HH.text (middleTruncate 24 18 fullSubject) ]
+      else
+        renderDecodedTreeIri summaryText
+
+  decodedTreeSummaryAttrs row summaryText =
+    let
+      fullSubject = decodedTreeFullSubject row summaryText
+    in
+      if fullSubject == "" then
+        [ classNames [ "decoded-tree-summary" ] ]
+      else
+        [ classNames [ "decoded-tree-summary" ]
+        , HP.title fullSubject
+        ]
+
+  decodedTreeFullSubject row summaryText =
+    if isCardanoUrn row.value then row.value
+    else if isCardanoUrn summaryText then summaryText
+    else ""
+
+  renderDecodedTreeIri value =
+    case curieForIri value of
+      Just link ->
+        HH.a
+          [ classNames [ "decoded-tree-iri" ]
+          , HP.href link.href
+          , HP.target "_blank"
+          , HP.rel "noopener noreferrer"
+          , HP.title link.href
+          ]
+          [ HH.text link.label ]
+      Nothing ->
+        HH.text value
+
+  curieForIri value =
+    case Array.find (\prefix -> startsWith prefix.iri value) decodedTreeIriPrefixes of
+      Just prefix ->
+        Just
+          { href: value
+          , label:
+              prefix.name
+                <> StringCodeUnits.drop (StringCodeUnits.length prefix.iri) value
+          }
+      Nothing ->
+        if startsWith "https://" value || startsWith "http://" value then
+          Just { href: value, label: middleTruncate 32 24 value }
+        else
+          Nothing
+
+  decodedTreeIriPrefixes =
+    [ { name: "cardano:", iri: "https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#" }
+    , { name: "rdf:", iri: "http://www.w3.org/1999/02/22-rdf-syntax-ns#" }
+    , { name: "rdfs:", iri: "http://www.w3.org/2000/01/rdf-schema#" }
+    , { name: "overlay:", iri: "https://lambdasistemi.github.io/cardano-ledger-inspector/overlay/amaru-treasury#" }
+    , { name: "owl:", iri: "http://www.w3.org/2002/07/owl#" }
+    , { name: "xsd:", iri: "http://www.w3.org/2001/XMLSchema#" }
+    , { name: "sh:", iri: "http://www.w3.org/ns/shacl#" }
+    ]
+
+  isCardanoUrn value =
+    startsWith "urn:cardano:" value
+
+  startsWith prefix value =
+    StringCodeUnits.take (StringCodeUnits.length prefix) value == prefix
+
+  middleTruncate headCount tailCount value =
+    let
+      valueLength = StringCodeUnits.length value
+      limit = headCount + tailCount + 3
+    in
+      if valueLength <= limit then
+        value
+      else
+        StringCodeUnits.take headCount value
+          <> "..."
+          <> StringCodeUnits.drop (valueLength - tailCount) value
+
   renderDecodedTreeAnnotation state row =
     case state.annotationDraft of
       Just draft | draft.rowId == row.id ->
         renderDecodedTreeAnnotationDraft state row draft
       _ ->
         if row.resolvedLabel == "" && row.annotationPredicate /= "" && row.annotationValue /= "" then
-          HH.element (HH.ElemName "md-outlined-button")
+          HH.element (HH.ElemName "md-icon-button")
             [ classNames [ "inline-action", "decoded-tree-annotate" ]
             , HH.attr (HH.AttrName "role") "button"
-            , mdControl "inline"
+            , HH.attr (HH.AttrName "aria-label") "Label this node"
+            , mdControl "icon"
             , HE.onClick (\_ -> StartDecodedTreeAnnotation row)
             ]
-            [ HH.text "Label this as..." ]
+            [ HH.element (HH.ElemName "md-icon") [] [ HH.text "edit" ] ]
         else
           HH.text ""
 
