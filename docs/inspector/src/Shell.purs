@@ -37,7 +37,7 @@ topbar active opts =
         [ classNames [ "page-frame", "topbar" ] ]
         [ HH.div
             [ classNames [ "brand" ] ]
-            [ HH.strong_ [ HH.text "CQuisitor" ]
+            [ HH.strong_ [ HH.text "Ledger Inspector" ]
             , HH.span_ [ HH.text "Cardano transaction inspector" ]
             ]
         , HH.nav
