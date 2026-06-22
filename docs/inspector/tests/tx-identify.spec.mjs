@@ -272,7 +272,7 @@ async function expectCQuisitorInspectSurface(page, route) {
   await decodeFixtureAt(page, route, conwayMainnetFixturePath);
 
   const topbar = page.getByRole("banner");
-  await expect(topbar.getByText("CQuisitor", { exact: true })).toBeVisible();
+  await expect(topbar.getByText("Ledger Inspector", { exact: true })).toBeVisible();
   await expect(topbar.getByRole("navigation").getByRole("link", { name: "Inspect" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -825,7 +825,7 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   expect(indexHtml).toContain("Roboto+Mono");
 
   await expect(
-    topbar.getByText("CQuisitor", { exact: true }),
+    topbar.getByText("Ledger Inspector", { exact: true }),
   ).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Inspect" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Settings" })).toBeVisible();
