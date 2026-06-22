@@ -6,3 +6,10 @@
 - [X] T121-S1 Update `Main.purs` presentation to gate on `state.result`, preserving the empty/error two-pane path and rendering a loaded-state header plus full-width result path for `Just _`.
 - [X] T121-S1 Update `styles.css` workspace/header/responsive rules so loaded desktop is full-width and narrow layouts stack without overlap.
 - [X] T121-S1 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S1` trailer.
+
+## Slice 2: Decoded-tree row compactness
+
+- [ ] T121-S2 Add Playwright RED assertions for decoded-structure rows: vocab IRIs render as linked CURIEs with the full href, raw vocab URLs are not shown as row text, `urn:cardano:*` subjects are collapsed and not linked, and annotation fields stay hidden until the edit icon is clicked.
+- [ ] T121-S2 Update `Main.purs` presentation so decoded tree rows use the `FFI/RdfShapes.js` prefix table for linked CURIE labels, collapse/copy non-dereferenceable `urn:cardano:*` subjects, and gate the existing annotation draft form behind an `md-icon-button` edit affordance without changing the save flow.
+- [ ] T121-S2 Update `styles.css` for the compact CURIE/subject/edit-icon row presentation and responsive annotation expander behavior.
+- [ ] T121-S2 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S2` trailer.
