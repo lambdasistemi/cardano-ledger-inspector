@@ -102,6 +102,10 @@ data Mode = ByHash | ByHex
 
 derive instance eqMode :: Eq Mode
 
+data ResultTab = StructureTab | WitnessTab | ValidationTab | GraphRdfTab
+
+derive instance eqResultTab :: Eq ResultTab
+
 type State =
   { provider :: Provider
   , blockfrostKey :: String
@@ -112,6 +116,7 @@ type State =
   , txHash :: String
   , txHex :: String
   , result :: Maybe InspectorResult
+  , resultTab :: ResultTab
   , txCbor :: Maybe String
   , operationArgs :: String
   , browser :: Maybe Json.Browser
@@ -240,6 +245,7 @@ data Action
   | CopyValue String String
   | BrowseJson String
   | ToggleDecodedTree String
+  | SelectResultTab ResultTab
   | Navigate Route MouseEvent
   | ToggleTheme
 
@@ -260,6 +266,7 @@ inspectorComponent initial =
         , txHash: ""
         , txHex: ""
         , result: Nothing
+        , resultTab: StructureTab
         , txCbor: Nothing
         , operationArgs: "{}"
         , browser: Nothing
@@ -345,9 +352,7 @@ inspectorComponent initial =
               ]
           , HH.div
               [ classNames [ "workspace-right" ] ]
-              [ renderResult state
-              , renderDecodedStructure state
-              ]
+              [ renderResult state ]
           ]
       ]
 
@@ -1268,17 +1273,17 @@ inspectorComponent initial =
                         else HH.text ""
                     ]
                 ]
-              <> renderIntentMaybe state
               <> ( if r.exitOk && summary.valid
-                     then renderInspection summary
+                     then [ renderResultSummary state summary ]
                      else []
                  )
-              <> renderIdentificationMaybe state
-              <> renderWitnessPlanMaybe state
-              <> renderValidationMaybe state
-              <> renderRdfMaybe state r.exitOk
-              <> renderBrowserMaybe state r.exitOk
-              <> [ renderRawJson r.stdout ]
+              <> ( if r.exitOk then
+                     [ renderResultTabs state
+                     , renderSelectedResultTab state r.stdout
+                     ]
+                   else
+                     [ renderRawJson r.stdout ]
+                 )
               <> renderStderr r.stderr
               )
 
@@ -1328,6 +1333,137 @@ inspectorComponent initial =
         if exitOk && browser.valid then [ renderBrowser state browser ]
         else []
       Nothing -> []
+
+  renderResultSummary state summary =
+    HH.div
+      [ classNames [ "inspection-summary", "result-summary" ] ]
+      ( [ renderResultSummaryTitle state summary
+        , HH.div
+            [ classNames [ "metric-grid" ] ]
+            (map renderMetric summary.metrics)
+        ]
+          <> renderSummaryIdentity state
+          <> renderSummaryWarnings state
+      )
+
+  renderResultSummaryTitle state summary =
+    case state.identification of
+      Just identification | identification.valid ->
+        HH.div
+          [ classNames [ "result-summary-title" ] ]
+          [ HH.h3_ [ HH.text identification.title ]
+          , HH.p_ [ HH.text identification.subtitle ]
+          ]
+      _ -> case state.intent of
+        Just intent | intent.valid ->
+          HH.div
+            [ classNames [ "result-summary-title" ] ]
+            [ HH.h3_ [ HH.text intent.title ]
+            , HH.p_ [ HH.text intent.subtitle ]
+            ]
+        _ ->
+          HH.div
+            [ classNames [ "result-summary-title" ] ]
+            [ HH.h3_ [ HH.text summary.title ] ]
+
+  renderSummaryIdentity state =
+    case state.identification of
+      Just identification ->
+        if identification.valid then
+          [ HH.div
+              [ classNames [ "summary-identity-grid" ] ]
+              (map (renderIdentityRow state) identification.primary)
+          ]
+        else []
+      Nothing -> []
+
+  renderSummaryWarnings state =
+    [ renderIntentWarnings state.intent
+    , renderWitnessPlanWarnings state.witnessPlan
+    , renderValidationWarnings state.validation
+    ]
+
+  renderIntentWarnings intent =
+    case intent of
+      Just value | value.valid -> renderWitnessWarnings value.warnings
+      _ -> HH.text ""
+
+  renderWitnessPlanWarnings witnessPlan =
+    case witnessPlan of
+      Just value | value.valid -> renderWitnessWarnings value.warnings
+      _ -> HH.text ""
+
+  renderValidationWarnings validation =
+    case validation of
+      Just value | value.valid -> renderWitnessWarnings value.warnings
+      _ -> HH.text ""
+
+  renderResultTabs state =
+    HH.div
+      [ classNames [ "result-tab-bar" ]
+      , HH.attr (HH.AttrName "role") "tablist"
+      , HH.attr (HH.AttrName "aria-label") "Inspect result views"
+      ]
+      (map (renderResultTabButton state.resultTab) resultTabs)
+
+  resultTabs =
+    [ StructureTab, WitnessTab, ValidationTab, GraphRdfTab ]
+
+  renderResultTabButton selectedTab tab =
+    let
+      selected = selectedTab == tab
+    in
+      HH.button
+        [ classNames
+            ( if selected then
+                [ "result-tab", "is-selected" ]
+              else
+                [ "result-tab" ]
+            )
+        , HH.attr (HH.AttrName "role") "tab"
+        , HH.attr (HH.AttrName "aria-selected") (if selected then "true" else "false")
+        , HE.onClick (\_ -> SelectResultTab tab)
+        ]
+        [ HH.text (resultTabLabel tab) ]
+
+  renderSelectedResultTab state stdout =
+    HH.div
+      [ classNames [ "result-tab-panel" ]
+      , HH.attr (HH.AttrName "role") "tabpanel"
+      , HH.attr (HH.AttrName "aria-label") (resultTabLabel state.resultTab)
+      ]
+      ( case state.resultTab of
+          StructureTab ->
+            [ renderDecodedStructure state ]
+          WitnessTab ->
+            renderIntentMaybe state
+              <> renderWitnessPlanMaybe state
+          ValidationTab ->
+            renderValidationMaybe state
+              <> renderShaclConformanceMaybe state.shaclConformance
+          GraphRdfTab ->
+            renderGraphRdfMaybe state
+              <> renderBrowserMaybe state true
+              <> [ renderRawJson stdout ]
+      )
+
+  renderGraphRdfMaybe state =
+    case state.rdf of
+      Just rdf ->
+        if rdf.valid then
+          [ renderRdfGraph rdf, renderOverlayBooks state ]
+            <> renderResolvedLabelsLensMaybe state.resolvedLabelsLens
+            <> renderTypedFieldsLensMaybe state.typedFieldsLens
+            <> renderSparqlLensMaybe state.sparqlLens
+        else []
+      Nothing -> []
+
+  resultTabLabel tab =
+    case tab of
+      StructureTab -> "Structure"
+      WitnessTab -> "Witness"
+      ValidationTab -> "Validation"
+      GraphRdfTab -> "Graph / RDF"
 
   renderInspection summary =
     [ HH.div
@@ -2644,6 +2780,7 @@ inspectorComponent initial =
         _
           { running = true
           , result = Nothing
+          , resultTab = StructureTab
           , txCbor = Nothing
           , operationArgs = "{}"
           , browser = Nothing
@@ -2824,6 +2961,8 @@ inspectorComponent initial =
                 else
                   expandPath rowId st.decodedTreeExpanded
             }
+    SelectResultTab tab ->
+      H.modify_ _ { resultTab = tab }
 
   updateAnnotationDraft update =
     H.modify_ \st -> st { annotationDraft = map update st.annotationDraft }

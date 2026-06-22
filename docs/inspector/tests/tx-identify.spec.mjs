@@ -197,13 +197,83 @@ async function decodeFixtureAt(page, route, txFixturePath = fixturePath) {
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
+  const resultPanel = page.locator(".result-panel");
   await expect(
-    page.getByRole("heading", { name: "Conway transaction identity" }),
+    resultPanel.getByRole("tab", { name: "Structure" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    resultPanel
+      .getByRole("tabpanel", { name: "Structure" })
+      .locator(".decoded-tree-row", { hasText: "Transaction" }),
   ).toBeVisible();
 }
 
 async function decodeFixture(page, txFixturePath = fixturePath) {
   await decodeFixtureAt(page, "/", txFixturePath);
+}
+
+async function expectTabbedInspectResult(page) {
+  const resultPanel = page.locator(".result-panel");
+  await expect(resultPanel).toBeVisible();
+
+  const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
+  await expect(tabs).toBeVisible();
+
+  const structureTab = tabs.getByRole("tab", { name: "Structure" });
+  await expect(structureTab).toHaveAttribute("aria-selected", "true");
+
+  const structurePanel = resultPanel.getByRole("tabpanel", { name: "Structure" });
+  await expect(structurePanel).toBeVisible();
+  await expect(
+    structurePanel.getByRole("heading", { name: "Decoded structure" }),
+  ).toBeVisible();
+  await expect(
+    structurePanel.locator(".decoded-tree-row", { hasText: "Transaction" }),
+  ).toBeVisible();
+
+  const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  expect(documentHeight).toBeLessThan(viewportHeight * 4);
+
+  await tabs.getByRole("tab", { name: "Witness" }).click();
+  const witnessPanel = resultPanel.getByRole("tabpanel", { name: "Witness" });
+  await expect(witnessPanel.getByRole("heading", { name: /Intent|Witness plan/ })).toBeVisible();
+  await expect(witnessPanel.getByRole("heading", { name: "Witness plan" })).toBeVisible();
+
+  await tabs.getByRole("tab", { name: "Validation" }).click();
+  const validationPanel = resultPanel.getByRole("tabpanel", { name: "Validation" });
+  await expect(validationPanel.locator(".validation-panel")).toBeVisible();
+  await expect(
+    validationPanel.getByRole("heading", { name: "RDF SHACL conformance" }),
+  ).toBeVisible();
+
+  await tabs.getByRole("tab", { name: "Graph / RDF" }).click();
+  const graphPanel = resultPanel.getByRole("tabpanel", { name: "Graph / RDF" });
+  await expect(
+    graphPanel.getByRole("heading", { name: "Transaction RDF graph" }),
+  ).toBeVisible();
+  await expect(graphPanel.getByRole("heading", { name: "Selected books" })).toBeVisible();
+  await expect(
+    graphPanel.getByRole("heading", { name: "SPARQL lens: resolved labels" }),
+  ).toBeVisible();
+  await expect(
+    graphPanel.getByRole("heading", { name: "SPARQL lens: typed contract fields" }),
+  ).toBeVisible();
+  await expect(
+    graphPanel.getByRole("heading", { name: "SPARQL lens: transaction outputs" }),
+  ).toBeVisible();
+  await expect(
+    graphPanel.getByRole("heading", { name: "Transaction browser" }),
+  ).toBeVisible();
+  await expect(graphPanel.getByText("Raw JSON", { exact: true })).toBeVisible();
+}
+
+async function selectResultTab(page, name) {
+  const resultPanel = page.locator(".result-panel");
+  await resultPanel.getByRole("tab", { name }).click();
+  const panel = resultPanel.getByRole("tabpanel", { name });
+  await expect(panel).toBeVisible();
+  return panel;
 }
 
 async function configureChainData(page, options = {}) {
@@ -810,16 +880,21 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
 
   const inputPanel = page.locator(".input-panel");
   const resultPanel = page.locator(".result-panel");
-  const identityPanel = page.locator(".identity-panel").first();
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await selectResultTab(page, "Validation");
   const validationPanel = page.locator(".validation-panel");
+  await selectResultTab(page, "Graph / RDF");
   const rdfPanel = page.locator(".rdf-panel");
   const lensPanel = page.locator(".sparql-lens-panel").first();
 
   await expect(page.locator(".provider-panel")).toHaveCount(0);
   await expect(inputPanel).toHaveAttribute("data-md3-surface", "input");
   await expect(resultPanel).toHaveAttribute("data-md3-surface", "result");
-  await expect(identityPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await selectResultTab(page, "Structure");
+  await expect(decodedPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await selectResultTab(page, "Validation");
   await expect(validationPanel).toHaveAttribute("data-md3-surface", "decoded");
+  await selectResultTab(page, "Graph / RDF");
   await expect(rdfPanel).toHaveAttribute("data-md3-surface", "decoded");
   await expect(lensPanel).toHaveAttribute("data-md3-surface", "decoded");
 
@@ -858,7 +933,7 @@ test("inspect keeps chain-data settings compact and gives input/results the work
   await expect(inputPanel).toBeVisible();
   await expect(leftPane.getByRole("heading", { name: "Books" })).toBeVisible();
   await expect(resultPanel.getByRole("heading", { name: "Decoded JSON" })).toBeVisible();
-  await expect(rightPane.getByRole("heading", { name: "Decoded structure" })).toBeVisible();
+  await expect(rightPane.locator(".decoded-structure-panel")).toHaveCount(0);
 
   const workspaceBox = await page.locator(".workspace").boundingBox();
   const leftBox = await leftPane.boundingBox();
@@ -946,20 +1021,10 @@ test("decodes a Conway transaction and exposes compact identity values", async (
 
   await expect(page.getByText("Transaction ID", { exact: true })).toBeVisible();
   await expect(page.getByText("Body hash", { exact: true })).toBeVisible();
-  await expect(page.getByText("Witnesses", { exact: true })).toBeVisible();
-  await expect(
-    page
-      .locator(".identity-panel:not(.witness-plan):not(.validation-panel)")
-      .getByText("Redeemers", { exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".identity-panel:not(.witness-plan):not(.validation-panel)")).toHaveCount(0);
 
-  await expect(
-    page
-      .locator(".identity-panel:not(.witness-plan):not(.validation-panel)")
-      .getByRole("button"),
-  ).toHaveCount(0);
-
-  const txIdRow = page.locator(".identity-row", { hasText: "Transaction ID" });
+  const summaryIdentity = page.locator(".summary-identity-grid");
+  const txIdRow = summaryIdentity.locator(".identity-row", { hasText: "Transaction ID" });
   const txId = await txIdRow.locator("code").innerText();
   await txIdRow.locator("code").click();
   await expect(txIdRow).toHaveClass(/is-copied/);
@@ -967,7 +1032,7 @@ test("decodes a Conway transaction and exposes compact identity values", async (
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(txId);
 
-  const bodyHashRow = page.locator(".identity-row", { hasText: "Body hash" });
+  const bodyHashRow = summaryIdentity.locator(".identity-row", { hasText: "Body hash" });
   const bodyHash = await bodyHashRow.locator("code").innerText();
   await bodyHashRow.locator("code").click();
   await expect(bodyHashRow).toHaveClass(/is-copied/);
@@ -979,6 +1044,7 @@ test("decodes a Conway transaction and exposes compact identity values", async (
 test("renders the transaction RDF graph after decode", async ({ page }) => {
   await decodeFixture(page);
 
+  await selectResultTab(page, "Graph / RDF");
   const rdfPanel = page.locator(".rdf-panel");
   await expect(
     rdfPanel.getByRole("heading", { name: "Transaction RDF graph" }),
@@ -1057,6 +1123,7 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     decodedPanel.locator(".decoded-tree-row", { hasText: "Metadata label" }).first(),
   ).toBeVisible();
 
+  await selectResultTab(page, "Graph / RDF");
   const rdfPanel = page.locator(".rdf-panel");
   await expect(
     rdfPanel.getByRole("heading", { name: "Transaction RDF graph" }),
@@ -1142,6 +1209,16 @@ test("preview subpath decodes genuine Conway fixture into RDF tree", async ({
   });
 });
 
+test("inspect result is tree-primary tabs after genuine decode", async ({ page }) => {
+  await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
+  await expectTabbedInspectResult(page);
+
+  await withPrefixedInspectorSite(async (baseUrl) => {
+    await decodeFixtureAt(page, `${baseUrl}inspect/`, conwayMainnetFixturePath);
+    await expectTabbedInspectResult(page);
+  });
+});
+
 test("selected library overlay book parts produce deterministic Turtle", async ({
   page,
 }) => {
@@ -1157,6 +1234,7 @@ test("selected library overlay book parts produce deterministic Turtle", async (
 
   await decodeFixtureAt(page, "/inspect");
 
+  await selectResultTab(page, "Graph / RDF");
   const overlayPanel = page.locator(".overlay-book-panel");
   await expect(
     overlayPanel.getByRole("heading", { name: "Selected books" }),
@@ -1185,6 +1263,7 @@ test("selected library overlay book parts produce deterministic Turtle", async (
     .getByRole("checkbox", { name: "Select Amaru treasury 2026 overlay" })
     .uncheck();
   await openInspectViaShell(page);
+  await selectResultTab(page, "Graph / RDF");
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
   await expect(selectedTurtle).not.toHaveValue(/Amaru Core Development treasury/);
@@ -1216,6 +1295,7 @@ test("resolves decoded-tree address rows from selected Turtle overlay books", as
   expect(rawAddress).toMatch(/^[0-9a-f]+$/);
   expect(rawAddress.length).toBeGreaterThanOrEqual(24);
 
+  await selectResultTab(page, "Graph / RDF");
   const turtleText = await page.locator(".rdf-panel .rdf-turtle").innerText();
   const address = await page.evaluate((graph) => {
     const result = globalThis.rdfShapes.query(
@@ -1237,6 +1317,7 @@ test("resolves decoded-tree address rows from selected Turtle overlay books", as
   expect(address).toMatch(/^addr1/);
 
   const resolvedLabel = "Fixture decoded treasury address";
+  await selectResultTab(page, "Structure");
   await expect(decodedPanel.getByText(resolvedLabel, { exact: true })).toHaveCount(0);
   await expect(addressRow).toContainText(rawAddress);
 
@@ -1260,9 +1341,11 @@ fixture:decodedTreasuryAddress
   ).toBeVisible();
 
   await openInspectViaShell(page);
+  await selectResultTab(page, "Graph / RDF");
   const overlayPanel = page.locator(".overlay-book-panel");
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
+  await selectResultTab(page, "Structure");
   const resolvedAddressRow = decodedPanel
     .locator(".decoded-tree-row")
     .filter({ hasText: "Address" })
@@ -1281,6 +1364,7 @@ test("inspect resolves decoded-tree address rows from selected library books", a
 }) => {
   await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
 
+  await selectResultTab(page, "Graph / RDF");
   const firstTurtleText = await page.locator(".rdf-panel .rdf-turtle").innerText();
   const address = await page.evaluate((graph) => {
     const result = globalThis.rdfShapes.query(
@@ -1334,6 +1418,7 @@ fixture:selectedLibraryAddress
     page.getByRole("heading", { name: "Conway transaction identity" }),
   ).toBeVisible();
 
+  await selectResultTab(page, "Graph / RDF");
   const overlayPanel = page.locator(".overlay-book-panel");
   const applySelectedBooks = overlayPanel.getByRole("button", {
     name: "Apply selected books",
@@ -1342,6 +1427,7 @@ fixture:selectedLibraryAddress
     await applySelectedBooks.click();
   }
 
+  await selectResultTab(page, "Structure");
   const decodedPanel = page.locator(".decoded-structure-panel");
   await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
   const resolvedAddressRow = decodedPanel
@@ -1478,6 +1564,7 @@ test("selected library blueprint book applies typed RDF fields", async ({
 
   await decodeFixtureAt(page, "/inspect", signingIntentFixturePath);
 
+  await selectResultTab(page, "Graph / RDF");
   const rdfPanel = page.locator(".rdf-panel");
   const turtle = rdfPanel.locator(".rdf-turtle");
   const typedFieldsPanel = page.locator(".typed-fields-panel");
@@ -1492,6 +1579,7 @@ test("selected library blueprint book applies typed RDF fields", async ({
     .getByRole("checkbox", { name: "Select SundaeSwap V3 blueprint" })
     .check();
   await openInspectViaShell(page);
+  await selectResultTab(page, "Graph / RDF");
   const overlayPanel = page.locator(".overlay-book-panel");
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
@@ -1529,6 +1617,7 @@ test("selected library blueprint book applies typed RDF fields", async ({
     .getByRole("checkbox", { name: "Select SundaeSwap V3 blueprint" })
     .uncheck();
   await openInspectViaShell(page);
+  await selectResultTab(page, "Graph / RDF");
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
   await expect(turtle).not.toContainText(":OrderDatum_max_protocol_fee 1280000");
@@ -1561,6 +1650,7 @@ test("lists selected library SHACL shapes as selected inspect parts", async ({ p
   const validateType = await page.evaluate(() => typeof globalThis.rdfShapes.validate);
   expect(validateType).toBe("function");
 
+  await selectResultTab(page, "Graph / RDF");
   const overlayPanel = page.locator(".overlay-book-panel");
   await expect(
     overlayPanel.locator(".book-part-row", {
@@ -1575,6 +1665,7 @@ test("renders selected library SHACL conformance for bundled Cardano RDF shapes"
 }) => {
   await decodeFixture(page);
 
+  await selectResultTab(page, "Validation");
   const conformancePanel = page.locator(".shacl-conformance-panel");
   await expect(
     conformancePanel.getByRole("heading", { name: "RDF SHACL conformance" }),
@@ -1610,6 +1701,7 @@ test("renders non-conforming SHACL violations for pasted shapes", async ({
 
   await decodeFixtureAt(page, "/inspect");
 
+  await selectResultTab(page, "Validation");
   const conformancePanel = page.locator(".shacl-conformance-panel");
   await expect(
     conformancePanel.getByRole("heading", { name: "RDF SHACL conformance" }),
@@ -1640,29 +1732,30 @@ test("keeps signer-critical intent visible in the first viewport", async ({ page
   await page.setViewportSize({ width: 1280, height: 720 });
   await decodeFixture(page, signingIntentFixturePath);
 
+  await selectResultTab(page, "Witness");
   const intentPanel = page.locator(".intent-panel");
   const intentMetric = (label, value) =>
     intentPanel
       .locator(".metric-card", { hasText: label })
       .getByText(value, { exact: true });
   await expect(intentPanel.getByRole("heading", { name: "Signing summary" })).toBeVisible();
-  await expectInFirstViewport(intentPanel.getByText("Swap ADA<->USDM", { exact: true }));
-  await expectInFirstViewport(
-    intentPanel.getByText("Required to pay Antithesis as vendor"),
-  );
-  await expectInFirstViewport(intentMetric("Signer net ADA", "unknown"));
-  await expectInFirstViewport(intentMetric("Missing signers", "2 missing required signers"));
-  await expectInFirstViewport(intentMetric("Redeemers", "2 redeemers"));
-  await expectInFirstViewport(intentMetric("Withdrawals", "1 withdrawal"));
-  await expectInFirstViewport(intentMetric("Mint/burn", "No mint/burn"));
+  await expect(intentPanel.getByText("Swap ADA<->USDM", { exact: true })).toBeVisible();
+  await expect(intentPanel.getByText("Required to pay Antithesis as vendor")).toBeVisible();
+  await expect(intentMetric("Signer net ADA", "unknown")).toBeVisible();
+  await expect(intentMetric("Missing signers", "2 missing required signers")).toBeVisible();
+  await expect(intentMetric("Redeemers", "2 redeemers")).toBeVisible();
+  await expect(intentMetric("Withdrawals", "1 withdrawal")).toBeVisible();
+  await expect(intentMetric("Mint/burn", "No mint/burn")).toBeVisible();
 });
 
 test("shows transaction-derived witness plan values", async ({ page }) => {
   await decodeFixture(page);
 
-  await expect(page.getByRole("heading", { name: "Witness plan" })).toBeVisible();
-  await expect(page.getByText("Transaction-only witness plan")).toBeVisible();
-  await expect(page.getByText("Present vkey witnesses")).toBeVisible();
+  await selectResultTab(page, "Witness");
+  const witnessPanel = page.locator(".witness-plan");
+  await expect(witnessPanel.getByRole("heading", { name: "Witness plan" })).toBeVisible();
+  await expect(witnessPanel.getByText("Transaction-only witness plan")).toBeVisible();
+  await expect(witnessPanel.getByText("Present vkey witnesses")).toBeVisible();
 
   const redeemerRow = page
     .locator(".witness-plan .witness-row")
@@ -1678,6 +1771,7 @@ test("shows transaction-derived witness plan values", async ({ page }) => {
 test("surfaces ledger validation diagnostics", async ({ page }) => {
   await decodeFixture(page);
 
+  await selectResultTab(page, "Validation");
   const validationPanel = page.locator(".validation-panel");
   await expect(
     validationPanel.getByRole("heading", { name: "Ledger validation" }),
@@ -1738,6 +1832,7 @@ test("keeps copy controls off non-value missing context rows", async ({ page }) 
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
+  await selectResultTab(page, "Validation");
   const missingContextSection = page
     .locator(".validation-panel .witness-section")
     .filter({ hasText: "Missing context" });
@@ -1817,12 +1912,17 @@ test("passes producer transaction CBOR into witness planning", async ({
   await expect(
     page.getByText("Producer transaction CBOR resolved every visible transaction input"),
   ).toBeVisible();
-  await expect(page.getByText("Producer txs")).toBeVisible();
+  await selectResultTab(page, "Validation");
+  await expect(
+    page.locator(".validation-panel .metric-card", { hasText: "Resolved inputs" }),
+  ).toBeVisible();
+  await selectResultTab(page, "Witness");
   await expect(
     page.locator(".witness-plan .identity-section-title", {
       hasText: "Resolved inputs",
     }),
   ).toBeVisible();
+  await selectResultTab(page, "Validation");
   await expect(
     page
       .locator(".validation-panel .identity-section-title", { hasText: "Resolved inputs" })
@@ -1838,6 +1938,7 @@ test("passes producer transaction CBOR into witness planning", async ({
   expect(protocolParameterRequests).toBe(1);
   expect(utxoRequests).toBe(0);
 
+  await selectResultTab(page, "Witness");
   const resolvedRow = page
     .locator(".witness-plan .witness-row")
     .filter({ hasText: "resolved" })
@@ -1907,6 +2008,7 @@ test("passes producer transaction CBOR into RDF resolved value flow", async ({
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
+  await selectResultTab(page, "Graph / RDF");
   const turtle = page.locator(".rdf-panel .rdf-turtle");
   await expect(turtle).toContainText("cardano:resolvedTo");
   await expect(turtle).toContainText("resolvedInput");
@@ -1952,6 +2054,7 @@ test("surfaces hard provider context resolution failures", async ({
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
+  await selectResultTab(page, "Validation");
   const providerResolution = page
     .locator(".validation-panel .witness-section")
     .filter({ hasText: "Provider resolution" });
@@ -2013,7 +2116,10 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
   await expect(
     page.getByText("Producer transaction CBOR resolved every visible transaction input"),
   ).toBeVisible();
-  await expect(page.getByText("Producer txs")).toBeVisible();
+  await selectResultTab(page, "Validation");
+  await expect(
+    page.locator(".validation-panel .metric-card", { hasText: "Resolved inputs" }),
+  ).toBeVisible();
   await expect(
     page
       .locator(".validation-panel .metric-card", { hasText: "Status" })
@@ -2040,6 +2146,7 @@ test("opens browser rows in place without losing identity context", async ({
 }) => {
   await decodeFixture(page);
 
+  await selectResultTab(page, "Graph / RDF");
   const inputsRow = page
     .locator(".browser-row")
     .filter({ has: page.locator("code", { hasText: "inputs" }) })
@@ -2053,11 +2160,9 @@ test("opens browser rows in place without losing identity context", async ({
 
   await expect(page.locator(".browser-children").first()).toBeVisible();
   await expect(
-    page.locator(".identity-panel:not(.witness-plan):not(.validation-panel)"),
-  ).toBeVisible();
-  await expect(
     page.getByRole("heading", { name: "Conway transaction identity" }),
   ).toBeVisible();
+  await expect(page.locator(".summary-identity-grid")).toBeVisible();
 });
 
 test("keeps decoded transaction layout within the viewport", async ({ page }) => {
