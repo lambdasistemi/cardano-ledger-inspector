@@ -2,11 +2,11 @@
 
 ## Slice 1 - Tabbed Tree-Primary Result
 
-- [ ] T114-S1 Add focused Playwright RED coverage for default `Structure` tab, bounded result height, tab reachability, and subpath decode.
-- [ ] T114-S1 Implement tab state/actions and render result as summary plus tabbed panels with decoded structure as the default.
-- [ ] T114-S1 Update CSS so the result lands compactly and advanced panels scroll inside their tab instead of stacking the page.
-- [ ] T114-S1 Run focused Playwright checks and `nix build .#packages.x86_64-linux.tx-inspector-ui`.
-- [ ] T114-S1 Commit one bisect-safe slice with the required `Tasks: T114-S1` trailer.
+- [X] T114-S1 Add focused Playwright RED coverage for default `Structure` tab, bounded result height, tab reachability, and subpath decode.
+- [X] T114-S1 Implement tab state/actions and render result as summary plus tabbed panels with decoded structure as the default.
+- [X] T114-S1 Update CSS so the result lands compactly and advanced panels scroll inside their tab instead of stacking the page.
+- [X] T114-S1 Run focused Playwright checks and `nix build .#packages.x86_64-linux.tx-inspector-ui`.
+- [X] T114-S1 Commit one bisect-safe slice with the required `Tasks: T114-S1` trailer.
 
 ## Finalization
 
