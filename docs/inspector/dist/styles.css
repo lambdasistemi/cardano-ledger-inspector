@@ -359,6 +359,91 @@ fieldset {
   overflow: hidden;
 }
 
+.loaded-workspace {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+}
+
+.loaded-workspace .workspace-right {
+  border-left: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.loaded-inspector-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px 12px;
+}
+
+.loaded-inspector-context {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, auto)) minmax(180px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.loaded-context-item {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.loaded-context-item span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.loaded-context-item strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+}
+
+.loaded-context-hash code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loaded-book-context,
+.loaded-inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.loaded-book-context {
+  justify-content: center;
+}
+
+.loaded-book-context span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 0.18rem 0.45rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.loaded-inspector-actions {
+  justify-content: end;
+}
+
 .panel {
   display: block;
   border: 0;
@@ -1586,6 +1671,20 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .loaded-inspector-header {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .loaded-inspector-context {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .loaded-book-context,
+  .loaded-inspector-actions {
+    justify-content: start;
+  }
+
   .workspace-left {
     border-right: 1px solid var(--border);
     border-radius: 8px 8px 0 0;
@@ -1659,6 +1758,15 @@ pre {
 
   .mode-options,
   .hash-form {
+    grid-template-columns: 1fr;
+  }
+
+  .loaded-inspector-context {
+    grid-template-columns: 1fr;
+  }
+
+  .loaded-inspector-actions {
+    display: grid;
     grid-template-columns: 1fr;
   }
 

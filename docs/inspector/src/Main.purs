@@ -246,6 +246,7 @@ data Action
   | BrowseJson String
   | ToggleDecodedTree String
   | SelectResultTab ResultTab
+  | ChangeInput
   | Navigate Route MouseEvent
   | ToggleTheme
 
@@ -324,21 +325,37 @@ inspectorComponent initial =
       ]
 
   renderInspector state =
-    HH.div
-      [ classNames [ "app-shell", "inspect-shell" ] ]
-      [ HH.div
-          [ classNames [ "workspace" ] ]
+    case state.result of
+      Just r | isDecodedResult r ->
+        HH.div
+          [ classNames [ "app-shell", "inspect-shell" ] ]
           [ HH.div
-              [ classNames [ "workspace-left" ] ]
-              [ renderSettingsSummary state
-              , renderModeTabs state
-              , renderBooksPanel state
+              [ classNames [ "workspace", "loaded-workspace" ] ]
+              [ renderLoadedInspectorHeader state
+              , HH.div
+                  [ classNames [ "workspace-right" ] ]
+                  [ renderResult state ]
               ]
-          , HH.div
-              [ classNames [ "workspace-right" ] ]
-              [ renderResult state ]
           ]
-      ]
+      _ ->
+        HH.div
+          [ classNames [ "app-shell", "inspect-shell" ] ]
+          [ HH.div
+              [ classNames [ "workspace" ] ]
+              [ HH.div
+                  [ classNames [ "workspace-left" ] ]
+                  [ renderSettingsSummary state
+                  , renderModeTabs state
+                  , renderBooksPanel state
+                  ]
+              , HH.div
+                  [ classNames [ "workspace-right" ] ]
+                  [ renderResult state ]
+              ]
+          ]
+
+  isDecodedResult result =
+    result.exitOk && (Json.inspect result.stdout).valid
 
   renderSettings state =
     HH.div
@@ -682,6 +699,98 @@ inspectorComponent initial =
           ]
           [ HH.text "Settings" ]
       ]
+
+  renderLoadedInspectorHeader state =
+    let
+      selected = selectedBooks state
+      parts = selectedBookParts state
+      overlayCount = Array.length (selectedOverlayParts state)
+      blueprintCount = Array.length (selectedBlueprintParts state)
+      shaclCount = Array.length (selectedShaclParts state)
+    in
+      HH.section
+        [ classNames [ "loaded-inspector-header" ]
+        , HH.attr (HH.AttrName "aria-label") "Loaded transaction controls"
+        ]
+        [ HH.div
+            [ classNames [ "loaded-inspector-context" ] ]
+            [ HH.div
+                [ classNames [ "loaded-context-item" ] ]
+                [ HH.span_ [ HH.text "Source" ]
+                , HH.strong_ [ HH.text (modeLabel state.mode) ]
+                ]
+            , HH.div
+                [ classNames [ "loaded-context-item" ] ]
+                [ HH.span_ [ HH.text "Provider" ]
+                , HH.strong_ [ HH.text (Provider.providerName state.provider) ]
+                ]
+            , HH.div
+                [ classNames [ "loaded-context-item" ] ]
+                [ HH.span_ [ HH.text "Network" ]
+                , HH.strong_ [ HH.text (networkName state.network) ]
+                ]
+            , HH.div
+                [ classNames [ "loaded-context-item", "loaded-context-hash" ] ]
+                [ HH.span_ [ HH.text "Tx id/hash" ]
+                , HH.code_ [ HH.text (loadedTxHash state) ]
+                ]
+            ]
+        , HH.div
+            [ classNames [ "loaded-book-context" ] ]
+            [ HH.span_ [ HH.text (show (Array.length selected) <> " selected") ]
+            , HH.span_ [ HH.text (show (Array.length parts) <> " parts") ]
+            , HH.span_ [ HH.text (show overlayCount <> " overlays") ]
+            , HH.span_ [ HH.text (show blueprintCount <> " blueprints") ]
+            , HH.span_ [ HH.text (show shaclCount <> " SHACL") ]
+            ]
+        , HH.div
+            [ classNames [ "loaded-inspector-actions" ] ]
+            [ HH.element (HH.ElemName "md-outlined-button")
+                [ classNames [ "secondary-action" ]
+                , HH.attr (HH.AttrName "role") "button"
+                , mdControl "secondary"
+                , HE.onClick (\_ -> ChangeInput)
+                ]
+                [ HH.text "Change input" ]
+            , HH.a
+                [ classNames [ "header-link" ]
+                , HP.href (state.routeBase <> Routing.routePath RouteLibrary)
+                , HE.onClick (Navigate RouteLibrary)
+                ]
+                [ HH.text "Library" ]
+            , HH.element (HH.ElemName "md-filled-button")
+                [ classNames [ "primary-action" ]
+                , HH.attr (HH.AttrName "role") "button"
+                , mdControl "primary"
+                , HP.disabled state.running
+                , HE.onClick (\_ -> ApplySelectedBooks)
+                ]
+                [ HH.text "Apply selected books" ]
+            ]
+        ]
+
+  modeLabel mode =
+    case mode of
+      ByHash -> "Tx hash"
+      ByHex  -> "CBOR hex"
+
+  loadedTxHash state =
+    case state.identification of
+      Just identification | identification.valid ->
+        case Array.find (\row -> row.path == "[\"identification\",\"tx_id\"]") identification.primary of
+          Just row -> row.value
+          Nothing ->
+            case Array.find (\row -> row.path == "[\"identification\",\"body_hash\"]") identification.primary of
+              Just row -> row.value
+              Nothing  -> fallbackInputHash state
+      _ -> fallbackInputHash state
+
+  fallbackInputHash state =
+    let
+      trimmedHash = String.trim state.txHash
+    in
+      if trimmedHash == "" then "decoded transaction"
+      else trimmedHash
 
   renderBooksPanel state =
     let
@@ -2973,6 +3082,8 @@ inspectorComponent initial =
             }
     SelectResultTab tab ->
       H.modify_ _ { resultTab = tab }
+    ChangeInput ->
+      H.modify_ _ { result = Nothing, copied = false, copiedPath = Nothing }
 
   updateAnnotationDraft update =
     H.modify_ \st -> st { annotationDraft = map update st.annotationDraft }

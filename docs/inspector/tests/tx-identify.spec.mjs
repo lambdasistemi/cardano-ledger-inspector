@@ -281,30 +281,27 @@ async function expectCQuisitorInspectSurface(page, route) {
   const workspace = page.locator(".workspace");
   const leftPane = page.locator(".workspace-left");
   const rightPane = page.locator(".workspace-right");
-  const leftBox = await leftPane.boundingBox();
+  const loadedHeader = page.locator(".loaded-inspector-header");
+  await expect(loadedHeader).toBeVisible();
+  await expect(loadedHeader).toContainText("CBOR hex");
+  await expect(loadedHeader).toContainText(/Blockfrost|Koios/);
+  await expect(loadedHeader).toContainText("mainnet");
+  await expect(loadedHeader).toContainText(/Tx (id|hash)/i);
+  await expect(loadedHeader).toContainText(/[0-9a-f]{16}/i);
+  await expect(loadedHeader.getByRole("button", { name: "Change input" })).toBeVisible();
+  await expect(loadedHeader.getByRole("link", { name: "Library" })).toBeVisible();
+  await expect(loadedHeader.getByRole("button", { name: "Apply selected books" })).toBeVisible();
+  await expect(loadedHeader).toContainText(/selected|parts/);
+
+  await expect(leftPane).toHaveCount(0);
   const rightBox = await rightPane.boundingBox();
   const workspaceBox = await workspace.boundingBox();
-  expect(leftBox).not.toBeNull();
   expect(rightBox).not.toBeNull();
   expect(workspaceBox).not.toBeNull();
 
-  const leftRatio = leftBox.width / workspaceBox.width;
   const rightRatio = rightBox.width / workspaceBox.width;
-  expect(leftRatio).toBeGreaterThan(0.46);
-  expect(leftRatio).toBeLessThan(0.54);
-  expect(rightRatio).toBeGreaterThan(0.46);
-  expect(rightRatio).toBeLessThan(0.54);
-  expect(Math.abs(leftBox.y - rightBox.y)).toBeLessThan(4);
-  expect(rightBox.x - (leftBox.x + leftBox.width)).toBeLessThanOrEqual(16);
-  await expect(rightPane).toHaveCSS("border-left-width", /[1-9]px/);
-
-  await expect(leftPane.locator(".settings-summary")).toContainText(/Blockfrost|Koios/);
-  await expect(leftPane.locator(".books-panel")).toContainText(/selected|parts/);
-  const pasteInput = leftPane.getByPlaceholder("Conway tx CBOR hex...");
-  await expect(pasteInput).toBeVisible();
-  const pasteBox = await pasteInput.boundingBox();
-  expect(pasteBox.height).toBeGreaterThan(170);
-  await expect(leftPane.getByRole("button", { name: "Decode" })).toBeVisible();
+  expect(rightRatio).toBeGreaterThan(0.92);
+  expect(rightBox.x - workspaceBox.x).toBeLessThanOrEqual(4);
 
   const resultPanel = rightPane.locator(".result-panel");
   const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
@@ -944,9 +941,16 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   await expect(providerPanel).not.toHaveCSS("background-color", lightBackground);
 
   await page.goto("/inspect");
+  const inputPanel = page.locator(".input-panel");
+  await expect(inputPanel).toHaveAttribute("data-md3-surface", "input");
+  await expect(page.locator("md-filled-button", { hasText: "Decode" })).toHaveAttribute(
+    "data-md3-control",
+    "primary",
+  );
+
   await decodeFixtureAt(page, "/inspect");
 
-  const inputPanel = page.locator(".input-panel");
+  const loadedHeader = page.locator(".loaded-inspector-header");
   const resultPanel = page.locator(".result-panel");
   const decodedPanel = page.locator(".decoded-structure-panel");
   await selectResultTab(page, "Validation");
@@ -956,7 +960,7 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   const lensPanel = page.locator(".sparql-lens-panel").first();
 
   await expect(page.locator(".provider-panel")).toHaveCount(0);
-  await expect(inputPanel).toHaveAttribute("data-md3-surface", "input");
+  await expect(loadedHeader).toBeVisible();
   await expect(resultPanel).toHaveAttribute("data-md3-surface", "result");
   await selectResultTab(page, "Structure");
   await expect(decodedPanel).toHaveAttribute("data-md3-surface", "decoded");
@@ -966,10 +970,6 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   await expect(rdfPanel).toHaveAttribute("data-md3-surface", "decoded");
   await expect(lensPanel).toHaveAttribute("data-md3-surface", "decoded");
 
-  await expect(page.locator("md-filled-button", { hasText: "Decode" })).toHaveAttribute(
-    "data-md3-control",
-    "primary",
-  );
   await expect(page.locator("md-outlined-button", { hasText: "Copy JSON" })).toHaveAttribute(
     "data-md3-control",
     "secondary",
@@ -1011,6 +1011,22 @@ test("inspect keeps chain-data settings compact and gives input/results the work
   expect(rightBox.width).toBeGreaterThan(workspaceBox.width * 0.46);
   expect(rightBox.width).toBeLessThan(workspaceBox.width * 0.54);
   expect(Math.abs(leftBox.y - rightBox.y)).toBeLessThan(8);
+
+  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill("not-a-conway-hex");
+  await page.getByRole("button", { name: "Decode" }).click();
+  await expect(resultPanel).toContainText(/malformed_hex|invalid/i);
+  await expect(page.locator(".loaded-inspector-header")).toHaveCount(0);
+  await expect(leftPane).toBeVisible();
+  await expect(rightPane).toBeVisible();
+
+  const errorWorkspaceBox = await page.locator(".workspace").boundingBox();
+  const errorLeftBox = await leftPane.boundingBox();
+  const errorRightBox = await rightPane.boundingBox();
+  expect(errorLeftBox.width).toBeGreaterThan(errorWorkspaceBox.width * 0.46);
+  expect(errorLeftBox.width).toBeLessThan(errorWorkspaceBox.width * 0.54);
+  expect(errorRightBox.width).toBeGreaterThan(errorWorkspaceBox.width * 0.46);
+  expect(errorRightBox.width).toBeLessThan(errorWorkspaceBox.width * 0.54);
 });
 
 test("settings changes provider state used by inspect hash decode", async ({ page }) => {
@@ -1536,24 +1552,14 @@ fixture:selectedLibraryAddress
   ).toBeChecked();
 
   await openInspectViaShell(page);
-  const txCbor = (await readFile(conwayMainnetFixturePath, "utf8")).trim();
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
-  await page.getByRole("button", { name: "Decode" }).click();
+  await selectResultTab(page, "Graph / RDF");
+  const overlayPanel = page.locator(".overlay-book-panel");
+  await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
+
+  await selectResultTab(page, "Structure");
   await expect(
     page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
-
-  await selectResultTab(page, "Graph / RDF");
-  const overlayPanel = page.locator(".overlay-book-panel");
-  const applySelectedBooks = overlayPanel.getByRole("button", {
-    name: "Apply selected books",
-  });
-  if (await applySelectedBooks.count()) {
-    await applySelectedBooks.click();
-  }
-
-  await selectResultTab(page, "Structure");
   const decodedPanel = page.locator(".decoded-structure-panel");
   await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
   const resolvedAddressRow = decodedPanel
