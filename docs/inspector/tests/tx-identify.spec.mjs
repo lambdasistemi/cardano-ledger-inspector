@@ -1164,7 +1164,24 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     hasText: "Transaction",
   });
   await expect(rootRow).toBeVisible();
-  await expect(rootRow).toContainText(/urn:cardano:tx:/);
+  const transactionTypeHref =
+    "https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#Transaction";
+  const transactionTypeLink = rootRow.getByRole("link", {
+    name: "cardano:Transaction",
+  });
+  await expect(transactionTypeLink).toBeVisible();
+  await expect(transactionTypeLink).toHaveAttribute("href", transactionTypeHref);
+  await expect(transactionTypeLink).toHaveAttribute("target", "_blank");
+  await expect(transactionTypeLink).toHaveAttribute("rel", /noopener/);
+  await expect(rootRow).not.toContainText(transactionTypeHref);
+
+  const rootSummary = rootRow.locator(".decoded-tree-summary");
+  const visibleRootSummary = await rootSummary.innerText();
+  const fullRootSubject = await rootSummary.getAttribute("title");
+  expect(fullRootSubject).toMatch(/^urn:cardano:tx:/);
+  expect(visibleRootSummary).toContain("...");
+  expect(visibleRootSummary).not.toBe(fullRootSubject);
+  await expect(rootSummary.getByRole("link")).toHaveCount(0);
 
   for (const section of [
     "Body",
@@ -1593,10 +1610,14 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
   const inlineLabel = "Inline annotated fixture address";
   await expect(firstAddressRow).not.toContainText(inlineLabel);
+  await expect(firstAddressRow.getByLabel("Label", { exact: true })).toHaveCount(0);
+  await expect(firstAddressRow.getByLabel("Optional type")).toHaveCount(0);
   await firstAddressRow
-    .getByRole("button", { name: "Label this as..." })
+    .getByRole("button", { name: "Label this node" })
     .click();
-  await firstAddressRow.getByLabel("Label").fill(inlineLabel);
+  await expect(firstAddressRow.getByLabel("Label", { exact: true })).toBeVisible();
+  await expect(firstAddressRow.getByLabel("Optional type")).toBeVisible();
+  await firstAddressRow.getByLabel("Label", { exact: true }).fill(inlineLabel);
   await firstAddressRow.getByLabel("Optional type").fill("FixtureAddress");
   await firstAddressRow.getByRole("radio", { name: "Create new local book" }).check();
   await firstAddressRow.getByLabel("New book name").fill("Inline fixture annotations");
@@ -1609,10 +1630,12 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
     .filter({ hasText: "Datum hash" })
     .first();
   const appendedLabel = "Existing-book annotated fixture datum hash";
+  await expect(datumHashRow.getByLabel("Label", { exact: true })).toHaveCount(0);
   await datumHashRow
-    .getByRole("button", { name: "Label this as..." })
+    .getByRole("button", { name: "Label this node" })
     .click();
-  await datumHashRow.getByLabel("Label").fill(appendedLabel);
+  await expect(datumHashRow.getByLabel("Label", { exact: true })).toBeVisible();
+  await datumHashRow.getByLabel("Label", { exact: true }).fill(appendedLabel);
   await datumHashRow.getByRole("radio", { name: "Append to existing book" }).check();
   await datumHashRow.getByLabel("Target book").selectOption({
     label: "Inline fixture annotations",

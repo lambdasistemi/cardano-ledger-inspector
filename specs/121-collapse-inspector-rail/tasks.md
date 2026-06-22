@@ -9,7 +9,7 @@
 
 ## Slice 2: Decoded-tree row compactness
 
-- [ ] T121-S2 Add Playwright RED assertions for decoded-structure rows: vocab IRIs render as linked CURIEs with the full href, raw vocab URLs are not shown as row text, `urn:cardano:*` subjects are collapsed and not linked, and annotation fields stay hidden until the edit icon is clicked.
-- [ ] T121-S2 Update `Main.purs` presentation so decoded tree rows use the `FFI/RdfShapes.js` prefix table for linked CURIE labels, collapse/copy non-dereferenceable `urn:cardano:*` subjects, and gate the existing annotation draft form behind an `md-icon-button` edit affordance without changing the save flow.
-- [ ] T121-S2 Update `styles.css` for the compact CURIE/subject/edit-icon row presentation and responsive annotation expander behavior.
-- [ ] T121-S2 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S2` trailer.
+- [X] T121-S2 Add Playwright RED assertions for decoded-structure rows: vocab IRIs render as linked CURIEs with the full href, raw vocab URLs are not shown as row text, `urn:cardano:*` subjects are collapsed and not linked, and annotation fields stay hidden until the edit icon is clicked.
+- [X] T121-S2 Update `Main.purs` presentation so decoded tree rows use the `FFI/RdfShapes.js` prefix table for linked CURIE labels, collapse/copy non-dereferenceable `urn:cardano:*` subjects, and gate the existing annotation draft form behind an `md-icon-button` edit affordance without changing the save flow.
+- [X] T121-S2 Update `styles.css` for the compact CURIE/subject/edit-icon row presentation and responsive annotation expander behavior.
+- [X] T121-S2 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S2` trailer.
