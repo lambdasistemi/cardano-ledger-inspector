@@ -20,12 +20,16 @@ unchanged.
   names, public-path-safe relative URLs, one shared asset copy in the package
   root, and gzip/brotli precompression.
 - Update the Pages and PR preview packaging only where needed to preserve the
-  `/inspector/` deployment shape and document the Pages compression limit.
+  `/inspector/` deployment shape, assert `.gz`/`.br` siblings for both wasm
+  assets in the package, and document the host compression/cache limits.
 - Add or extend Playwright coverage to assert separate wasm asset fetches,
   non-root subpath routing, decode, and RDF/SPARQL behavior.
-- Add nginx preview config modeled on cardano-mpfs-offchain PR #316:
-  `gzip_static`, brotli, `application/wasm`, immutable cache headers for hashed
-  assets, and SPA fallback under the preview prefix.
+- Keep live preview smoke strict for the host-independent wasm asset contract:
+  the hashed wasm URL exists, returns HTTP 200, and serves
+  `Content-Type: application/wasm`.
+- Treat live brotli/gzip_static serving and immutable cache headers as
+  external shared-host infrastructure. Preview probes may report advisory
+  warnings, but they are not a #117 completion gate.
 
 ## Slices
 
@@ -40,14 +44,14 @@ Driver and cross-checker own one vertical slice:
 - `.github/workflows/pr-preview.yml`
 - `gh-docs/installation.md`
 - `gh-docs/architecture.md`
-- any new `deploy/spa/*` files needed by the PR preview container
 
 Expected proof:
 
 - RED Playwright assertion fails against the current inline wasm build because
   no separate wasm asset is fetched.
 - GREEN emits hashed wasm assets, streams/falls back correctly, and passes the
-  decode plus RDF/SPARQL assertions under a non-root subpath.
+  decode plus RDF/SPARQL assertions under a non-root subpath. The package also
+  contains `.gz` and `.br` siblings for both wasm assets.
 - `./gate.sh` passes before the driver commits.
 - The commit body contains `Tasks: T117-S1`.
 
