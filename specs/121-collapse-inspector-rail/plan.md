@@ -12,7 +12,7 @@ Observed direction: CQuisitor keeps control surfaces compact and modal/header-li
 
 ## Slice
 
-One vertical presentation slice is appropriate because the state gate, CSS layout, and Playwright coverage are one coherent UX behavior.
+The original rail-collapse work is one vertical presentation slice because the state gate, CSS layout, and Playwright coverage are one coherent UX behavior. The A-001 preview follow-up adds a second presentation-only slice on the same branch/PR for decoded-structure row compactness.
 
 ### Slice 1: Loaded-state rail collapse
 
@@ -31,6 +31,30 @@ Work:
 - Keep input and books reachable from the loaded header without changing decode or book logic. A details/expand affordance, edit-input toggle, or compact controls are acceptable if the decoded structure remains dominant.
 - Update CSS `.workspace*` and responsive rules so loaded mode is full-width and narrow mode stacks cleanly.
 - Add/extend Playwright assertions for empty two-pane behavior and loaded full-width/collapsed behavior, including the existing prefixed subpath harness.
+
+Focused proof:
+
+- `nix build .#packages.x86_64-linux.tx-inspector-ui`
+- `just test-playwright`
+- `just format-check`
+- `just hlint`
+- Browser smoke of the published preview with `specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex`.
+
+### Slice 2: Decoded-tree row compactness
+
+Owned files:
+
+- `docs/inspector/src/Main.purs`
+- `docs/inspector/dist/styles.css`
+- `docs/inspector/tests/tx-identify.spec.mjs`
+
+Work:
+
+- In decoded-structure rows, render known vocab IRIs as linked CURIEs using a local prefix table that mirrors the `PREFIX` declarations in `docs/inspector/src/FFI/RdfShapes.js`; unknown HTTP(S) IRIs remain linked but middle-truncated.
+- Collapse `urn:cardano:*` subject values from `id` or `summary` into a short middle-ellipsized, copyable, tooltip-backed text form; do not link URN subjects.
+- Replace the always-visible inline annotation call-to-action with a compact `md-icon-button` edit affordance per row, while preserving `StartDecodedTreeAnnotation` and `SaveDecodedTreeAnnotation` behavior and every field in the existing annotation draft form.
+- Keep the change presentation-only: no decode/resolution changes, no annotation persistence changes, no new JavaScript dependencies.
+- Extend Playwright coverage for the CURIE href, absence of raw vocab URL text, collapsed/not-linked URN subjects, and editor hidden-until-click behavior.
 
 Focused proof:
 
