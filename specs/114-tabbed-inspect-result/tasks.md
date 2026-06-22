@@ -10,6 +10,6 @@
 
 ## Finalization
 
-- [ ] T114-F1 Orchestrator review: verify diff scope, commit trailer, local gate, and task amendment.
-- [ ] T114-F2 Push branch and open/update draft PR linked to #114 and #113.
+- [X] T114-F1 Orchestrator review: verify diff scope, commit trailer, local gate, and task amendment.
+- [X] T114-F2 Push branch and open/update draft PR linked to #114 and #113.
 - [ ] T114-F3 Verify CI and preview smoke before reporting COMPLETE.
