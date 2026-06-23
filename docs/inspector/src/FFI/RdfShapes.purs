@@ -30,6 +30,7 @@ type DecodedTreeRow =
   , value :: String
   , summary :: String
   , raw :: String
+  , entityIri :: String
   , resolvedLabel :: String
   , resolvedType :: String
   , annotationPredicate :: String

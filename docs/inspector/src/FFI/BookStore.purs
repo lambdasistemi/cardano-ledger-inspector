@@ -69,6 +69,7 @@ foreign import inspectImpl :: Store -> BookStoreInspection
 foreign import annotationTurtle
   :: { label :: String
      , typeName :: String
+     , entityIri :: String
      , predicate :: String
      , value :: String
      }

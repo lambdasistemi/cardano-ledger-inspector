@@ -1598,6 +1598,33 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   const decodedPanel = page.locator(".decoded-structure-panel");
   await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
 
+  const output0Row = decodedPanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Output 0" })
+    .first();
+  await expect(output0Row).toBeVisible();
+  const output0Subject = await output0Row
+    .locator(".decoded-tree-summary")
+    .getAttribute("title");
+  expect(output0Subject).toMatch(/^urn:cardano:utxo:/);
+
+  const outputLabel = "Inline annotated fixture output";
+  await expect(output0Row).not.toContainText(outputLabel);
+  await output0Row
+    .getByRole("button", { name: "Label this node" })
+    .click();
+  await expect(output0Row.getByLabel("Label", { exact: true })).toBeVisible();
+  await output0Row.getByLabel("Label", { exact: true }).fill(outputLabel);
+  await output0Row.getByLabel("Optional type").fill("cardano:TransactionOutput");
+  await output0Row.getByRole("radio", { name: "Create new local book" }).check();
+  await output0Row.getByLabel("New book name").fill("Inline fixture annotations");
+  await output0Row.getByRole("button", { name: "Save label" }).click();
+
+  await expect(output0Row).toContainText(outputLabel);
+  await expect(
+    output0Row.getByRole("link", { name: "cardano:TransactionOutput" }),
+  ).toBeVisible();
+
   const addressRows = decodedPanel
     .locator(".decoded-tree-row")
     .filter({ hasText: "Address" });
@@ -1619,8 +1646,10 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await expect(firstAddressRow.getByLabel("Optional type")).toBeVisible();
   await firstAddressRow.getByLabel("Label", { exact: true }).fill(inlineLabel);
   await firstAddressRow.getByLabel("Optional type").fill("FixtureAddress");
-  await firstAddressRow.getByRole("radio", { name: "Create new local book" }).check();
-  await firstAddressRow.getByLabel("New book name").fill("Inline fixture annotations");
+  await firstAddressRow.getByRole("radio", { name: "Append to existing book" }).check();
+  await firstAddressRow.getByLabel("Target book").selectOption({
+    label: "Inline fixture annotations",
+  });
   await firstAddressRow.getByRole("button", { name: "Save label" }).click();
 
   await expect(firstAddressRow).toContainText(inlineLabel);
@@ -1644,6 +1673,27 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
   await expect(datumHashRow).toContainText(appendedLabel);
 
+  await decodedPanel.getByRole("button", { name: /^Witnesses\b/ }).click();
+  const verificationKeyRow = decodedPanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Verification key" })
+    .first();
+  const verificationKeyLabel = "Existing-book annotated verification key";
+  await expect(verificationKeyRow).toBeVisible();
+  await expect(verificationKeyRow.getByLabel("Label", { exact: true })).toHaveCount(0);
+  await verificationKeyRow
+    .getByRole("button", { name: "Label this node" })
+    .click();
+  await expect(verificationKeyRow.getByLabel("Label", { exact: true })).toBeVisible();
+  await verificationKeyRow.getByLabel("Label", { exact: true }).fill(verificationKeyLabel);
+  await verificationKeyRow.getByRole("radio", { name: "Append to existing book" }).check();
+  await verificationKeyRow.getByLabel("Target book").selectOption({
+    label: "Inline fixture annotations",
+  });
+  await verificationKeyRow.getByRole("button", { name: "Save label" }).click();
+
+  await expect(verificationKeyRow).toContainText(verificationKeyLabel);
+
   const rawStore = await page.evaluate(
     (key) => window.localStorage.getItem(key),
     localBookStoreKey,
@@ -1658,9 +1708,13 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   expect(generatedBook.raw).toContain("@prefix cardano:");
   expect(generatedBook.raw).toContain("@prefix rdfs:");
   expect(generatedBook.raw).toContain("@prefix local:");
+  expect(generatedBook.raw).toContain(`<${output0Subject}>`);
+  expect(generatedBook.raw).not.toContain("local:annotation-");
   expect(generatedBook.raw).toContain("cardano:bech32");
+  expect(generatedBook.raw).toContain(outputLabel);
   expect(generatedBook.raw).toContain(inlineLabel);
   expect(generatedBook.raw).toContain(appendedLabel);
+  expect(generatedBook.raw).toContain(verificationKeyLabel);
 
   await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
   await expect(page).toHaveURL(/\/library$/);

@@ -3194,12 +3194,13 @@ inspectorComponent initial =
         BookStore.annotationTurtle
           { label
           , typeName
+          , entityIri: row.entityIri
           , predicate: row.annotationPredicate
           , value: row.annotationValue
           }
     if label == "" then
       annotationError "Label is required."
-    else if row.annotationPredicate == "" || row.annotationValue == "" || turtle == "" then
+    else if row.entityIri == "" || row.annotationPredicate == "" || row.annotationValue == "" || turtle == "" then
       annotationError "This decoded row does not expose a supported annotation identifier."
     else if draft.mode == "existing" then
       case Array.find (\book -> book.id == draft.bookId && book.selected && not book.seed) st.books of
