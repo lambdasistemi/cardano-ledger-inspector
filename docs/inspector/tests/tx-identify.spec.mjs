@@ -279,9 +279,9 @@ async function expectCQuisitorInspectSurface(page, route) {
   );
 
   const workspace = page.locator(".workspace");
-  const leftPane = page.locator(".workspace-left");
-  const rightPane = page.locator(".workspace-right");
   const loadedHeader = page.locator(".loaded-inspector-header");
+  const booksPanel = workspace.locator(".books-panel");
+  const resultPanel = workspace.locator(".result-panel");
   await expect(loadedHeader).toBeVisible();
   await expect(loadedHeader).toContainText("CBOR hex");
   await expect(loadedHeader).toContainText(/Blockfrost|Koios/);
@@ -293,17 +293,9 @@ async function expectCQuisitorInspectSurface(page, route) {
   await expect(loadedHeader.getByRole("button", { name: "Apply selected books" })).toBeVisible();
   await expect(loadedHeader).toContainText(/selected|parts/);
 
-  await expect(leftPane).toHaveCount(0);
-  const rightBox = await rightPane.boundingBox();
-  const workspaceBox = await workspace.boundingBox();
-  expect(rightBox).not.toBeNull();
-  expect(workspaceBox).not.toBeNull();
-
-  const rightRatio = rightBox.width / workspaceBox.width;
-  expect(rightRatio).toBeGreaterThan(0.92);
-  expect(rightBox.x - workspaceBox.x).toBeLessThanOrEqual(4);
-
-  const resultPanel = rightPane.locator(".result-panel");
+  await expect(page.locator(".workspace-left")).toHaveCount(0);
+  await expect(page.locator(".workspace-right")).toHaveCount(0);
+  await expect(booksPanel.getByRole("heading", { name: "Books" })).toBeVisible();
   const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
   await expect(tabs.getByRole("tab", { name: "Structure" })).toHaveAttribute(
     "aria-selected",
@@ -318,6 +310,36 @@ async function expectCQuisitorInspectSurface(page, route) {
   await expect(transactionRow).toBeVisible();
   await expect(resultPanel.getByRole("heading", { name: "Conway transaction identity" })).toHaveCount(0);
   await expect(resultPanel.locator(".summary-identity-grid")).toHaveCount(0);
+
+  const loadedStack = await workspace.evaluate((root) => {
+    const rectForElement = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      };
+    };
+    const rectFor = (selector) => {
+      const element = root.querySelector(selector);
+      return element ? rectForElement(element) : null;
+    };
+    return {
+      workspace: rectForElement(root),
+      header: rectFor(".loaded-inspector-header"),
+      books: rectFor(".books-panel"),
+      result: rectFor(".result-panel"),
+    };
+  });
+  expect(loadedStack.workspace).not.toBeNull();
+  expect(loadedStack.header).not.toBeNull();
+  expect(loadedStack.books).not.toBeNull();
+  expect(loadedStack.result).not.toBeNull();
+  expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.books.top + 1);
+  expect(loadedStack.books.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
+  expect(loadedStack.result.width).toBeGreaterThan(loadedStack.workspace.width * 0.92);
+  expect(Math.abs(loadedStack.header.left - loadedStack.result.left)).toBeLessThanOrEqual(4);
 
   const positions = await resultPanel.evaluate((panel) => {
     const tree = panel.querySelector(".decoded-structure-panel .decoded-tree-row");
@@ -980,53 +1002,162 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   );
 });
 
-test("inspect keeps chain-data settings compact and gives input/results the workspace", async ({
+test("inspect stacks load form, books, and decoded result vertically", async ({
   page,
 }) => {
   await page.goto("/inspect");
 
   await expect(page.locator(".provider-panel")).toHaveCount(0);
-  const leftPane = page.locator(".workspace-left");
-  const rightPane = page.locator(".workspace-right");
-  const settingsSummary = leftPane.locator(".settings-summary");
-  const inputPanel = leftPane.locator(".input-panel");
-  const resultPanel = rightPane.locator(".result-panel");
+  const workspace = page.locator(".workspace");
+  const settingsSummary = workspace.locator(".settings-summary");
+  const inputPanel = workspace.locator(".input-panel");
+  const booksPanel = workspace.locator(".books-panel");
+  const resultPanel = workspace.locator(".result-panel");
 
-  await expect(leftPane).toBeVisible();
-  await expect(rightPane).toBeVisible();
+  await expect(page.locator(".workspace-left")).toHaveCount(0);
+  await expect(page.locator(".workspace-right")).toHaveCount(0);
   await expect(settingsSummary).toBeVisible();
   await expect(settingsSummary).toContainText("Blockfrost");
   await expect(settingsSummary).toContainText("mainnet");
   await expect(settingsSummary.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(inputPanel).toBeVisible();
-  await expect(leftPane.getByRole("heading", { name: "Books" })).toBeVisible();
+  await expect(booksPanel.getByRole("heading", { name: "Books" })).toBeVisible();
+  await expect(inputPanel.locator(".books-panel")).toHaveCount(0);
   await expect(resultPanel.getByRole("heading", { name: "Decoded structure" })).toBeVisible();
-  await expect(rightPane.locator(".decoded-structure-panel")).toHaveCount(0);
+  await expect(resultPanel.locator(".decoded-structure-panel")).toHaveCount(0);
 
-  const workspaceBox = await page.locator(".workspace").boundingBox();
-  const leftBox = await leftPane.boundingBox();
-  const rightBox = await rightPane.boundingBox();
-  expect(leftBox.width).toBeGreaterThan(workspaceBox.width * 0.46);
-  expect(leftBox.width).toBeLessThan(workspaceBox.width * 0.54);
-  expect(rightBox.width).toBeGreaterThan(workspaceBox.width * 0.46);
-  expect(rightBox.width).toBeLessThan(workspaceBox.width * 0.54);
-  expect(Math.abs(leftBox.y - rightBox.y)).toBeLessThan(8);
+  const emptyStack = await workspace.evaluate((root) => {
+    const rectForElement = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      };
+    };
+    const rectFor = (selector) => {
+      const element = root.querySelector(selector);
+      return element ? rectForElement(element) : null;
+    };
+    return {
+      workspace: rectForElement(root),
+      input: rectFor(".input-panel"),
+      books: rectFor(".books-panel"),
+      result: rectFor(".result-panel"),
+    };
+  });
+  expect(emptyStack.workspace).not.toBeNull();
+  expect(emptyStack.input).not.toBeNull();
+  expect(emptyStack.books).not.toBeNull();
+  expect(emptyStack.result).not.toBeNull();
+  expect(emptyStack.input.bottom).toBeLessThanOrEqual(emptyStack.books.top + 1);
+  expect(emptyStack.books.bottom).toBeLessThanOrEqual(emptyStack.result.top + 1);
+  expect(emptyStack.input.width).toBeGreaterThan(emptyStack.workspace.width * 0.92);
+  expect(emptyStack.result.width).toBeGreaterThan(emptyStack.workspace.width * 0.92);
+  expect(Math.abs(emptyStack.input.left - emptyStack.result.left)).toBeLessThanOrEqual(4);
+
+  const booksList = booksPanel.locator(".books-list");
+  const booksOverflow = await booksList.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      maxHeight: styles.maxHeight,
+      overflow: styles.overflow,
+      overflowY: styles.overflowY,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    };
+  });
+  expect(booksOverflow.maxHeight).not.toBe("150px");
+  expect(booksOverflow.overflow).not.toBe("hidden");
+  expect(booksOverflow.overflowY).not.toBe("hidden");
+  expect(booksOverflow.clientHeight).toBeGreaterThanOrEqual(booksOverflow.scrollHeight);
 
   await page.getByRole("radio", { name: "CBOR hex" }).check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill("not-a-conway-hex");
   await page.getByRole("button", { name: "Decode" }).click();
   await expect(resultPanel).toContainText(/malformed_hex|invalid/i);
   await expect(page.locator(".loaded-inspector-header")).toHaveCount(0);
-  await expect(leftPane).toBeVisible();
-  await expect(rightPane).toBeVisible();
+  await expect(inputPanel).toBeVisible();
+  await expect(booksPanel).toBeVisible();
+  await expect(resultPanel).toBeVisible();
 
-  const errorWorkspaceBox = await page.locator(".workspace").boundingBox();
-  const errorLeftBox = await leftPane.boundingBox();
-  const errorRightBox = await rightPane.boundingBox();
-  expect(errorLeftBox.width).toBeGreaterThan(errorWorkspaceBox.width * 0.46);
-  expect(errorLeftBox.width).toBeLessThan(errorWorkspaceBox.width * 0.54);
-  expect(errorRightBox.width).toBeGreaterThan(errorWorkspaceBox.width * 0.46);
-  expect(errorRightBox.width).toBeLessThan(errorWorkspaceBox.width * 0.54);
+  const errorStack = await workspace.evaluate((root) => {
+    const rectForElement = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+      };
+    };
+    const rectFor = (selector) => {
+      const element = root.querySelector(selector);
+      return element ? rectForElement(element) : null;
+    };
+    return {
+      workspace: rectForElement(root),
+      input: rectFor(".input-panel"),
+      books: rectFor(".books-panel"),
+      result: rectFor(".result-panel"),
+    };
+  });
+  expect(errorStack.input.bottom).toBeLessThanOrEqual(errorStack.books.top + 1);
+  expect(errorStack.books.bottom).toBeLessThanOrEqual(errorStack.result.top + 1);
+  expect(errorStack.result.width).toBeGreaterThan(errorStack.workspace.width * 0.92);
+
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const loadedHeader = page.locator(".loaded-inspector-header");
+  await expect(loadedHeader).toBeVisible();
+  await expect(inputPanel).toHaveCount(0);
+  await expect(booksPanel).toBeVisible();
+  await expect(resultPanel.getByRole("tab", { name: "Structure" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(resultPanel.locator(".decoded-structure-panel")).toBeVisible();
+
+  const loadedStack = await workspace.evaluate((root) => {
+    const rectForElement = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      };
+    };
+    const rectFor = (selector) => {
+      const element = root.querySelector(selector);
+      return element ? rectForElement(element) : null;
+    };
+    return {
+      workspace: rectForElement(root),
+      header: rectFor(".loaded-inspector-header"),
+      books: rectFor(".books-panel"),
+      result: rectFor(".result-panel"),
+    };
+  });
+  expect(loadedStack.header).not.toBeNull();
+  expect(loadedStack.books).not.toBeNull();
+  expect(loadedStack.result).not.toBeNull();
+  expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.books.top + 1);
+  expect(loadedStack.books.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
+  expect(loadedStack.result.width).toBeGreaterThan(loadedStack.workspace.width * 0.92);
+  expect(Math.abs(loadedStack.header.left - loadedStack.result.left)).toBeLessThanOrEqual(4);
+
+  await loadedHeader.getByRole("button", { name: "Change input" }).click();
+  await expect(inputPanel).toBeVisible();
+  await expect(resultPanel.locator(".decoded-structure-panel")).toBeVisible();
+  await expect(page.getByPlaceholder("Conway tx CBOR hex...")).toHaveValue(txCbor);
+
+  await page.getByRole("button", { name: "Decode" }).click();
+  await expect(loadedHeader).toBeVisible();
+  await expect(inputPanel).toHaveCount(0);
+  await expect(resultPanel.locator(".decoded-structure-panel")).toBeVisible();
 });
 
 test("settings changes provider state used by inspect hash decode", async ({ page }) => {

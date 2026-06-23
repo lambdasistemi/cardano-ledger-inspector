@@ -116,6 +116,7 @@ type State =
   , txHash :: String
   , txHex :: String
   , result :: Maybe InspectorResult
+  , loadFormExpanded :: Boolean
   , resultTab :: ResultTab
   , txCbor :: Maybe String
   , operationArgs :: String
@@ -267,6 +268,7 @@ inspectorComponent initial =
         , txHash: ""
         , txHex: ""
         , result: Nothing
+        , loadFormExpanded: true
         , resultTab: StructureTab
         , txCbor: Nothing
         , operationArgs: "{}"
@@ -325,37 +327,42 @@ inspectorComponent initial =
       ]
 
   renderInspector state =
-    case state.result of
-      Just r | isDecodedResult r ->
-        HH.div
-          [ classNames [ "app-shell", "inspect-shell" ] ]
-          [ HH.div
-              [ classNames [ "workspace", "loaded-workspace" ] ]
-              [ renderLoadedInspectorHeader state
-              , HH.div
-                  [ classNames [ "workspace-right" ] ]
-                  [ renderResult state ]
-              ]
-          ]
-      _ ->
-        HH.div
-          [ classNames [ "app-shell", "inspect-shell" ] ]
-          [ HH.div
-              [ classNames [ "workspace" ] ]
-              [ HH.div
-                  [ classNames [ "workspace-left" ] ]
-                  [ renderSettingsSummary state
-                  , renderModeTabs state
-                  , renderBooksPanel state
-                  ]
-              , HH.div
-                  [ classNames [ "workspace-right" ] ]
-                  [ renderResult state ]
-              ]
-          ]
+    let
+      decodedLoaded = case state.result of
+        Just r -> isDecodedResult r
+        Nothing -> false
+      showLoadedHeader = decodedLoaded && not state.loadFormExpanded
+    in
+      HH.div
+        [ classNames [ "app-shell", "inspect-shell" ] ]
+        [ HH.div
+            [ classNames
+                ( if showLoadedHeader then
+                    [ "workspace", "loaded-workspace" ]
+                  else
+                    [ "workspace" ]
+                )
+            ]
+            [ if showLoadedHeader then
+                renderLoadedInspectorHeader state
+              else
+                renderLoadForm state
+            , renderBooksPanel state
+            , HH.div
+                [ classNames [ "workspace-main" ] ]
+                [ renderResult state ]
+            ]
+        ]
 
   isDecodedResult result =
     result.exitOk && (Json.inspect result.stdout).valid
+
+  renderLoadForm state =
+    HH.div
+      [ classNames [ "load-form-stack" ] ]
+      [ renderSettingsSummary state
+      , renderModeTabs state
+      ]
 
   renderSettings state =
     HH.div
@@ -2993,6 +3000,7 @@ inspectorComponent initial =
         _
           { running = true
           , result = Nothing
+          , loadFormExpanded = true
           , resultTab = StructureTab
           , txCbor = Nothing
           , operationArgs = "{}"
@@ -3042,7 +3050,7 @@ inspectorComponent initial =
                       in pure (Left diag)
                     Right cbor -> pure (Right cbor)
       case hexE of
-        Left err -> H.modify_ _ { running = false, fetchError = Just err, browserPath = "[]" }
+        Left err -> H.modify_ _ { running = false, loadFormExpanded = true, fetchError = Just err, browserPath = "[]" }
         Right h -> do
           operationResult <- H.liftAff (runLedgerOperation h "tx.inspect" "{}")
           let
@@ -3094,6 +3102,7 @@ inspectorComponent initial =
             _
               { running = false
               , result = Just inspectionResult
+              , loadFormExpanded = not (isDecodedResult inspectionResult)
               , txCbor = Just h
               , operationArgs = inputContextArgs
               , browser = if operationResult.exitOk && browser.valid then Just browser else Nothing
@@ -3177,7 +3186,7 @@ inspectorComponent initial =
     SelectResultTab tab ->
       H.modify_ _ { resultTab = tab }
     ChangeInput ->
-      H.modify_ _ { result = Nothing, copied = false, copiedPath = Nothing }
+      H.modify_ _ { loadFormExpanded = true, copied = false, copiedPath = Nothing }
 
   updateAnnotationDraft update =
     H.modify_ \st -> st { annotationDraft = map update st.annotationDraft }

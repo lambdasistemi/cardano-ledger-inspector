@@ -328,12 +328,13 @@ fieldset {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(0, 1fr);
-  gap: 0;
-  align-items: stretch;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: start;
   min-height: calc(100vh - 67px);
 }
 
+.load-form-stack,
 .workspace-left,
 .workspace-right,
 .workspace-main {
@@ -341,6 +342,19 @@ fieldset {
   gap: 0;
   align-content: start;
   min-width: 0;
+}
+
+.load-form-stack,
+.workspace-main {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.load-form-stack > .panel:last-child,
+.workspace-main > .panel:last-child {
+  border-bottom: 0;
 }
 
 .workspace-left {
@@ -361,13 +375,7 @@ fieldset {
 
 .loaded-workspace {
   grid-template-columns: 1fr;
-  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
-}
-
-.loaded-workspace .workspace-right {
-  border-left: 1px solid var(--border);
-  border-radius: 8px;
 }
 
 .loaded-inspector-header {
@@ -485,6 +493,12 @@ fieldset {
   gap: 10px;
 }
 
+.workspace > .books-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .books-panel .panel-heading,
 .decoded-structure-panel .panel-heading {
   margin-bottom: 0;
@@ -502,8 +516,8 @@ fieldset {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--md-sys-color-surface-container-low);
-  max-height: 150px;
-  overflow: hidden;
+  max-height: none;
+  overflow: visible;
 }
 
 .book-summary-row,

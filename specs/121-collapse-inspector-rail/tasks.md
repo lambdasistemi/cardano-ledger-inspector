@@ -23,7 +23,7 @@
 
 ## Slice 4: Vertical inspect stack
 
-- [ ] T121-S4 Add Playwright RED coverage for the revised vertical inspect layout: load form above books above decoded structure, no right-column decoded pane, decoded structure full-width, books outside the load form and not clipped, and loaded-state collapse/uncollapse/re-decode behavior.
-- [ ] T121-S4 Update `Main.purs` presentation so `.workspace` renders as a vertical stack with a top collapsible load form, a separate books section, and full-width decoded results below while preserving CURIE links, collapsed URNs, edit-icon annotation gating, and entity-bound annotation resolution.
-- [ ] T121-S4 Update `styles.css` to remove the horizontal two-column workspace assumptions, fix the books panel height truncation/overflow bug, and keep empty, loaded, and narrow layouts visually coherent.
-- [ ] T121-S4 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S4` trailer.
+- [X] T121-S4 Add Playwright RED coverage for the revised vertical inspect layout: load form above books above decoded structure, no right-column decoded pane, decoded structure full-width, books outside the load form and not clipped, and loaded-state collapse/uncollapse/re-decode behavior.
+- [X] T121-S4 Update `Main.purs` presentation so `.workspace` renders as a vertical stack with a top collapsible load form, a separate books section, and full-width decoded results below while preserving CURIE links, collapsed URNs, edit-icon annotation gating, and entity-bound annotation resolution.
+- [X] T121-S4 Update `styles.css` to remove the horizontal two-column workspace assumptions, fix the books panel height truncation/overflow bug, and keep empty, loaded, and narrow layouts visually coherent.
+- [X] T121-S4 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S4` trailer.
