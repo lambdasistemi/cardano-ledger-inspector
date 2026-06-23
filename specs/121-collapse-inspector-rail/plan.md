@@ -12,7 +12,7 @@ Observed direction: CQuisitor keeps control surfaces compact and modal/header-li
 
 ## Slice
 
-The original rail-collapse work is one vertical presentation slice because the state gate, CSS layout, and Playwright coverage are one coherent UX behavior. The A-001 preview follow-up adds a second presentation-only slice on the same branch/PR for decoded-structure row compactness.
+The original rail-collapse work is one vertical presentation slice because the state gate, CSS layout, and Playwright coverage are one coherent UX behavior. The A-001 preview follow-up adds a second presentation-only slice on the same branch/PR for decoded-structure row compactness. A-002 adds a logic slice for decoded-tree annotation resolution. A-004 is a user redirect that supersedes the horizontal two-pane layout from Slice 1/A-001 with a vertical stack: load form at the top, books as its own section, decoded structure full-width below.
 
 ### Slice 1: Loaded-state rail collapse
 
@@ -90,8 +90,35 @@ Focused proof:
 - `just hlint`
 - Browser smoke of the published preview: label a decoded node and observe the row resolve live without re-decode.
 
+### Slice 4: Vertical inspect stack
+
+Owned files:
+
+- `docs/inspector/src/Main.purs`
+- `docs/inspector/dist/styles.css`
+- `docs/inspector/tests/tx-identify.spec.mjs`
+
+Work:
+
+- Replace the horizontal `.workspace` two-column layout with a vertical stack ordered top-to-bottom: collapsible load form, independent books section, full-width decoded result/structure area.
+- Keep the load form expanded for empty/error states. Once a transaction result is present, default the load form to a compact header with source/network/tx context and a "Change input" style control that re-expands it at any time.
+- Ensure the expanded loaded form is fully re-operable: users can change the tx hash or CBOR input and decode again; after successful re-decode the form returns to the compact loaded header.
+- Move `renderBooksPanel` out of the load/input form. Fix the books-panel max-height/overflow truncation so the section is not clipped; it may size to content or scroll deliberately with visible affordance.
+- Move `renderResult` below the load/books sections and make it full-width in both empty and loaded states. Remove the right-column decoded structure assumption.
+- Preserve all prior decoded-tree behavior: linked CURIEs, collapsed/copyable `urn:cardano:*` subjects, edit-icon-gated annotation editor, and entity-bound annotation save/resolution.
+- Extend Playwright coverage for vertical order, full-width decoded structure/no right column, books outside load form and not clipped, and collapse/uncollapse/re-decode round trip.
+
+Focused proof:
+
+- `nix build .#packages.x86_64-linux.tx-inspector-ui`
+- `just test-playwright`
+- `just format-check`
+- `just hlint`
+- Browser smoke of the published preview in empty and loaded states, including uncollapse/change-input visibility.
+
 ## Risks
 
 - Existing CQuisitor layout tests currently assert the loaded pane stays 50/50; those must become the RED assertions for this ticket rather than being weakened.
 - The header must expose real context without inventing new data dependencies; prefer existing state/result helpers.
 - The CSS file is committed source in this app, so style changes must be reviewed like normal source rather than treated as generated output.
+- Slice 4 intentionally changes earlier loaded-state layout assertions. Tests that still encode "decoded structure is on the right" should become RED assertions for the new vertical order rather than being weakened or deleted without replacement.

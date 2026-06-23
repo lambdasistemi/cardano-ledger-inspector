@@ -20,3 +20,10 @@
 - [X] T121-S3 Surface the decoded row's canonical entity IRI to the annotation save path and update generated annotation Turtle so `rdfs:label` and optional `a <type>` attach to that entity rather than a synthetic local proxy.
 - [X] T121-S3 Preserve the A-001 presentation contract and existing annotation book persistence/export/import behavior while making the saved label/type re-query into `resolvedLabel`/`resolvedType` without a re-decode.
 - [X] T121-S3 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S3` trailer.
+
+## Slice 4: Vertical inspect stack
+
+- [ ] T121-S4 Add Playwright RED coverage for the revised vertical inspect layout: load form above books above decoded structure, no right-column decoded pane, decoded structure full-width, books outside the load form and not clipped, and loaded-state collapse/uncollapse/re-decode behavior.
+- [ ] T121-S4 Update `Main.purs` presentation so `.workspace` renders as a vertical stack with a top collapsible load form, a separate books section, and full-width decoded results below while preserving CURIE links, collapsed URNs, edit-icon annotation gating, and entity-bound annotation resolution.
+- [ ] T121-S4 Update `styles.css` to remove the horizontal two-column workspace assumptions, fix the books panel height truncation/overflow bug, and keep empty, loaded, and narrow layouts visually coherent.
+- [ ] T121-S4 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S4` trailer.
