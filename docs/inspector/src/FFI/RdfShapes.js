@@ -384,6 +384,15 @@ const txOutRefFromUtxoUri = (value) => {
   return match ? `${match[1]}#${match[2]}` : "";
 };
 
+const isIri = (value) => /^https?:\/\//.test(String(value || "")) || String(value || "").startsWith("urn:");
+
+const annotationEntityIri = (entity, kind, value) => {
+  const entityValue = String(entity || "");
+  if (isIri(entityValue)) return entityValue;
+  const rawValue = String(value || "");
+  return rawValue === "" ? "" : `urn:cardano:id:${kind}:${rawValue}`;
+};
+
 const slug = (value) =>
   String(value || "row")
     .replace(/[^A-Za-z0-9]+/g, "-")
@@ -400,6 +409,7 @@ const treeRow = ({
   value = "",
   summary = "",
   raw = "",
+  entityIri = "",
   resolvedLabel = "",
   resolvedType = "",
   annotationPredicate = "",
@@ -414,6 +424,7 @@ const treeRow = ({
   value,
   summary,
   raw,
+  entityIri,
   resolvedLabel,
   resolvedType,
   annotationPredicate,
@@ -448,6 +459,7 @@ const appendLeaf = (rows, parentId, depth, order, label, kind, value, extra = {}
       value: stringValue,
       summary: compact(stringValue),
       raw: extra.raw || stringValue,
+      entityIri: extra.entityIri || "",
       resolvedLabel: extra.resolvedLabel || "",
       resolvedType: extra.resolvedType || "",
       annotationPredicate: extra.annotationPredicate || "",
@@ -530,6 +542,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       value: transactionId,
       summary: compact(transactionId),
       raw: txId,
+      entityIri: transactionId,
       resolvedLabel: rootResolved.resolvedLabel,
       resolvedType: rootResolved.resolvedType,
     }),
@@ -564,6 +577,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         raw,
         {
           raw,
+          entityIri: annotationEntityIri(bindingValue(field.entity), "hash", bindingValue(field.raw)),
           resolvedLabel: resolved.resolvedLabel,
           resolvedType: resolved.resolvedType,
           annotationPredicate: bindingValue(field.kind) === "hash" ? "cardano:bytesHex" : "",
@@ -601,6 +615,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         value,
         {
           raw,
+          entityIri: annotationEntityIri(bindingValue(input.entity), "tx-out-ref", raw),
           resolvedLabel: resolved.resolvedLabel,
           resolvedType: resolved.resolvedType,
           annotationPredicate: raw === "" ? "" : "cardano:fromTxOutRef",
@@ -635,6 +650,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           value: outputValue,
           summary: compact(outputValue),
           raw: outputValue,
+          entityIri: outputValue,
           resolvedLabel: outputResolved.resolvedLabel,
           resolvedType: outputResolved.resolvedType,
           annotationPredicate: outputTxOutRef === "" ? "" : "cardano:fromTxOutRef",
@@ -658,6 +674,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           bindingValue(output.addressBech32),
           bindingValue(output.address),
         ).resolvedType,
+        entityIri: annotationEntityIri(bindingValue(output.address), "address", bindingValue(output.addressBech32)),
         annotationPredicate: "cardano:bech32",
         annotationValue: bindingValue(output.addressBech32),
       });
@@ -672,6 +689,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       appendLeaf(rows, outputId, 3, 40, "Datum hash", "hash", datumHash, {
         resolvedLabel: datumHashResolved.resolvedLabel,
         resolvedType: datumHashResolved.resolvedType,
+        entityIri: annotationEntityIri(bindingValue(output.datumHash), "hash", bindingValue(output.datumHashHex)),
         annotationPredicate: "cardano:bytesHex",
         annotationValue: bindingValue(output.datumHashHex),
       });
@@ -679,6 +697,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       appendLeaf(rows, outputId, 3, 50, "Datum raw bytes", "raw-bytes", bindingValue(output.datumRaw), {
         resolvedLabel: datumRawResolved.resolvedLabel,
         resolvedType: datumRawResolved.resolvedType,
+        entityIri: annotationEntityIri(bindingValue(output.datum), "raw-bytes", bindingValue(output.datumRaw)),
         annotationPredicate: "cardano:hasRawBytes",
         annotationValue: bindingValue(output.datumRaw),
       });
@@ -716,6 +735,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           value: witnessValue,
           summary: compact(witnessValue),
           raw: bindingValue(witness.witness),
+          entityIri: bindingValue(witness.witness),
           resolvedLabel: witnessResolved.resolvedLabel,
           resolvedType: witnessResolved.resolvedType,
         }),
@@ -725,6 +745,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       appendLeaf(rows, witnessId, 3, 10, "Verification key", "key", keyValue, {
         resolvedLabel: keyResolved.resolvedLabel,
         resolvedType: keyResolved.resolvedType,
+        entityIri: annotationEntityIri(bindingValue(witness.verificationKey), "key", bindingValue(witness.verificationKeyHex)),
         annotationPredicate: "cardano:bytesHex",
         annotationValue: bindingValue(witness.verificationKeyHex),
       });
@@ -761,6 +782,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           value: bindingValue(redeemer.redeemer),
           summary: compact(firstBindingValue(redeemer.dataHashHex, redeemer.dataHash, redeemer.redeemer)),
           raw: bindingValue(redeemer.redeemer),
+          entityIri: bindingValue(redeemer.redeemer),
           resolvedLabel: redeemerResolved.resolvedLabel,
           resolvedType: redeemerResolved.resolvedType,
         }),
@@ -778,6 +800,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       appendLeaf(rows, redeemerId, 3, 30, "Data hash", "hash", dataHashValue, {
         resolvedLabel: dataHashResolved.resolvedLabel,
         resolvedType: dataHashResolved.resolvedType,
+        entityIri: annotationEntityIri(bindingValue(redeemer.dataHash), "hash", bindingValue(redeemer.dataHashHex)),
         annotationPredicate: "cardano:bytesHex",
         annotationValue: bindingValue(redeemer.dataHashHex),
       });
@@ -785,6 +808,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       appendLeaf(rows, redeemerId, 3, 40, "Data raw bytes", "raw-bytes", bindingValue(redeemer.dataRaw), {
         resolvedLabel: dataRawResolved.resolvedLabel,
         resolvedType: dataRawResolved.resolvedType,
+        entityIri: annotationEntityIri(bindingValue(redeemer.data), "raw-bytes", bindingValue(redeemer.dataRaw)),
         annotationPredicate: "cardano:hasRawBytes",
         annotationValue: bindingValue(redeemer.dataRaw),
       });
@@ -821,6 +845,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           value: bindingValue(meta.metadata),
           summary: compact(firstBindingValue(meta.text, meta.raw, meta.metadata)),
           raw: firstBindingValue(meta.raw, meta.metadata),
+          entityIri: bindingValue(meta.metadata),
           resolvedLabel: metaResolved.resolvedLabel,
           resolvedType: metaResolved.resolvedType,
         }),
@@ -828,6 +853,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       appendLeaf(rows, metaId, 3, 10, "Metadata label", "integer", bindingValue(meta.label));
       appendLeaf(rows, metaId, 3, 20, "Text", "text", bindingValue(meta.text));
       appendLeaf(rows, metaId, 3, 30, "Raw bytes", "raw-bytes", bindingValue(meta.raw), {
+        entityIri: annotationEntityIri(bindingValue(meta.metadata), "raw-bytes", bindingValue(meta.raw)),
         annotationPredicate: "cardano:hasRawBytes",
         annotationValue: bindingValue(meta.raw),
       });

@@ -95,15 +95,6 @@ export const inspectImpl = (store) => {
   };
 };
 
-const hashText = (raw) => {
-  let hash = 2166136261;
-  for (let i = 0; i < raw.length; i += 1) {
-    hash ^= raw.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
-};
-
 const localToken = (value, fallback = "Annotation") => {
   const token = text(value)
     .trim()
@@ -121,13 +112,22 @@ const turtleType = (value) => {
   return `local:${localToken(raw, "Type")}`;
 };
 
-export const annotationTurtle = ({ label, typeName, predicate, value }) => {
+const turtleSubject = (value) => {
+  const raw = text(value).trim();
+  if (raw === "") return "";
+  if (/[<>"{}|\\^`]/.test(raw)) return "";
+  if (/^https?:\/\//.test(raw) || raw.startsWith("urn:")) return `<${raw}>`;
+  if (/^(cardano|rdfs|local):[A-Za-z_][A-Za-z0-9_-]*$/.test(raw)) return raw;
+  return "";
+};
+
+export const annotationTurtle = ({ label, typeName, entityIri, predicate, value }) => {
   const trimmedLabel = text(label).trim();
+  const subject = turtleSubject(entityIri);
   const trimmedPredicate = text(predicate).trim();
   const trimmedValue = text(value).trim();
-  if (trimmedLabel === "" || trimmedPredicate === "" || trimmedValue === "") return "";
+  if (trimmedLabel === "" || subject === "" || trimmedPredicate === "" || trimmedValue === "") return "";
 
-  const subject = `local:annotation-${localToken(trimmedPredicate, "predicate").toLowerCase()}-${hashText(`${trimmedPredicate}\n${trimmedValue}`)}`;
   const typeObject = turtleType(typeName);
   const typeLine = typeObject === "" ? "" : `  a ${typeObject} ;\n`;
 

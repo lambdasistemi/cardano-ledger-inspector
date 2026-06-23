@@ -16,7 +16,7 @@
 
 ## Slice 3: Annotation labels bind to decoded entities
 
-- [ ] T121-S3 Add Playwright RED coverage that labeling decoded-tree nodes resolves the row through the decoded-tree resolver immediately after Save, including Output 0, an address, a script/hash-like row, and another identifier row where present.
-- [ ] T121-S3 Surface the decoded row's canonical entity IRI to the annotation save path and update generated annotation Turtle so `rdfs:label` and optional `a <type>` attach to that entity rather than a synthetic local proxy.
-- [ ] T121-S3 Preserve the A-001 presentation contract and existing annotation book persistence/export/import behavior while making the saved label/type re-query into `resolvedLabel`/`resolvedType` without a re-decode.
-- [ ] T121-S3 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S3` trailer.
+- [X] T121-S3 Add Playwright RED coverage that labeling decoded-tree nodes resolves the row through the decoded-tree resolver immediately after Save, including Output 0, an address, a script/hash-like row, and another identifier row where present.
+- [X] T121-S3 Surface the decoded row's canonical entity IRI to the annotation save path and update generated annotation Turtle so `rdfs:label` and optional `a <type>` attach to that entity rather than a synthetic local proxy.
+- [X] T121-S3 Preserve the A-001 presentation contract and existing annotation book persistence/export/import behavior while making the saved label/type re-query into `resolvedLabel`/`resolvedType` without a re-decode.
+- [X] T121-S3 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S3` trailer.
