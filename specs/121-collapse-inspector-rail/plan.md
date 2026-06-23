@@ -64,6 +64,32 @@ Focused proof:
 - `just hlint`
 - Browser smoke of the published preview with `specs/001-ledger-functional-layer/fixtures/conway-mainnet-tx.hex`.
 
+### Slice 3: Annotation labels bind to decoded entities
+
+Owned files:
+
+- `docs/inspector/src/FFI/BookStore.js`
+- `docs/inspector/src/FFI/BookStore.purs`
+- `docs/inspector/src/FFI/RdfShapes.js`
+- `docs/inspector/src/FFI/RdfShapes.purs`
+- `docs/inspector/src/Main.purs`
+- `docs/inspector/tests/tx-identify.spec.mjs`
+
+Work:
+
+- Add/extend Playwright coverage so saving an inline decoded-tree annotation proves resolver binding, not just local book persistence or transient DOM text. The test must fail on the current synthetic-proxy Turtle.
+- Expose the canonical decoded-tree entity IRI on `DecodedTreeRow` (or otherwise pass the same canonical subject into the save path) for rows that support annotations.
+- Generate annotation Turtle that writes `rdfs:label` and optional `a <type>` on the target entity IRI itself, matching the decoded-tree/overlay resolution subject convention instead of `local:annotation-*` proxy subjects.
+- Recompute decoded-tree lenses after save as today, preserving selected-book persistence, export/import round-trip, and A-001 CURIE/collapsed-URN/edit-icon presentation.
+
+Focused proof:
+
+- `nix build .#packages.x86_64-linux.tx-inspector-ui`
+- `just test-playwright`
+- `just format-check`
+- `just hlint`
+- Browser smoke of the published preview: label a decoded node and observe the row resolve live without re-decode.
+
 ## Risks
 
 - Existing CQuisitor layout tests currently assert the loaded pane stays 50/50; those must become the RED assertions for this ticket rather than being weakened.
