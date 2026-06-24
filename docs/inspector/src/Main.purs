@@ -958,6 +958,9 @@ inspectorComponent initial =
                   , HH.span
                       [ classNames [ "kind-badge" ] ]
                       [ renderDecodedTreeKind row ]
+                  , HH.span
+                      [ classNames [ "decoded-tree-actions" ] ]
+                      [ renderDecodedTreeAnnotationAction state row ]
                   ]
               , if summaryText == "" then
                   HH.text ""
@@ -1079,6 +1082,13 @@ inspectorComponent initial =
     case state.annotationDraft of
       Just draft | draft.rowId == row.id ->
         renderDecodedTreeAnnotationDraft state row draft
+      _ ->
+        HH.text ""
+
+  renderDecodedTreeAnnotationAction state row =
+    case state.annotationDraft of
+      Just draft | draft.rowId == row.id ->
+        HH.text ""
       _ ->
         if row.resolvedLabel == "" && row.annotationPredicate /= "" && row.annotationValue /= "" then
           HH.element (HH.ElemName "md-icon-button")
@@ -2443,6 +2453,19 @@ inspectorComponent initial =
                   , HH.span
                       [ classNames [ "kind-badge" ] ]
                       [ HH.text row.kind ]
+                  , if row.canDive then
+                      HH.span
+                        [ classNames [ "browser-row-actions" ] ]
+                        [
+                          HH.element (HH.ElemName "md-outlined-button")
+                            [ HE.onClick (\_ -> BrowseJson row.path)
+                            , classNames [ "inline-action", "browser-row-action" ]
+                            , HH.attr (HH.AttrName "role") "button"
+                            , mdControl "inline"
+                            ]
+                            [ HH.text (if expanded then "Close" else "Open") ]
+                        ]
+                    else HH.text ""
                   ]
               , HH.div
                   [ classNames [ "browser-summary", "summary-copy-target" ]
@@ -2451,19 +2474,6 @@ inspectorComponent initial =
                   ]
                   [ HH.text row.summary ]
               ]
-          , if row.canDive then
-              HH.div
-                [ classNames [ "browser-actions" ] ]
-                [
-                  HH.element (HH.ElemName "md-outlined-button")
-                    [ HE.onClick (\_ -> BrowseJson row.path)
-                    , classNames [ "inline-action" ]
-                    , HH.attr (HH.AttrName "role") "button"
-                    , mdControl "inline"
-                    ]
-                    [ HH.text (if expanded then "Close" else "Open") ]
-                ]
-            else HH.text ""
           ]
       ] <> if expanded then
         [ HH.div
