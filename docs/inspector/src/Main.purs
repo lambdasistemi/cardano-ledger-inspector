@@ -924,7 +924,7 @@ inspectorComponent initial =
   renderDecodedTreeRow state rows row =
     let
       hasChildren = Array.any (\candidate -> candidate.parentId == row.id) rows
-      expanded = row.parentId == "" || row.depth >= 2 || Array.elem row.id state.decodedTreeExpanded
+      expanded = row.parentId == "" || row.depth >= 1 || Array.elem row.id state.decodedTreeExpanded
       rowClasses =
         if hasChildren && expanded then
           [ "decoded-tree-row", "is-expanded", "decoded-tree-depth-" <> show row.depth ]

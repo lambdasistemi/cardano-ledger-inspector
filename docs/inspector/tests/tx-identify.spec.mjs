@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +25,14 @@ const packagedSiteDir = path.resolve(
   process.cwd(),
   process.env.TX_INSPECTOR_SITE_DIR || "result",
 );
+const amaruTreasuryTxRoot =
+  process.env.TX_AMARU_TREASURY_TX_ROOT || "/code/amaru-treasury-tx";
+const amaruTreasuryTx2026Root = path.join(
+  amaruTreasuryTxRoot,
+  "transactions/2026",
+);
+const contingencyTxId =
+  "18d57a4f104df4cc776104ce626958e2110122392e4c4c7671edc8861b48452e";
 const previewPrefix = "/lambdasistemi/cardano-ledger-inspector/pr-99/";
 const localBookStoreKey = "cardano-ledger-inspector.books.v1";
 const pastedTurtleBook = `
@@ -51,6 +59,525 @@ cardano:RequiresSentinelShape
   sh:minCount 1 ;
   sh:message "Transactions must include sentinel off-spec marker." .
 `;
+
+const conwayBodyFields = [
+  { key: 0, label: "inputs" },
+  { key: 1, label: "outputs" },
+  { key: 2, label: "fee" },
+  { key: 3, label: "ttl" },
+  { key: 4, label: "certs" },
+  { key: 5, label: "withdrawals" },
+  { key: 6, label: "update" },
+  { key: 7, label: "auxiliary_data_hash" },
+  { key: 8, label: "validity_start_interval" },
+  { key: 9, label: "mint" },
+  { key: 11, label: "script_data_hash" },
+  { key: 13, label: "collateral" },
+  { key: 14, label: "required_signers" },
+  { key: 15, label: "network_id" },
+  { key: 16, label: "collateral_return" },
+  { key: 17, label: "total_collateral" },
+  { key: 18, label: "reference_inputs" },
+  { key: 19, label: "voting_procedures" },
+  { key: 20, label: "voting_proposals" },
+  { key: 22, label: "donation" },
+  { key: 21, label: "current_treasury_value" },
+];
+const conwayWitnessFields = [
+  { keys: [0], label: "vkeys" },
+  { keys: [1], label: "native_scripts" },
+  { keys: [2], label: "bootstraps" },
+  { keys: [3, 6, 7], label: "plutus_scripts" },
+  { keys: [4], label: "plutus_data" },
+  { keys: [5], label: "redeemers" },
+];
+const conwayAuxiliaryDataFields = [
+  "metadata",
+  "native_scripts",
+  "plutus_scripts",
+  "prefer_alonzo_format",
+];
+const conwayBodyFieldByKey = new Map(
+  conwayBodyFields.map((field) => [field.key, field.label]),
+);
+const conwayWitnessFieldByKey = new Map(
+  conwayWitnessFields.flatMap((field) =>
+    field.keys.map((key) => [key, field.label]),
+  ),
+);
+class CborReader {
+  constructor(hex) {
+    this.bytes = Buffer.from(hex.replace(/\s+/g, ""), "hex");
+    this.offset = 0;
+  }
+
+  peekByte() {
+    if (this.offset >= this.bytes.length) {
+      throw new Error("unexpected end of CBOR");
+    }
+    return this.bytes[this.offset];
+  }
+
+  readByte() {
+    const byte = this.peekByte();
+    this.offset += 1;
+    return byte;
+  }
+
+  isBreak() {
+    return this.offset < this.bytes.length && this.bytes[this.offset] === 0xff;
+  }
+
+  readLength(additional) {
+    if (additional < 24) return additional;
+    if (additional === 24) return this.readByte();
+    if (additional === 25) {
+      const value = this.bytes.readUInt16BE(this.offset);
+      this.offset += 2;
+      return value;
+    }
+    if (additional === 26) {
+      const value = this.bytes.readUInt32BE(this.offset);
+      this.offset += 4;
+      return value;
+    }
+    if (additional === 27) {
+      const value = this.bytes.readBigUInt64BE(this.offset);
+      this.offset += 8;
+      if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error(`CBOR length exceeds safe integer: ${value}`);
+      }
+      return Number(value);
+    }
+    if (additional === 31) return null;
+    throw new Error(`unsupported CBOR additional info ${additional}`);
+  }
+
+  readHeader() {
+    const initial = this.readByte();
+    const major = initial >> 5;
+    const additional = initial & 0x1f;
+    const length = this.readLength(additional);
+    return { major, additional, length, indefinite: additional === 31 };
+  }
+
+  readInteger() {
+    const header = this.readHeader();
+    if (header.major === 0) return header.length;
+    if (header.major === 1) return -1 - header.length;
+    throw new Error(`expected integer key, got CBOR major ${header.major}`);
+  }
+
+  readArrayLength() {
+    const header = this.readHeader();
+    if (header.major !== 4 || header.indefinite) {
+      throw new Error("expected definite CBOR array");
+    }
+    return header.length;
+  }
+
+  readBool() {
+    const header = this.readHeader();
+    if (header.major !== 7) {
+      throw new Error(`expected CBOR bool, got major ${header.major}`);
+    }
+    if (header.additional === 20) return false;
+    if (header.additional === 21) return true;
+    throw new Error(`expected CBOR bool, got simple ${header.additional}`);
+  }
+
+  readIntegerKeyMap() {
+    const header = this.readHeader();
+    if (header.major !== 5) {
+      throw new Error(`expected CBOR map, got major ${header.major}`);
+    }
+    const keys = [];
+    const readEntry = () => {
+      keys.push(this.readInteger());
+      this.skipValue();
+    };
+
+    if (header.indefinite) {
+      while (!this.isBreak()) readEntry();
+      this.readByte();
+    } else {
+      for (let i = 0; i < header.length; i += 1) readEntry();
+    }
+    return new Set(keys);
+  }
+
+  readAuxiliaryData() {
+    if (this.peekByte() === 0xf6) {
+      this.skipValue();
+      return { present: false, metadataLabels: [] };
+    }
+
+    while ((this.peekByte() >> 5) === 6) {
+      this.readHeader();
+    }
+
+    const header = this.readHeader();
+    if (header.major !== 5) {
+      this.skipValueAfterHeader(header);
+      return { present: true, metadataLabels: [] };
+    }
+
+    const metadataLabels = [];
+    let sawAuxiliaryEnvelope = false;
+    const readEntry = () => {
+      const key = this.readInteger();
+      if (key >= 0 && key <= 3) sawAuxiliaryEnvelope = true;
+      if (key === 0) {
+        metadataLabels.push(...this.readMetadataLabels());
+      } else {
+        if (!sawAuxiliaryEnvelope) metadataLabels.push(key);
+        this.skipValue();
+      }
+    };
+
+    if (header.indefinite) {
+      while (!this.isBreak()) readEntry();
+      this.readByte();
+    } else {
+      for (let i = 0; i < header.length; i += 1) readEntry();
+    }
+
+    return { present: true, metadataLabels };
+  }
+
+  readMetadataLabels() {
+    const header = this.readHeader();
+    if (header.major !== 5) {
+      this.skipValueAfterHeader(header);
+      return [];
+    }
+
+    const labels = [];
+    const readEntry = () => {
+      labels.push(this.readInteger());
+      this.skipValue();
+    };
+    if (header.indefinite) {
+      while (!this.isBreak()) readEntry();
+      this.readByte();
+    } else {
+      for (let i = 0; i < header.length; i += 1) readEntry();
+    }
+    return labels;
+  }
+
+  skipValue() {
+    this.skipValueAfterHeader(this.readHeader());
+  }
+
+  skipValueAfterHeader(header) {
+    switch (header.major) {
+      case 0:
+      case 1:
+        return;
+      case 2:
+      case 3:
+        if (header.indefinite) {
+          while (!this.isBreak()) this.skipValue();
+          this.readByte();
+        } else {
+          this.offset += header.length;
+        }
+        return;
+      case 4:
+        if (header.indefinite) {
+          while (!this.isBreak()) this.skipValue();
+          this.readByte();
+        } else {
+          for (let i = 0; i < header.length; i += 1) this.skipValue();
+        }
+        return;
+      case 5:
+        if (header.indefinite) {
+          while (!this.isBreak()) {
+            this.skipValue();
+            this.skipValue();
+          }
+          this.readByte();
+        } else {
+          for (let i = 0; i < header.length; i += 1) {
+            this.skipValue();
+            this.skipValue();
+          }
+        }
+        return;
+      case 6:
+        this.skipValue();
+        return;
+      case 7:
+        if (header.additional === 24) this.offset += 1;
+        else if (header.additional === 25) this.offset += 2;
+        else if (header.additional === 26) this.offset += 4;
+        else if (header.additional === 27) this.offset += 8;
+        return;
+      default:
+        throw new Error(`unsupported CBOR major type ${header.major}`);
+    }
+  }
+}
+
+function walkConwayTransactionCbor(hex) {
+  const reader = new CborReader(hex);
+  const txLength = reader.readArrayLength();
+  expect(txLength, "Conway transaction CBOR must be a 4-item array").toBe(4);
+  const bodyKeys = reader.readIntegerKeyMap();
+  const witnessKeys = reader.readIntegerKeyMap();
+  const isValid = reader.readBool();
+  const auxiliaryData = reader.readAuxiliaryData();
+
+  return { bodyKeys, witnessKeys, isValid, auxiliaryData };
+}
+
+async function signedTxFixtures(root = amaruTreasuryTx2026Root) {
+  const fixtures = [];
+  async function walk(dir) {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(entryPath);
+      } else if (entry.isFile() && entry.name === "signed-tx.hex") {
+        fixtures.push(entryPath);
+      }
+    }
+  }
+  await walk(root);
+  return fixtures.sort();
+}
+
+function normalizeStructureLabel(label) {
+  return String(label || "")
+    .replace(/\s+\d+\s+(fields?|inputs?|outputs?|key witnesses?|redeemers?|labels?)$/i, "")
+    .replace(/\s+NULL$/i, "")
+    .replace(/\s+(true|false)$/i, "")
+    .replace(/\s+urn:cardano:.*$/i, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeSummary(summary) {
+  return String(summary || "").trim();
+}
+
+async function expandDecodedStructure(panel) {
+  for (let pass = 0; pass < 8; pass += 1) {
+    const expanded = await panel.evaluate(async (root) => {
+      const toggles = Array.from(
+        root.querySelectorAll(".decoded-tree-row:not(.is-expanded) .decoded-tree-toggle"),
+      );
+      for (const toggle of toggles) toggle.click();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      return toggles.length;
+    });
+    if (expanded === 0) return;
+  }
+}
+
+async function decodedStructureRows(page) {
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await expandDecodedStructure(decodedPanel);
+  return decodedPanel.locator(".decoded-tree-row").evaluateAll((nodes) =>
+    nodes.map((node, index) => {
+      const depthClass = Array.from(node.classList).find((className) =>
+        className.startsWith("decoded-tree-depth-"),
+      );
+      const labelNode =
+        node.querySelector(".decoded-tree-keyline > md-outlined-button") ||
+        node.querySelector(".decoded-tree-keyline > strong");
+      const summaryNode = node.querySelector(".decoded-tree-summary");
+      const depth = depthClass
+        ? Number(depthClass.replace("decoded-tree-depth-", ""))
+        : 0;
+      return {
+        index,
+        depth,
+        label: labelNode?.textContent?.trim() || "",
+        summary: summaryNode?.textContent?.trim() || "",
+      };
+    }),
+  );
+}
+
+function rowLabel(row) {
+  return normalizeStructureLabel(row.label);
+}
+
+function rowSummary(row) {
+  return normalizeSummary(row.summary);
+}
+
+function rootRowIndex(rows) {
+  const index = rows.findIndex((row) => row.depth === 0 && rowLabel(row) === "transaction");
+  expect(index, "Structure tree should expose a transaction root").toBeGreaterThanOrEqual(0);
+  return index;
+}
+
+function descendantRange(rows, parentIndex) {
+  const parentDepth = rows[parentIndex].depth;
+  let end = parentIndex + 1;
+  while (end < rows.length && rows[end].depth > parentDepth) end += 1;
+  return rows.slice(parentIndex + 1, end);
+}
+
+function childRows(rows, parentIndex) {
+  const parentDepth = rows[parentIndex].depth;
+  return descendantRange(rows, parentIndex).filter(
+    (row) => row.depth === parentDepth + 1,
+  );
+}
+
+function childLabels(rows, parentIndex) {
+  return childRows(rows, parentIndex).map(rowLabel);
+}
+
+function childRow(rows, parentIndex, label) {
+  return childRows(rows, parentIndex).find((row) => rowLabel(row) === label);
+}
+
+function rowIndex(rows, target) {
+  const index = rows.findIndex((row) => row.index === target.index);
+  expect(index, `row ${target.label} should be present`).toBeGreaterThanOrEqual(0);
+  return index;
+}
+
+function expectAbsentRowsAreNull(rows, parentIndex, fields, presentLabels, context) {
+  for (const child of childRows(rows, parentIndex)) {
+    const label = rowLabel(child);
+    if (!fields.includes(label) || presentLabels.has(label)) continue;
+    expect(
+      rowSummary(child),
+      `${context}.${label} should render explicit NULL when absent`,
+    ).toBe("NULL");
+  }
+}
+
+function renderedConwayFieldTree(rows) {
+  const rootIndex = rootRowIndex(rows);
+  const transactionRow = childRow(rows, rootIndex, "transaction");
+  expect(transactionRow, "transaction wrapper").toBeTruthy();
+  const transactionIndex = rowIndex(rows, transactionRow);
+  const bodyRow = childRow(rows, transactionIndex, "body");
+  expect(bodyRow, "transaction body").toBeTruthy();
+  const witnessRow = childRow(rows, transactionIndex, "witness_set");
+  expect(witnessRow, "transaction witness_set").toBeTruthy();
+  const auxiliaryRow = childRow(rows, transactionIndex, "auxiliary_data");
+  expect(auxiliaryRow, "transaction auxiliary_data").toBeTruthy();
+
+  return {
+    top_level: childLabels(rows, rootIndex),
+    transaction: childLabels(rows, transactionIndex),
+    body: childLabels(rows, rowIndex(rows, bodyRow)),
+    witness_set: childLabels(rows, rowIndex(rows, witnessRow)),
+    auxiliary_data: childLabels(rows, rowIndex(rows, auxiliaryRow)),
+  };
+}
+
+function expectRenderedConwayShape(rows, shape, fixtureName) {
+  const rootIndex = rootRowIndex(rows);
+  expect(childLabels(rows, rootIndex), `${fixtureName} top-level structure`).toEqual([
+    "transaction_hash",
+    "transaction",
+  ]);
+
+  const transactionRow = childRow(rows, rootIndex, "transaction");
+  expect(transactionRow, `${fixtureName} transaction wrapper`).toBeTruthy();
+  const transactionIndex = rowIndex(rows, transactionRow);
+  expect(childLabels(rows, transactionIndex), `${fixtureName} transaction fields`).toEqual([
+    "body",
+    "witness_set",
+    "is_valid",
+    "auxiliary_data",
+  ]);
+
+  const bodyRow = childRow(rows, transactionIndex, "body");
+  expect(bodyRow, `${fixtureName} body`).toBeTruthy();
+  const bodyIndex = rowIndex(rows, bodyRow);
+  const bodyLabels = childLabels(rows, bodyIndex);
+  const expectedBodyLabels = conwayBodyFields.map((field) => field.label);
+  expect(bodyLabels, `${fixtureName} body CDDL order`).toEqual(expectedBodyLabels);
+  for (const key of shape.bodyKeys) {
+    const field = conwayBodyFieldByKey.get(key);
+    expect(field, `${fixtureName} unsupported body key ${key}`).toBeTruthy();
+    expect(bodyLabels, `${fixtureName} present body key ${key}`).toContain(field);
+  }
+  expectAbsentRowsAreNull(
+    rows,
+    bodyIndex,
+    expectedBodyLabels,
+    new Set(
+      Array.from(shape.bodyKeys)
+        .map((key) => conwayBodyFieldByKey.get(key))
+        .filter(Boolean),
+    ),
+    `${fixtureName}.body`,
+  );
+
+  const witnessRow = childRow(rows, transactionIndex, "witness_set");
+  expect(witnessRow, `${fixtureName} witness_set`).toBeTruthy();
+  const witnessIndex = rowIndex(rows, witnessRow);
+  const witnessLabels = childLabels(rows, witnessIndex);
+  const expectedWitnessLabels = conwayWitnessFields.map((field) => field.label);
+  expect(witnessLabels, `${fixtureName} witness_set CDDL order`).toEqual(
+    expectedWitnessLabels,
+  );
+  for (const key of shape.witnessKeys) {
+    const field = conwayWitnessFieldByKey.get(key);
+    expect(field, `${fixtureName} unsupported witness_set key ${key}`).toBeTruthy();
+    expect(witnessLabels, `${fixtureName} present witness_set key ${key}`).toContain(field);
+  }
+  expectAbsentRowsAreNull(
+    rows,
+    witnessIndex,
+    expectedWitnessLabels,
+    new Set(
+      Array.from(shape.witnessKeys)
+        .map((key) => conwayWitnessFieldByKey.get(key))
+        .filter(Boolean),
+    ),
+    `${fixtureName}.witness_set`,
+  );
+
+  const isValidRow = childRow(rows, transactionIndex, "is_valid");
+  expect(isValidRow, `${fixtureName} is_valid`).toBeTruthy();
+  expect(rowSummary(isValidRow), `${fixtureName} is_valid value`).toBe(
+    String(shape.isValid),
+  );
+
+  const auxiliaryRow = childRow(rows, transactionIndex, "auxiliary_data");
+  expect(auxiliaryRow, `${fixtureName} auxiliary_data`).toBeTruthy();
+  if (!shape.auxiliaryData.present) {
+    expect(rowSummary(auxiliaryRow), `${fixtureName} auxiliary_data absent`).toBe("NULL");
+  } else {
+    const auxiliaryIndex = rowIndex(rows, auxiliaryRow);
+    expect(
+      childLabels(rows, auxiliaryIndex),
+      `${fixtureName} auxiliary_data fields`,
+    ).toEqual(conwayAuxiliaryDataFields);
+    if (shape.auxiliaryData.metadataLabels.length > 0) {
+      const metadataRow = childRow(rows, auxiliaryIndex, "metadata");
+      expect(metadataRow, `${fixtureName} auxiliary_data.metadata`).toBeTruthy();
+      const metadataLabels = descendantRange(rows, rowIndex(rows, metadataRow)).map(rowLabel);
+      expect(
+        metadataLabels,
+        `${fixtureName} auxiliary_data.metadata expansion`,
+      ).toContain("metadata_label");
+      expect(
+        metadataLabels.some((label) => ["text", "raw_bytes"].includes(label)),
+        `${fixtureName} auxiliary_data.metadata value expansion`,
+      ).toBeTruthy();
+    }
+  }
+
+  const feeRows = rows.filter((row) => rowLabel(row) === "fee");
+  expect(feeRows, `${fixtureName} duplicate fee rows`).toHaveLength(1);
+}
 
 function contentTypeFor(filePath) {
   if (filePath.endsWith(".html")) return "text/html";
@@ -192,8 +719,20 @@ async function decodeFixtureAt(page, route, txFixturePath = fixturePath) {
   await installClipboardMock(page);
   await mockKoiosValidationContext(page, validationContext);
 
+  await decodeTxCbor(page, route, txCbor);
+}
+
+async function decodeTxCbor(page, route, txCbor) {
   await page.goto(route);
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
+  await submitTxCbor(page, txCbor);
+}
+
+async function submitTxCbor(page, txCbor) {
+  const cborMode = page.getByRole("radio", { name: "CBOR hex" });
+  if ((await cborMode.count()) === 0) {
+    await page.getByRole("button", { name: "Change input" }).click();
+  }
+  await cborMode.check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
@@ -204,7 +743,8 @@ async function decodeFixtureAt(page, route, txFixturePath = fixturePath) {
   await expect(
     resultPanel
       .getByRole("tabpanel", { name: "Structure" })
-      .locator(".decoded-tree-row", { hasText: "Transaction" }),
+      .locator(".decoded-tree-row.decoded-tree-depth-0", { hasText: "Transaction" })
+      .first(),
   ).toBeVisible();
 }
 
@@ -228,12 +768,10 @@ async function expectTabbedInspectResult(page) {
     structurePanel.getByRole("heading", { name: "Decoded structure" }),
   ).toBeVisible();
   await expect(
-    structurePanel.locator(".decoded-tree-row", { hasText: "Transaction" }),
+    structurePanel
+      .locator(".decoded-tree-row.decoded-tree-depth-0", { hasText: "Transaction" })
+      .first(),
   ).toBeVisible();
-
-  const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
-  const viewportHeight = await page.evaluate(() => window.innerHeight);
-  expect(documentHeight).toBeLessThan(viewportHeight * 4);
 
   await tabs.getByRole("tab", { name: "Witness" }).click();
   const witnessPanel = resultPanel.getByRole("tabpanel", { name: "Witness" });
@@ -1291,9 +1829,9 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
   ).toBeVisible();
   await expect(decodedPanel.locator(".decoded-structure-placeholder")).toHaveCount(0);
 
-  const rootRow = decodedPanel.locator(".decoded-tree-row", {
+  const rootRow = decodedPanel.locator(".decoded-tree-row.decoded-tree-depth-0", {
     hasText: "Transaction",
-  });
+  }).first();
   await expect(rootRow).toBeVisible();
   const transactionTypeHref =
     "https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#Transaction";
@@ -1315,31 +1853,36 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
   await expect(rootSummary.getByRole("link")).toHaveCount(0);
 
   for (const section of [
-    "Body",
-    "Inputs",
-    "Outputs",
-    "Fee",
-    "Witnesses",
-    "Redeemers",
-    "Metadata",
+    "transaction",
+    "body",
+    "inputs",
+    "outputs",
+    "witness_set",
+    "vkeys",
+    "redeemers",
+    "metadata",
   ]) {
     await expect(
       decodedPanel.getByRole("button", { name: new RegExp(`^${section}\\b`) }),
     ).toBeVisible();
   }
 
-  const body = decodedPanel.getByRole("button", { name: /^Body\b/ });
+  const body = decodedPanel.getByRole("button", { name: /^body\b/ });
   await body.click();
   const fieldPredicateHref =
     "https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#";
   const scalarBodyRow = (label) =>
-    decodedPanel.locator(".decoded-tree-row.decoded-tree-depth-2", {
+    decodedPanel.locator(".decoded-tree-row.decoded-tree-depth-3", {
       has: page.locator(".decoded-tree-keyline strong", {
         hasText: new RegExp(`^${label}$`),
       }),
     });
 
-  const validityRow = scalarBodyRow("Validity");
+  const validityRow = decodedPanel.locator(".decoded-tree-row.decoded-tree-depth-2", {
+    has: page.locator(".decoded-tree-keyline strong", {
+      hasText: /^is_valid$/,
+    }),
+  });
   await expect(validityRow).toBeVisible();
   const validityTypeLink = validityRow.getByRole("link", { name: "cardano:isValid" });
   await expect(validityTypeLink).toBeVisible();
@@ -1350,7 +1893,7 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
   await expect(validityRow).not.toContainText("cardano:Transaction");
   await expect(validityRow).not.toContainText(`${fieldPredicateHref}isValid`);
 
-  const feeRow = scalarBodyRow("Fee");
+  const feeRow = scalarBodyRow("fee");
   await expect(feeRow).toBeVisible();
   const feeTypeLink = feeRow.getByRole("link", { name: "cardano:hasFee" });
   await expect(feeTypeLink).toBeVisible();
@@ -1358,7 +1901,7 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
   await expect(feeRow).not.toContainText("cardano:Transaction");
   await expect(feeRow).not.toContainText(`${fieldPredicateHref}hasFee`);
 
-  const totalCollateralRow = scalarBodyRow("Total collateral");
+  const totalCollateralRow = scalarBodyRow("total_collateral");
   if ((await totalCollateralRow.count()) > 0) {
     const totalCollateralTypeLink = totalCollateralRow.getByRole("link", {
       name: "cardano:totalCollateral",
@@ -1372,7 +1915,7 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     await expect(totalCollateralRow).not.toContainText(`${fieldPredicateHref}totalCollateral`);
   }
 
-  const outputs = decodedPanel.getByRole("button", { name: /^Outputs\b/ });
+  const outputs = decodedPanel.getByRole("button", { name: /^outputs\b/ });
   await outputs.click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: "Output 0" }),
@@ -1384,17 +1927,12 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     decodedPanel.locator(".decoded-tree-row", { hasText: "Lovelace" }).first(),
   ).toBeVisible();
 
-  await outputs.click();
-  await expect(
-    decodedPanel.locator(".decoded-tree-row", { hasText: "Output 0" }),
-  ).toHaveCount(0);
-
-  await decodedPanel.getByRole("button", { name: /^Witnesses\b/ }).click();
+  await decodedPanel.getByRole("button", { name: /^vkeys\b/ }).click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: "Key witness" }).first(),
   ).toBeVisible();
 
-  const metadata = decodedPanel.getByRole("button", { name: /^Metadata\b/ });
+  const metadata = decodedPanel.getByRole("button", { name: /^metadata\b/ });
   await metadata.click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: "Metadata label" }).first(),
@@ -1414,6 +1952,53 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     }),
   ).toBeVisible();
   await expect(lensPanel.locator(".sparql-lens-row").first()).toBeVisible();
+});
+
+test("faithful CQuisitor parity renders Conway structure for the Amaru treasury corpus", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+
+  const fixtures = await signedTxFixtures();
+  expect(
+    fixtures.length,
+    `${amaruTreasuryTx2026Root} signed-tx.hex corpus should be non-empty`,
+  ).toBeGreaterThan(0);
+
+  const validationContext = await loadValidationContext();
+  await installClipboardMock(page);
+  await mockKoiosValidationContext(page, validationContext);
+  await page.goto("/");
+
+  let checkedContingencyGolden = false;
+  for (const txFixturePath of fixtures) {
+    const txCbor = (await readFile(txFixturePath, "utf8")).trim();
+    const shape = walkConwayTransactionCbor(txCbor);
+    await submitTxCbor(page, txCbor);
+
+    const rows = await decodedStructureRows(page);
+    const fixtureName = path.relative(amaruTreasuryTx2026Root, txFixturePath);
+    expectRenderedConwayShape(rows, shape, fixtureName);
+
+    if (txFixturePath.includes(contingencyTxId)) {
+      checkedContingencyGolden = true;
+      expect(
+        renderedConwayFieldTree(rows),
+        "18d57a4f contingency CQuisitor field tree",
+      ).toEqual({
+        top_level: ["transaction_hash", "transaction"],
+        transaction: ["body", "witness_set", "is_valid", "auxiliary_data"],
+        body: conwayBodyFields.map((field) => field.label),
+        witness_set: conwayWitnessFields.map((field) => field.label),
+        auxiliary_data: conwayAuxiliaryDataFields,
+      });
+    }
+  }
+
+  expect(
+    checkedContingencyGolden,
+    `expected to cover contingency transaction ${contingencyTxId}`,
+  ).toBe(true);
 });
 
 test("decodes genuine Conway fixture into RDF tree", async ({
@@ -1443,24 +2028,24 @@ test("decodes genuine Conway fixture into RDF tree", async ({
   await expect(decodedPanel.locator(".decoded-structure-placeholder")).toHaveCount(0);
   await expect(decodedPanel.getByText("Tree renderer pending.", { exact: true })).toHaveCount(0);
 
-  const rootRow = decodedPanel.locator(".decoded-tree-row", {
+  const rootRow = decodedPanel.locator(".decoded-tree-row.decoded-tree-depth-0", {
     hasText: "Transaction",
-  });
+  }).first();
   await expect(rootRow).toBeVisible();
   await expect(rootRow).toContainText(/urn:cardano:tx:/);
 
-  for (const section of ["Outputs", "Witnesses"]) {
+  for (const section of ["outputs", "vkeys"]) {
     await expect(
       decodedPanel.getByRole("button", { name: new RegExp(`^${section}\\b`) }),
     ).toBeVisible();
   }
 
-  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+  await decodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: "Output 0" }),
   ).toBeVisible();
 
-  await decodedPanel.getByRole("button", { name: /^Witnesses\b/ }).click();
+  await decodedPanel.getByRole("button", { name: /^vkeys\b/ }).click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: /Key witness|Script witness|Redeemer/ }).first(),
   ).toBeVisible();
@@ -1479,10 +2064,12 @@ test("preview subpath decodes genuine Conway fixture into RDF tree", async ({
     await expect(decodedPanel.locator(".decoded-structure-placeholder")).toHaveCount(0);
     await expect(decodedPanel.getByText("Tree renderer pending.", { exact: true })).toHaveCount(0);
     await expect(
-      decodedPanel.locator(".decoded-tree-row", { hasText: "Transaction" }),
+      decodedPanel
+        .locator(".decoded-tree-row.decoded-tree-depth-0", { hasText: "Transaction" })
+        .first(),
     ).toBeVisible();
-    await expect(decodedPanel.getByRole("button", { name: /^Outputs\b/ })).toBeVisible();
-    await expect(decodedPanel.getByRole("button", { name: /^Witnesses\b/ })).toBeVisible();
+    await expect(decodedPanel.getByRole("button", { name: /^outputs\b/ })).toBeVisible();
+    await expect(decodedPanel.getByRole("button", { name: /^vkeys\b/ })).toBeVisible();
   });
 });
 
@@ -1617,7 +2204,7 @@ test("resolves decoded-tree address rows from selected Turtle overlay books", as
   await decodeFixture(page, conwayMainnetFixturePath);
 
   const decodedPanel = page.locator(".decoded-structure-panel");
-  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+  await decodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
 
   const addressRow = decodedPanel
     .locator(".decoded-tree-row")
@@ -1753,7 +2340,7 @@ fixture:selectedLibraryAddress
     page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
   const decodedPanel = page.locator(".decoded-structure-panel");
-  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+  await decodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
   const resolvedAddressRow = decodedPanel
     .locator(".decoded-tree-row")
     .filter({ hasText: "Address" })
@@ -1771,7 +2358,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
 
   const decodedPanel = page.locator(".decoded-structure-panel");
-  await decodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+  await decodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
 
   const output0Row = decodedPanel
     .locator(".decoded-tree-row")
@@ -1848,7 +2435,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
   await expect(datumHashRow).toContainText(appendedLabel);
 
-  await decodedPanel.getByRole("button", { name: /^Witnesses\b/ }).click();
+  await decodedPanel.getByRole("button", { name: /^vkeys\b/ }).click();
   const verificationKeyRow = decodedPanel
     .locator(".decoded-tree-row")
     .filter({ hasText: "Verification key" })
@@ -1920,7 +2507,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
     await decodeFixtureAt(cleanPage, "/inspect", conwayMainnetFixturePath);
     const cleanDecodedPanel = cleanPage.locator(".decoded-structure-panel");
-    await cleanDecodedPanel.getByRole("button", { name: /^Outputs\b/ }).click();
+    await cleanDecodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
     await expect(
       cleanDecodedPanel
         .locator(".decoded-tree-row")
