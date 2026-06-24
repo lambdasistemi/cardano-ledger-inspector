@@ -12,7 +12,7 @@ Observed direction: CQuisitor keeps control surfaces compact and modal/header-li
 
 ## Slice
 
-The original rail-collapse work is one vertical presentation slice because the state gate, CSS layout, and Playwright coverage are one coherent UX behavior. The A-001 preview follow-up adds a second presentation-only slice on the same branch/PR for decoded-structure row compactness. A-002 adds a logic slice for decoded-tree annotation resolution. A-004 is a user redirect that supersedes the horizontal two-pane layout from Slice 1/A-001 with a vertical stack: load form at the top, books as its own section, decoded structure full-width below.
+The original rail-collapse work is one vertical presentation slice because the state gate, CSS layout, and Playwright coverage are one coherent UX behavior. The A-001 preview follow-up adds a second presentation-only slice on the same branch/PR for decoded-structure row compactness. A-002 adds a logic slice for decoded-tree annotation resolution. A-004 is a user redirect that supersedes the horizontal two-pane layout from Slice 1/A-001 with a vertical stack: load form at the top, books as its own section, decoded structure full-width below. A-005 adds a decoded-tree resolution fix so scalar body-field rows never inherit the parent transaction's class or label.
 
 ### Slice 1: Loaded-state rail collapse
 
@@ -116,9 +116,34 @@ Focused proof:
 - `just hlint`
 - Browser smoke of the published preview in empty and loaded states, including uncollapse/change-input visibility.
 
+### Slice 5: Field-level decoded-tree badges
+
+Owned files:
+
+- `docs/inspector/src/FFI/RdfShapes.js`
+- `docs/inspector/src/FFI/RdfShapes.purs`
+- `docs/inspector/tests/tx-identify.spec.mjs`
+
+Work:
+
+- Add Playwright RED coverage proving the decoded Body/Fee row does not render `cardano:Transaction` as its resolved type badge and instead renders a field-level linked CURIE such as `cardano:hasFee`.
+- Fix `decodedBodyFieldsQuery` so scalar transaction-property rows (Validity, Fee, Total collateral) surface a row-level predicate/value-kind type rather than resolving `rdfs:label` and `a ?resolvedType` from the parent transaction entity.
+- Preserve genuine sub-entity resolution for rows whose entity is meaningful in its own right, including hashes, mint values, collateral returns, inputs, outputs, witnesses, redeemers, metadata, and A-002 annotation targets.
+- Audit the decoded-tree lenses in `docs/inspector/src/FFI/RdfShapes.js` for the same parent-inheritance pattern and document the settled row-to-type mapping in the implementation notes or test names.
+- Keep all prior A-001/A-002/A-004 behavior intact: linked CURIEs, collapsed copyable `urn:cardano:*` subjects, edit-icon annotation gating, annotation labels resolving live, and the vertical layout.
+
+Focused proof:
+
+- `nix build .#packages.x86_64-linux.tx-inspector-ui`
+- `just test-playwright`
+- `just format-check`
+- `just hlint`
+- Browser smoke of the published preview: decode, expand Body, and confirm Fee shows a field-level badge, not `cardano:Transaction`.
+
 ## Risks
 
 - Existing CQuisitor layout tests currently assert the loaded pane stays 50/50; those must become the RED assertions for this ticket rather than being weakened.
 - The header must expose real context without inventing new data dependencies; prefer existing state/result helpers.
 - The CSS file is committed source in this app, so style changes must be reviewed like normal source rather than treated as generated output.
 - Slice 4 intentionally changes earlier loaded-state layout assertions. Tests that still encode "decoded structure is on the right" should become RED assertions for the new vertical order rather than being weakened or deleted without replacement.
+- Slice 5 must not solve the visible symptom by hiding badges globally. The fix belongs in the tree row data: scalar rows get their own predicate/type, while real entities continue to resolve labels and classes.
