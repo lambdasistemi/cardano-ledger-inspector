@@ -1392,18 +1392,6 @@ md-icon-button:focus-visible,
   background: color-mix(in srgb, var(--md-sys-color-primary-container) 44%, var(--surface));
 }
 
-.decoded-tree-depth-1 {
-  margin-left: 12px;
-}
-
-.decoded-tree-depth-2 {
-  margin-left: 24px;
-}
-
-.decoded-tree-depth-3 {
-  margin-left: 36px;
-}
-
 .decoded-tree-main {
   display: grid;
   gap: 0.25rem;
@@ -1417,12 +1405,31 @@ md-icon-button:focus-visible,
   min-width: 0;
 }
 
+.decoded-tree-keyline > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.decoded-tree-keyline .kind-badge {
+  flex: 0 0 auto;
+}
+
 .decoded-tree-toggle {
-  min-width: 104px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.decoded-tree-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
 }
 
 .decoded-tree-annotate {
-  justify-self: start;
+  flex: 0 0 auto;
   width: 32px;
   height: 32px;
   max-width: 100%;
@@ -1592,8 +1599,7 @@ md-icon-button:focus-visible,
   min-width: 0;
 }
 
-.browser-keyline,
-.browser-actions {
+.browser-keyline {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1601,10 +1607,29 @@ md-icon-button:focus-visible,
 }
 
 .browser-keyline code {
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: min(42vw, 28rem);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.browser-keyline .kind-badge {
+  flex: 0 0 auto;
+}
+
+.browser-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.browser-row-action {
+  min-width: 68px;
+  min-height: 30px;
 }
 
 .browser-summary {
@@ -1839,10 +1864,6 @@ pre {
   .browser-heading,
   .identity-heading {
     display: grid;
-  }
-
-  .browser-actions {
-    justify-content: start;
   }
 
   .browser-children {

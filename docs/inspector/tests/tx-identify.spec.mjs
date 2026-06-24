@@ -405,6 +405,68 @@ async function decodedStructureRows(page) {
   );
 }
 
+async function decodedStructureIndentationViolations(page) {
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  await expandDecodedStructure(decodedPanel);
+  return decodedPanel.locator(".decoded-tree-row-list").evaluate((root) => {
+    const depthOf = (row) => {
+      const depthClass = Array.from(row.classList).find((className) =>
+        className.startsWith("decoded-tree-depth-"),
+      );
+      return depthClass ? Number(depthClass.replace("decoded-tree-depth-", "")) : 0;
+    };
+    const labelOf = (row) =>
+      (
+        row.querySelector(".decoded-tree-keyline > md-outlined-button") ||
+        row.querySelector(".decoded-tree-keyline > strong")
+      )?.textContent?.trim() || "(unlabelled)";
+    const directRows = (container) =>
+      Array.from(container.children).filter((child) =>
+        child.classList.contains("decoded-tree-row"),
+      );
+
+    const violations = [];
+    for (const parent of root.querySelectorAll(".decoded-tree-row")) {
+      const parentDepth = depthOf(parent);
+      if (parentDepth < 3) continue;
+      const childContainer = parent.nextElementSibling;
+      if (!childContainer?.classList.contains("decoded-tree-children")) continue;
+      const parentLeft = parent.getBoundingClientRect().left;
+      for (const child of directRows(childContainer)) {
+        const childDepth = depthOf(child);
+        if (childDepth !== parentDepth + 1) continue;
+        const childLeft = child.getBoundingClientRect().left;
+        if (!(childLeft > parentLeft)) {
+          violations.push(
+            `${labelOf(parent)} depth ${parentDepth} left ${parentLeft.toFixed(2)} -> ${labelOf(child)} depth ${childDepth} left ${childLeft.toFixed(2)}`,
+          );
+        }
+      }
+    }
+    return violations;
+  });
+}
+
+async function decodedTreeAnnotationActionLayout(row) {
+  return row.evaluate((node) => ({
+    headerButtonCount: node.querySelectorAll(
+      ':scope > .decoded-tree-main > .decoded-tree-keyline .decoded-tree-annotate[data-aria-label="Label this node"]',
+    ).length,
+    standaloneButtonCount: node.querySelectorAll(
+      ":scope > .decoded-tree-main > .decoded-tree-annotate",
+    ).length,
+  }));
+}
+
+async function browserRowActionLayout(row) {
+  return row.evaluate((node) => ({
+    headerActions: Array.from(
+      node.querySelectorAll(":scope > .browser-row-main > .browser-keyline md-outlined-button"),
+    ).map((button) => button.textContent.trim()),
+    standaloneActionCount: node.querySelectorAll(":scope > .browser-actions").length,
+  }));
+}
+
 function rowLabel(row) {
   return normalizeStructureLabel(row.label);
 }
@@ -2372,9 +2434,16 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
   const outputLabel = "Inline annotated fixture output";
   await expect(output0Row).not.toContainText(outputLabel);
+  await expect(decodedTreeAnnotationActionLayout(output0Row)).resolves.toEqual({
+    headerButtonCount: 1,
+    standaloneButtonCount: 0,
+  });
   await output0Row
     .getByRole("button", { name: "Label this node" })
     .click();
+  await expect(
+    output0Row.locator(":scope > .decoded-tree-main > .decoded-tree-annotation-form"),
+  ).toBeVisible();
   await expect(output0Row.getByLabel("Label", { exact: true })).toBeVisible();
   await output0Row.getByLabel("Label", { exact: true }).fill(outputLabel);
   await output0Row.getByLabel("Optional type").fill("cardano:TransactionOutput");
@@ -3126,12 +3195,23 @@ test("opens browser rows in place without losing identity context", async ({
     .first();
 
   await expect(inputsRow.getByRole("button", { name: "Copy" })).toHaveCount(0);
+  await expect(browserRowActionLayout(inputsRow)).resolves.toEqual({
+    headerActions: ["Open"],
+    standaloneActionCount: 0,
+  });
   await inputsRow.locator(".browser-summary").click();
   await expect(inputsRow).toHaveClass(/is-copied/);
 
-  await inputsRow.getByRole("button", { name: "Open" }).click();
+  await inputsRow
+    .locator(":scope > .browser-row-main > .browser-keyline")
+    .getByRole("button", { name: "Open" })
+    .click();
 
   await expect(page.locator(".browser-children").first()).toBeVisible();
+  await expect(browserRowActionLayout(inputsRow)).resolves.toEqual({
+    headerActions: ["Close"],
+    standaloneActionCount: 0,
+  });
   await expect(
     page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
@@ -3152,4 +3232,6 @@ test("keeps decoded transaction layout within the viewport", async ({ page }) =>
   });
 
   expect(overflowPx).toBeLessThanOrEqual(1);
+
+  await expect(decodedStructureIndentationViolations(page)).resolves.toEqual([]);
 });
