@@ -568,41 +568,132 @@ const normalizeDecodedTreeRows = (graphTtl) => {
   const redeemers = queryBindings(graphTtl, decodedRedeemersQuery);
   const metadata = queryBindings(graphTtl, decodedMetadataQuery);
 
-  if (bodyFields.length > 0) {
-    addSection(rows, "decoded-body", "Body", 10, countText(bodyFields.length, "field"));
-    bodyFields.forEach((field, index) => {
-      const raw = firstBindingValue(field.raw, field.value, field.entity);
-      const resolved = resolvedFrom(
-        labelMatches,
-        bindingValue(field.resolvedLabel),
-        bindingValue(field.resolvedType),
-        raw,
-        bindingValue(field.value),
-        bindingValue(field.entity),
-      );
-      appendLeaf(
-        rows,
-        "decoded-body",
-        2,
-        index,
-        bindingValue(field.label),
-        bindingValue(field.kind),
-        raw,
-        {
-          raw,
-          entityIri: annotationEntityIri(bindingValue(field.entity), "hash", bindingValue(field.raw)),
-          resolvedLabel: resolved.resolvedLabel,
-          resolvedType: resolved.resolvedType,
-          annotationPredicate: bindingValue(field.kind) === "hash" ? "cardano:bytesHex" : "",
-          annotationValue: bindingValue(field.kind) === "hash" ? bindingValue(field.raw) : "",
-        },
-      );
-    });
+  const bodyFieldByLabel = new Map();
+  for (const field of bodyFields) {
+    const label = bindingValue(field.label);
+    if (label !== "" && !bodyFieldByLabel.has(label)) bodyFieldByLabel.set(label, field);
   }
 
-  if (inputs.length > 0) {
-    addSection(rows, "decoded-inputs", "Inputs", 20, countText(inputs.length, "input"));
-    inputs.forEach((input, index) => {
+  const metadataById = new Map();
+  for (const row of metadata) {
+    const id = bindingValue(row.metadata);
+    if (id !== "" && !metadataById.has(id)) metadataById.set(id, row);
+  }
+  const metadataRows = Array.from(metadataById.values());
+
+  const addNode = ({
+    id,
+    parentId,
+    depth,
+    order,
+    label,
+    kind,
+    value = "",
+    summary = "",
+    raw = "",
+    entityIri = "",
+    resolvedLabel = "",
+    resolvedType = "",
+    annotationPredicate = "",
+    annotationValue = "",
+  }) => {
+    rows.push(
+      treeRow({
+        id,
+        parentId,
+        depth,
+        order,
+        label,
+        kind,
+        value,
+        summary,
+        raw,
+        entityIri,
+        resolvedLabel,
+        resolvedType,
+        annotationPredicate,
+        annotationValue,
+      }),
+    );
+  };
+  const addNullField = (parentId, depth, order, label) => {
+    addNode({
+      id: `${parentId}-${slug(label)}`,
+      parentId,
+      depth,
+      order,
+      label,
+      kind: "null",
+      value: "NULL",
+      summary: "NULL",
+      raw: "NULL",
+    });
+  };
+  const addContainerField = (parentId, depth, order, label, summary, extra = {}) => {
+    addNode({
+      id: extra.id || `${parentId}-${slug(label)}`,
+      parentId,
+      depth,
+      order,
+      label,
+      kind: extra.kind || "section",
+      value: extra.value || "",
+      summary,
+      raw: extra.raw || "",
+      entityIri: extra.entityIri || "",
+      resolvedLabel: extra.resolvedLabel || "",
+      resolvedType: extra.resolvedType || "",
+    });
+  };
+  const addBodyScalar = (parentId, depth, order, label, sourceLabel) => {
+    const field = bodyFieldByLabel.get(sourceLabel);
+    if (!field) {
+      addNullField(parentId, depth, order, label);
+      return;
+    }
+    const raw = firstBindingValue(field.raw, field.value, field.entity);
+    if (raw === "") {
+      addNullField(parentId, depth, order, label);
+      return;
+    }
+    const resolved = resolvedFrom(
+      labelMatches,
+      bindingValue(field.resolvedLabel),
+      bindingValue(field.resolvedType),
+      raw,
+      bindingValue(field.value),
+      bindingValue(field.entity),
+    );
+    addNode({
+      id: `${parentId}-${slug(label)}`,
+      parentId,
+      depth,
+      order,
+      label,
+      kind: bindingValue(field.kind),
+      value: raw,
+      summary: compact(raw),
+      raw,
+      entityIri: annotationEntityIri(bindingValue(field.entity), "hash", bindingValue(field.raw)),
+      resolvedLabel: resolved.resolvedLabel,
+      resolvedType: resolved.resolvedType,
+      annotationPredicate: bindingValue(field.kind) === "hash" ? "cardano:bytesHex" : "",
+      annotationValue: bindingValue(field.kind) === "hash" ? bindingValue(field.raw) : "",
+    });
+  };
+  const groupedInputs = {
+    inputs: inputs.filter((input) => bindingValue(input.section) === "Inputs"),
+    collateral: inputs.filter((input) => bindingValue(input.section) === "Collateral inputs"),
+    reference_inputs: inputs.filter((input) => bindingValue(input.section) === "Reference inputs"),
+  };
+  const addInputGroup = (label, order, rowsForSection, childLabel) => {
+    const parentId = `decoded-body-${slug(label)}`;
+    if (rowsForSection.length === 0) {
+      addNullField("decoded-body", 3, order, label);
+      return;
+    }
+    addContainerField("decoded-body", 3, order, label, countText(rowsForSection.length, "input"));
+    rowsForSection.forEach((input, index) => {
       const section = bindingValue(input.section);
       const tx = bindingValue(input.txIdHex);
       const inputIndex = bindingValue(input.index);
@@ -620,10 +711,10 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       );
       appendLeaf(
         rows,
-        "decoded-inputs",
-        2,
+        parentId,
+        4,
         index,
-        section === "Inputs" ? `Input ${index}` : `${section} ${index}`,
+        `${childLabel} ${index}`,
         "tx-out-ref",
         value,
         {
@@ -636,10 +727,64 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         },
       );
     });
-  }
+  };
 
-  if (outputs.length > 0) {
-    addSection(rows, "decoded-outputs", "Outputs", 30, countText(outputs.length, "output"));
+  addNode({
+    id: "decoded-transaction-hash",
+    parentId: "decoded-root",
+    depth: 1,
+    order: 10,
+    label: "transaction_hash",
+    kind: "hash",
+    value: txId,
+    summary: compact(txId),
+    raw: txId,
+    entityIri: annotationEntityIri(transactionId, "tx", txId),
+    resolvedLabel: rootResolved.resolvedLabel,
+    resolvedType: rootResolved.resolvedType,
+    annotationPredicate: txId === "" ? "" : "cardano:bytesHex",
+    annotationValue: txId,
+  });
+  addNode({
+    id: "decoded-transaction",
+    parentId: "decoded-root",
+    depth: 1,
+    order: 20,
+    label: "transaction",
+    kind: humanToken(firstBindingValue(root.resolvedType) || "Transaction"),
+    value: transactionId,
+    summary: compact(transactionId),
+    raw: txId,
+    entityIri: transactionId,
+    resolvedLabel: rootResolved.resolvedLabel,
+    resolvedType: rootResolved.resolvedType,
+  });
+  addContainerField(
+    "decoded-transaction",
+    2,
+    10,
+    "body",
+    countText(21, "field"),
+    { id: "decoded-body" },
+  );
+  addContainerField(
+    "decoded-transaction",
+    2,
+    20,
+    "witness_set",
+    countText(6, "field"),
+    { id: "decoded-witness_set" },
+  );
+
+  const bodyFieldOrder = [
+    ["inputs", 10, () => addInputGroup("inputs", 10, groupedInputs.inputs, "Input")],
+    ["outputs", 20, () => {
+      const outputParentId = "decoded-body-outputs";
+      if (outputs.length === 0) {
+        addNullField("decoded-body", 3, 20, "outputs");
+        return;
+      }
+      addContainerField("decoded-body", 3, 20, "outputs", countText(outputs.length, "output"));
     outputs.forEach((output, index) => {
       const outputIndex = firstBindingValue(output.index, { value: String(index) });
       const outputId = `decoded-output-${slug(outputIndex)}-${index}`;
@@ -655,8 +800,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       rows.push(
         treeRow({
           id: outputId,
-          parentId: "decoded-outputs",
-          depth: 2,
+          parentId: outputParentId,
+          depth: 4,
           order: index,
           label: `Output ${outputIndex}`,
           kind: "output",
@@ -670,9 +815,9 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           annotationValue: outputTxOutRef,
         }),
       );
-      appendLeaf(rows, outputId, 3, 10, "Index", "integer", outputIndex);
-      appendLeaf(rows, outputId, 3, 20, "Lovelace", "lovelace", bindingValue(output.lovelace));
-      appendLeaf(rows, outputId, 3, 30, "Address", "address", bindingValue(output.address), {
+      appendLeaf(rows, outputId, 5, 10, "Index", "integer", outputIndex);
+      appendLeaf(rows, outputId, 5, 20, "Lovelace", "lovelace", bindingValue(output.lovelace));
+      appendLeaf(rows, outputId, 5, 30, "Address", "address", bindingValue(output.address), {
         resolvedLabel: resolvedFrom(
           labelMatches,
           "",
@@ -699,7 +844,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         bindingValue(output.datumHashHex),
         bindingValue(output.datumHash),
       );
-      appendLeaf(rows, outputId, 3, 40, "Datum hash", "hash", datumHash, {
+      appendLeaf(rows, outputId, 5, 40, "Datum hash", "hash", datumHash, {
         resolvedLabel: datumHashResolved.resolvedLabel,
         resolvedType: datumHashResolved.resolvedType,
         entityIri: annotationEntityIri(bindingValue(output.datumHash), "hash", bindingValue(output.datumHashHex)),
@@ -707,7 +852,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         annotationValue: bindingValue(output.datumHashHex),
       });
       const datumRawResolved = resolvedFrom(labelMatches, "", "", bindingValue(output.datumRaw));
-      appendLeaf(rows, outputId, 3, 50, "Datum raw bytes", "raw-bytes", bindingValue(output.datumRaw), {
+      appendLeaf(rows, outputId, 5, 50, "Datum raw bytes", "raw-bytes", bindingValue(output.datumRaw), {
         resolvedLabel: datumRawResolved.resolvedLabel,
         resolvedType: datumRawResolved.resolvedType,
         entityIri: annotationEntityIri(bindingValue(output.datum), "raw-bytes", bindingValue(output.datumRaw)),
@@ -715,18 +860,33 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         annotationValue: bindingValue(output.datumRaw),
       });
     });
-  }
+    }],
+    ["fee", 30, () => addBodyScalar("decoded-body", 3, 30, "fee", "Fee")],
+    ["ttl", 40, () => addNullField("decoded-body", 3, 40, "ttl")],
+    ["certs", 50, () => addNullField("decoded-body", 3, 50, "certs")],
+    ["withdrawals", 60, () => addNullField("decoded-body", 3, 60, "withdrawals")],
+    ["update", 70, () => addNullField("decoded-body", 3, 70, "update")],
+    ["auxiliary_data_hash", 80, () => addBodyScalar("decoded-body", 3, 80, "auxiliary_data_hash", "Auxiliary data hash")],
+    ["validity_start_interval", 90, () => addNullField("decoded-body", 3, 90, "validity_start_interval")],
+    ["mint", 100, () => addBodyScalar("decoded-body", 3, 100, "mint", "Mint")],
+    ["script_data_hash", 110, () => addBodyScalar("decoded-body", 3, 110, "script_data_hash", "Script data hash")],
+    ["collateral", 120, () => addInputGroup("collateral", 120, groupedInputs.collateral, "Collateral")],
+    ["required_signers", 130, () => addNullField("decoded-body", 3, 130, "required_signers")],
+    ["network_id", 140, () => addNullField("decoded-body", 3, 140, "network_id")],
+    ["collateral_return", 150, () => addBodyScalar("decoded-body", 3, 150, "collateral_return", "Collateral return")],
+    ["total_collateral", 160, () => addBodyScalar("decoded-body", 3, 160, "total_collateral", "Total collateral")],
+    ["reference_inputs", 170, () => addInputGroup("reference_inputs", 170, groupedInputs.reference_inputs, "Reference input")],
+    ["voting_procedures", 180, () => addNullField("decoded-body", 3, 180, "voting_procedures")],
+    ["voting_proposals", 190, () => addNullField("decoded-body", 3, 190, "voting_proposals")],
+    ["donation", 200, () => addNullField("decoded-body", 3, 200, "donation")],
+    ["current_treasury_value", 210, () => addNullField("decoded-body", 3, 210, "current_treasury_value")],
+  ];
+  bodyFieldOrder.forEach(([, , add]) => add());
 
-  const feeFields = bodyFields.filter((field) => bindingValue(field.label) === "Fee");
-  if (feeFields.length > 0) {
-    addSection(rows, "decoded-fee", "Fee", 40, compact(bindingValue(feeFields[0].value)));
-    feeFields.forEach((field, index) => {
-      appendLeaf(rows, "decoded-fee", 2, index, "Lovelace", "lovelace", bindingValue(field.value));
-    });
-  }
-
-  if (witnesses.length > 0) {
-    addSection(rows, "decoded-witnesses", "Witnesses", 50, countText(witnesses.length, "key witness"));
+  if (witnesses.length === 0) {
+    addNullField("decoded-witness_set", 3, 10, "vkeys");
+  } else {
+    addContainerField("decoded-witness_set", 3, 10, "vkeys", "");
     witnesses.forEach((witness, index) => {
       const witnessId = `decoded-key-witness-${index}`;
       const witnessValue = firstBindingValue(witness.verificationKeyHex, witness.verificationKey, witness.witness);
@@ -740,8 +900,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       rows.push(
         treeRow({
           id: witnessId,
-          parentId: "decoded-witnesses",
-          depth: 2,
+          parentId: "decoded-witness_set-vkeys",
+          depth: 4,
           order: index,
           label: `Key witness ${index}`,
           kind: "key-witness",
@@ -755,7 +915,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       );
       const keyValue = firstBindingValue(witness.verificationKeyHex, witness.verificationKey);
       const keyResolved = resolvedFrom(labelMatches, "", "", keyValue);
-      appendLeaf(rows, witnessId, 3, 10, "Verification key", "key", keyValue, {
+      appendLeaf(rows, witnessId, 5, 10, "Verification key", "key", keyValue, {
         resolvedLabel: keyResolved.resolvedLabel,
         resolvedType: keyResolved.resolvedType,
         entityIri: annotationEntityIri(bindingValue(witness.verificationKey), "key", bindingValue(witness.verificationKeyHex)),
@@ -763,15 +923,21 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         annotationValue: bindingValue(witness.verificationKeyHex),
       });
       const signatureResolved = resolvedFrom(labelMatches, "", "", bindingValue(witness.signature));
-      appendLeaf(rows, witnessId, 3, 20, "Signature", "signature", bindingValue(witness.signature), {
+      appendLeaf(rows, witnessId, 5, 20, "Signature", "signature", bindingValue(witness.signature), {
         resolvedLabel: signatureResolved.resolvedLabel,
         resolvedType: signatureResolved.resolvedType,
       });
     });
   }
 
-  if (redeemers.length > 0) {
-    addSection(rows, "decoded-redeemers", "Redeemers", 60, countText(redeemers.length, "redeemer"));
+  addNullField("decoded-witness_set", 3, 20, "native_scripts");
+  addNullField("decoded-witness_set", 3, 30, "bootstraps");
+  addNullField("decoded-witness_set", 3, 40, "plutus_scripts");
+  addNullField("decoded-witness_set", 3, 50, "plutus_data");
+  if (redeemers.length === 0) {
+    addNullField("decoded-witness_set", 3, 60, "redeemers");
+  } else {
+    addContainerField("decoded-witness_set", 3, 60, "redeemers", countText(redeemers.length, "redeemer"));
     redeemers.forEach((redeemer, index) => {
       const redeemerId = `decoded-redeemer-${index}`;
       const purpose = bindingValue(redeemer.purpose);
@@ -787,8 +953,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       rows.push(
         treeRow({
           id: redeemerId,
-          parentId: "decoded-redeemers",
-          depth: 2,
+          parentId: "decoded-witness_set-redeemers",
+          depth: 4,
           order: index,
           label: purpose === "" ? `Redeemer ${index}` : `${purpose} redeemer ${redeemerIndex}`,
           kind: "redeemer",
@@ -800,8 +966,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           resolvedType: redeemerResolved.resolvedType,
         }),
       );
-      appendLeaf(rows, redeemerId, 3, 10, "Purpose", "purpose", purpose);
-      appendLeaf(rows, redeemerId, 3, 20, "Index", "integer", redeemerIndex);
+      appendLeaf(rows, redeemerId, 5, 10, "Purpose", "purpose", purpose);
+      appendLeaf(rows, redeemerId, 5, 20, "Index", "integer", redeemerIndex);
       const dataHashValue = firstBindingValue(redeemer.dataHashHex, redeemer.dataHash);
       const dataHashResolved = resolvedFrom(
         labelMatches,
@@ -810,7 +976,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         bindingValue(redeemer.dataHashHex),
         bindingValue(redeemer.dataHash),
       );
-      appendLeaf(rows, redeemerId, 3, 30, "Data hash", "hash", dataHashValue, {
+      appendLeaf(rows, redeemerId, 5, 30, "Data hash", "hash", dataHashValue, {
         resolvedLabel: dataHashResolved.resolvedLabel,
         resolvedType: dataHashResolved.resolvedType,
         entityIri: annotationEntityIri(bindingValue(redeemer.dataHash), "hash", bindingValue(redeemer.dataHashHex)),
@@ -818,26 +984,42 @@ const normalizeDecodedTreeRows = (graphTtl) => {
         annotationValue: bindingValue(redeemer.dataHashHex),
       });
       const dataRawResolved = resolvedFrom(labelMatches, "", "", bindingValue(redeemer.dataRaw));
-      appendLeaf(rows, redeemerId, 3, 40, "Data raw bytes", "raw-bytes", bindingValue(redeemer.dataRaw), {
+      appendLeaf(rows, redeemerId, 5, 40, "Data raw bytes", "raw-bytes", bindingValue(redeemer.dataRaw), {
         resolvedLabel: dataRawResolved.resolvedLabel,
         resolvedType: dataRawResolved.resolvedType,
         entityIri: annotationEntityIri(bindingValue(redeemer.data), "raw-bytes", bindingValue(redeemer.dataRaw)),
         annotationPredicate: "cardano:hasRawBytes",
         annotationValue: bindingValue(redeemer.dataRaw),
       });
-      appendLeaf(rows, redeemerId, 3, 50, "Memory units", "ex-units", bindingValue(redeemer.memory));
-      appendLeaf(rows, redeemerId, 3, 60, "CPU units", "ex-units", bindingValue(redeemer.cpu));
+      appendLeaf(rows, redeemerId, 5, 50, "Memory units", "ex-units", bindingValue(redeemer.memory));
+      appendLeaf(rows, redeemerId, 5, 60, "CPU units", "ex-units", bindingValue(redeemer.cpu));
     });
   }
 
-  const metadataById = new Map();
-  for (const row of metadata) {
-    const id = bindingValue(row.metadata);
-    if (id !== "" && !metadataById.has(id)) metadataById.set(id, row);
-  }
-  const metadataRows = Array.from(metadataById.values());
+  const validityField = bodyFieldByLabel.get("Validity");
+  const isValidValue = firstBindingValue(root.valid, validityField?.value);
+  addNode({
+    id: "decoded-is-valid",
+    parentId: "decoded-transaction",
+    depth: 2,
+    order: 30,
+    label: "is_valid",
+    kind: "boolean",
+    value: isValidValue === "" ? "NULL" : isValidValue,
+    summary: isValidValue === "" ? "NULL" : isValidValue,
+    raw: isValidValue,
+    resolvedType: "https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#isValid",
+  });
+  addContainerField(
+    "decoded-transaction",
+    2,
+    40,
+    "auxiliary_data",
+    metadataRows.length === 0 ? "NULL" : countText(metadataRows.length, "label"),
+    { id: "decoded-auxiliary_data" },
+  );
   if (metadataRows.length > 0) {
-    addSection(rows, "decoded-metadata", "Metadata", 70, countText(metadataRows.length, "label"));
+    addContainerField("decoded-auxiliary_data", 3, 10, "metadata", countText(metadataRows.length, "label"));
     metadataRows.forEach((meta, index) => {
       const metaId = `decoded-metadata-${slug(bindingValue(meta.label))}-${index}`;
       const metaResolved = resolvedFrom(
@@ -850,8 +1032,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       rows.push(
         treeRow({
           id: metaId,
-          parentId: "decoded-metadata",
-          depth: 2,
+          parentId: "decoded-auxiliary_data-metadata",
+          depth: 4,
           order: index,
           label: `Metadata label ${bindingValue(meta.label)}`,
           kind: "metadata",
@@ -863,15 +1045,20 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           resolvedType: metaResolved.resolvedType,
         }),
       );
-      appendLeaf(rows, metaId, 3, 10, "Metadata label", "integer", bindingValue(meta.label));
-      appendLeaf(rows, metaId, 3, 20, "Text", "text", bindingValue(meta.text));
-      appendLeaf(rows, metaId, 3, 30, "Raw bytes", "raw-bytes", bindingValue(meta.raw), {
+      appendLeaf(rows, metaId, 5, 10, "Metadata label", "integer", bindingValue(meta.label));
+      appendLeaf(rows, metaId, 5, 20, "Text", "text", bindingValue(meta.text));
+      appendLeaf(rows, metaId, 5, 30, "Raw bytes", "raw-bytes", bindingValue(meta.raw), {
         entityIri: annotationEntityIri(bindingValue(meta.metadata), "raw-bytes", bindingValue(meta.raw)),
         annotationPredicate: "cardano:hasRawBytes",
         annotationValue: bindingValue(meta.raw),
       });
     });
+  } else {
+    addNullField("decoded-auxiliary_data", 3, 10, "metadata");
   }
+  addNullField("decoded-auxiliary_data", 3, 20, "native_scripts");
+  addNullField("decoded-auxiliary_data", 3, 30, "plutus_scripts");
+  addNullField("decoded-auxiliary_data", 3, 40, "prefer_alonzo_format");
 
   return rows.sort((a, b) => {
     if (a.parentId !== b.parentId) return a.parentId.localeCompare(b.parentId);
