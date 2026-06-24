@@ -1328,6 +1328,50 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     ).toBeVisible();
   }
 
+  const body = decodedPanel.getByRole("button", { name: /^Body\b/ });
+  await body.click();
+  const fieldPredicateHref =
+    "https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#";
+  const scalarBodyRow = (label) =>
+    decodedPanel.locator(".decoded-tree-row.decoded-tree-depth-2", {
+      has: page.locator(".decoded-tree-keyline strong", {
+        hasText: new RegExp(`^${label}$`),
+      }),
+    });
+
+  const validityRow = scalarBodyRow("Validity");
+  await expect(validityRow).toBeVisible();
+  const validityTypeLink = validityRow.getByRole("link", { name: "cardano:isValid" });
+  await expect(validityTypeLink).toBeVisible();
+  await expect(validityTypeLink).toHaveAttribute(
+    "href",
+    `${fieldPredicateHref}isValid`,
+  );
+  await expect(validityRow).not.toContainText("cardano:Transaction");
+  await expect(validityRow).not.toContainText(`${fieldPredicateHref}isValid`);
+
+  const feeRow = scalarBodyRow("Fee");
+  await expect(feeRow).toBeVisible();
+  const feeTypeLink = feeRow.getByRole("link", { name: "cardano:hasFee" });
+  await expect(feeTypeLink).toBeVisible();
+  await expect(feeTypeLink).toHaveAttribute("href", `${fieldPredicateHref}hasFee`);
+  await expect(feeRow).not.toContainText("cardano:Transaction");
+  await expect(feeRow).not.toContainText(`${fieldPredicateHref}hasFee`);
+
+  const totalCollateralRow = scalarBodyRow("Total collateral");
+  if ((await totalCollateralRow.count()) > 0) {
+    const totalCollateralTypeLink = totalCollateralRow.getByRole("link", {
+      name: "cardano:totalCollateral",
+    });
+    await expect(totalCollateralTypeLink).toBeVisible();
+    await expect(totalCollateralTypeLink).toHaveAttribute(
+      "href",
+      `${fieldPredicateHref}totalCollateral`,
+    );
+    await expect(totalCollateralRow).not.toContainText("cardano:Transaction");
+    await expect(totalCollateralRow).not.toContainText(`${fieldPredicateHref}totalCollateral`);
+  }
+
   const outputs = decodedPanel.getByRole("button", { name: /^Outputs\b/ });
   await outputs.click();
   await expect(

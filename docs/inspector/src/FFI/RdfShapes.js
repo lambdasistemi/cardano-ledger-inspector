@@ -74,18 +74,21 @@ WHERE {
   ?transaction a cardano:Transaction .
   {
     ?transaction cardano:isValid ?value .
-    BIND(?transaction AS ?entity)
+    BIND(cardano:isValid AS ?resolveEntity)
+    BIND(cardano:isValid AS ?resolvedType)
     BIND("Validity" AS ?label)
     BIND("boolean" AS ?kind)
     BIND("10" AS ?sort)
   } UNION {
     ?transaction cardano:hasFee ?value .
-    BIND(?transaction AS ?entity)
+    BIND(cardano:hasFee AS ?resolveEntity)
+    BIND(cardano:hasFee AS ?resolvedType)
     BIND("Fee" AS ?label)
     BIND("lovelace" AS ?kind)
     BIND("20" AS ?sort)
   } UNION {
     ?transaction cardano:scriptDataHash ?entity .
+    BIND(?entity AS ?resolveEntity)
     OPTIONAL { ?entity cardano:bytesHex ?raw . }
     BIND("Script data hash" AS ?label)
     BIND("hash" AS ?kind)
@@ -93,6 +96,7 @@ WHERE {
     BIND("30" AS ?sort)
   } UNION {
     ?transaction cardano:auxiliaryDataHash ?entity .
+    BIND(?entity AS ?resolveEntity)
     OPTIONAL { ?entity cardano:bytesHex ?raw . }
     BIND("Auxiliary data hash" AS ?label)
     BIND("hash" AS ?kind)
@@ -100,25 +104,34 @@ WHERE {
     BIND("40" AS ?sort)
   } UNION {
     ?transaction cardano:totalCollateral ?value .
-    BIND(?transaction AS ?entity)
+    BIND(cardano:totalCollateral AS ?resolveEntity)
+    BIND(cardano:totalCollateral AS ?resolvedType)
     BIND("Total collateral" AS ?label)
     BIND("lovelace" AS ?kind)
     BIND("50" AS ?sort)
   } UNION {
     ?transaction cardano:hasMint ?entity .
+    BIND(?entity AS ?resolveEntity)
     BIND("Mint" AS ?label)
     BIND("mint" AS ?kind)
     BIND(STR(?entity) AS ?value)
     BIND("60" AS ?sort)
   } UNION {
     ?transaction cardano:hasCollateralReturn ?entity .
+    BIND(?entity AS ?resolveEntity)
     BIND("Collateral return" AS ?label)
     BIND("output" AS ?kind)
     BIND(STR(?entity) AS ?value)
     BIND("70" AS ?sort)
   }
-  OPTIONAL { ?entity rdfs:label ?resolvedLabel . }
-  OPTIONAL { ?entity a ?resolvedType . }
+  OPTIONAL {
+    FILTER(BOUND(?resolveEntity))
+    ?resolveEntity rdfs:label ?resolvedLabel .
+  }
+  OPTIONAL {
+    FILTER(BOUND(?resolveEntity))
+    ?resolveEntity a ?resolvedType .
+  }
 }
 ORDER BY ?sort ?label ?value ?entity
 `;
