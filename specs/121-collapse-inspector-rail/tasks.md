@@ -30,7 +30,7 @@
 
 ## Slice 5: Field-level decoded-tree badges
 
-- [ ] T121-S5 Add Playwright RED coverage that the decoded Body/Fee row renders a field-level linked CURIE badge and never `cardano:Transaction`, with scalar body fields not inheriting the transaction label/type.
-- [ ] T121-S5 Update `RdfShapes.js` decoded-tree lenses so scalar transaction-property rows use their own field predicate or value type, while genuine sub-entities still resolve their own `rdfs:label` and `a` class.
-- [ ] T121-S5 Audit body fields, inputs, outputs, witnesses, redeemers, metadata, and the root query for parent-inheritance bugs and preserve A-001/A-002/A-004 row presentation, annotation resolution, and vertical layout behavior.
-- [ ] T121-S5 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S5` trailer.
+- [X] T121-S5 Add Playwright RED coverage that the decoded Body/Fee row renders a field-level linked CURIE badge and never `cardano:Transaction`, with scalar body fields not inheriting the transaction label/type.
+- [X] T121-S5 Update `RdfShapes.js` decoded-tree lenses so scalar transaction-property rows use their own field predicate or value type, while genuine sub-entities still resolve their own `rdfs:label` and `a` class.
+- [X] T121-S5 Audit body fields, inputs, outputs, witnesses, redeemers, metadata, and the root query for parent-inheritance bugs and preserve A-001/A-002/A-004 row presentation, annotation resolution, and vertical layout behavior.
+- [X] T121-S5 Run `nix build .#packages.x86_64-linux.tx-inspector-ui`, `just test-playwright`, `just format-check`, and `just hlint`; commit one bisect-safe slice with the required `Tasks: T121-S5` trailer.
