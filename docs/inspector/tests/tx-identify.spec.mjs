@@ -350,6 +350,16 @@ async function signedTxFixtures(root = amaruTreasuryTx2026Root) {
   return fixtures.sort();
 }
 
+async function contingencySignedTxFixture() {
+  const fixtures = await signedTxFixtures();
+  const fixture = fixtures.find((fixturePath) => fixturePath.includes(contingencyTxId));
+  expect(
+    fixture,
+    `expected to find contingency signed-tx.hex fixture ${contingencyTxId}`,
+  ).toBeTruthy();
+  return fixture;
+}
+
 function normalizeStructureLabel(label) {
   return String(label || "")
     .replace(/\s+\d+\s+(fields?|inputs?|outputs?|key witnesses?|redeemers?|labels?)$/i, "")
@@ -367,16 +377,19 @@ function normalizeSummary(summary) {
 }
 
 async function expandDecodedStructure(panel) {
-  for (let pass = 0; pass < 8; pass += 1) {
+  for (let pass = 0; pass < 256; pass += 1) {
     const expanded = await panel.evaluate(async (root) => {
-      const toggles = Array.from(
-        root.querySelectorAll(".decoded-tree-row:not(.is-expanded) .decoded-tree-toggle"),
-      );
-      for (const toggle of toggles) toggle.click();
+      const toggle = Array.from(root.querySelectorAll(".decoded-tree-row:not(.is-expanded)"))
+        .map((row) =>
+          row.querySelector(":scope > .decoded-tree-main > .decoded-tree-keyline .decoded-tree-toggle"),
+        )
+        .find(Boolean);
+      if (!toggle) return false;
+      toggle.click();
       await new Promise((resolve) => requestAnimationFrame(resolve));
-      return toggles.length;
+      return true;
     });
-    if (expanded === 0) return;
+    if (!expanded) return;
   }
 }
 
@@ -465,6 +478,21 @@ async function browserRowActionLayout(row) {
     ).map((button) => button.textContent.trim()),
     standaloneActionCount: node.querySelectorAll(":scope > .browser-actions").length,
   }));
+}
+
+async function directDecodedTreeChildLabels(row) {
+  return row.evaluate((node) => {
+    const children = node.nextElementSibling;
+    if (!children?.classList.contains("decoded-tree-children")) return [];
+    return Array.from(children.children)
+      .filter((child) => child.classList.contains("decoded-tree-row"))
+      .map((child) => {
+        const label =
+          child.querySelector(":scope > .decoded-tree-main > .decoded-tree-keyline > md-outlined-button") ||
+          child.querySelector(":scope > .decoded-tree-main > .decoded-tree-keyline > strong");
+        return label?.textContent?.trim() || "";
+      });
+  });
 }
 
 function rowLabel(row) {
@@ -1890,6 +1918,7 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     decodedPanel.getByRole("heading", { name: "Decoded structure" }),
   ).toBeVisible();
   await expect(decodedPanel.locator(".decoded-structure-placeholder")).toHaveCount(0);
+  await expandDecodedStructure(decodedPanel);
 
   const rootRow = decodedPanel.locator(".decoded-tree-row.decoded-tree-depth-0", {
     hasText: "Transaction",
@@ -1929,8 +1958,6 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     ).toBeVisible();
   }
 
-  const body = decodedPanel.getByRole("button", { name: /^body\b/ });
-  await body.click();
   const fieldPredicateHref =
     "https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#";
   const scalarBodyRow = (label) =>
@@ -1977,8 +2004,6 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     await expect(totalCollateralRow).not.toContainText(`${fieldPredicateHref}totalCollateral`);
   }
 
-  const outputs = decodedPanel.getByRole("button", { name: /^outputs\b/ });
-  await outputs.click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: "Output 0" }),
   ).toBeVisible();
@@ -1989,13 +2014,10 @@ test("renders decoded-structure tree from RDF rows", async ({ page }) => {
     decodedPanel.locator(".decoded-tree-row", { hasText: "Lovelace" }).first(),
   ).toBeVisible();
 
-  await decodedPanel.getByRole("button", { name: /^vkeys\b/ }).click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: "Key witness" }).first(),
   ).toBeVisible();
 
-  const metadata = decodedPanel.getByRole("button", { name: /^metadata\b/ });
-  await metadata.click();
   await expect(
     decodedPanel.locator(".decoded-tree-row", { hasText: "Metadata label" }).first(),
   ).toBeVisible();
@@ -2061,6 +2083,44 @@ test("faithful CQuisitor parity renders Conway structure for the Amaru treasury 
     checkedContingencyGolden,
     `expected to cover contingency transaction ${contingencyTxId}`,
   ).toBe(true);
+});
+
+test("decoded structure toggles collapse and expand direct children", async ({
+  page,
+}) => {
+  const txFixturePath = await contingencySignedTxFixture();
+  const txCbor = (await readFile(txFixturePath, "utf8")).trim();
+  await decodeTxCbor(page, "/", txCbor);
+
+  const decodedPanel = page.locator(".decoded-structure-panel");
+  const bodyRow = decodedPanel
+    .locator(".decoded-tree-row", {
+      has: page.locator(".decoded-tree-keyline > md-outlined-button", {
+        hasText: /^body\b/,
+      }),
+    })
+    .first();
+  await expect(bodyRow).toBeVisible();
+
+  const initiallyVisibleChildren =
+    (await directDecodedTreeChildLabels(bodyRow)).map(normalizeStructureLabel);
+  expect(initiallyVisibleChildren).toEqual(
+    expect.arrayContaining(["inputs", "outputs", "fee"]),
+  );
+
+  await bodyRow
+    .locator(":scope > .decoded-tree-main > .decoded-tree-keyline .decoded-tree-toggle")
+    .click();
+  await expect(directDecodedTreeChildLabels(bodyRow)).resolves.toEqual([]);
+
+  await bodyRow
+    .locator(":scope > .decoded-tree-main > .decoded-tree-keyline .decoded-tree-toggle")
+    .click();
+  const restoredChildren =
+    (await directDecodedTreeChildLabels(bodyRow)).map(normalizeStructureLabel);
+  expect(restoredChildren).toEqual(
+    expect.arrayContaining(["inputs", "outputs", "fee"]),
+  );
 });
 
 test("decodes genuine Conway fixture into RDF tree", async ({
@@ -2266,7 +2326,7 @@ test("resolves decoded-tree address rows from selected Turtle overlay books", as
   await decodeFixture(page, conwayMainnetFixturePath);
 
   const decodedPanel = page.locator(".decoded-structure-panel");
-  await decodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
+  await expandDecodedStructure(decodedPanel);
 
   const addressRow = decodedPanel
     .locator(".decoded-tree-row")
@@ -2329,6 +2389,7 @@ fixture:decodedTreasuryAddress
   await overlayPanel.getByRole("button", { name: "Apply selected books" }).click();
 
   await selectResultTab(page, "Structure");
+  await expandDecodedStructure(decodedPanel);
   const resolvedAddressRow = decodedPanel
     .locator(".decoded-tree-row")
     .filter({ hasText: "Address" })
@@ -2402,7 +2463,7 @@ fixture:selectedLibraryAddress
     page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
   const decodedPanel = page.locator(".decoded-structure-panel");
-  await decodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
+  await expandDecodedStructure(decodedPanel);
   const resolvedAddressRow = decodedPanel
     .locator(".decoded-tree-row")
     .filter({ hasText: "Address" })
@@ -2420,7 +2481,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
 
   const decodedPanel = page.locator(".decoded-structure-panel");
-  await decodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
+  await expandDecodedStructure(decodedPanel);
 
   const output0Row = decodedPanel
     .locator(".decoded-tree-row")
@@ -2455,6 +2516,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await expect(
     output0Row.getByRole("link", { name: "cardano:TransactionOutput" }),
   ).toBeVisible();
+  await expandDecodedStructure(decodedPanel);
 
   const addressRows = decodedPanel
     .locator(".decoded-tree-row")
@@ -2484,6 +2546,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await firstAddressRow.getByRole("button", { name: "Save label" }).click();
 
   await expect(firstAddressRow).toContainText(inlineLabel);
+  await expandDecodedStructure(decodedPanel);
 
   const datumHashRow = decodedPanel
     .locator(".decoded-tree-row")
@@ -2504,7 +2567,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
   await expect(datumHashRow).toContainText(appendedLabel);
 
-  await decodedPanel.getByRole("button", { name: /^vkeys\b/ }).click();
+  await expandDecodedStructure(decodedPanel);
   const verificationKeyRow = decodedPanel
     .locator(".decoded-tree-row")
     .filter({ hasText: "Verification key" })
@@ -2576,7 +2639,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
     await decodeFixtureAt(cleanPage, "/inspect", conwayMainnetFixturePath);
     const cleanDecodedPanel = cleanPage.locator(".decoded-structure-panel");
-    await cleanDecodedPanel.getByRole("button", { name: /^outputs\b/ }).click();
+    await expandDecodedStructure(cleanDecodedPanel);
     await expect(
       cleanDecodedPanel
         .locator(".decoded-tree-row")
