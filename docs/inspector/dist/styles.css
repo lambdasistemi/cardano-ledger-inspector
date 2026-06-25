@@ -392,7 +392,7 @@ fieldset {
 
 .loaded-inspector-context {
   display: grid;
-  grid-template-columns: repeat(3, minmax(96px, auto)) minmax(180px, 1fr);
+  grid-template-columns: repeat(3, minmax(96px, auto)) repeat(2, minmax(180px, 1fr));
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -418,11 +418,23 @@ fieldset {
   font-size: 0.88rem;
 }
 
-.loaded-context-hash code {
+.loaded-context-value {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.loaded-context-value code {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.loaded-context-copy {
+  min-height: 30px;
 }
 
 .loaded-book-context,

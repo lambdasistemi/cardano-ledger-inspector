@@ -1885,6 +1885,42 @@ test("decodes a Conway transaction and exposes compact identity values", async (
     .toBe(bodyHash);
 });
 
+test("loaded header surfaces tx id and CBOR", async ({ page }) => {
+  const txFixturePath = await contingencySignedTxFixture();
+  const txCbor = (await readFile(txFixturePath, "utf8")).trim();
+
+  await decodeFixtureAt(page, "/", txFixturePath);
+
+  const loadedHeader = page.locator(".loaded-inspector-header");
+  await expect(loadedHeader).toBeVisible();
+
+  const txIdRow = loadedHeader.locator(".loaded-context-item").filter({
+    has: page.getByText("Tx id/hash", { exact: true }),
+  });
+  await expect(txIdRow).toBeVisible();
+  await expect(txIdRow.locator("code")).toHaveText(contingencyTxId);
+
+  const cborRow = loadedHeader.locator(".loaded-context-item").filter({
+    has: page.getByText("CBOR", { exact: true }),
+  });
+  await expect(cborRow).toBeVisible();
+  const cborValue = cborRow.locator("code");
+  await expect(cborValue).toContainText(txCbor.slice(0, 16));
+  await expect(cborValue).toContainText(txCbor.slice(-8));
+  const visibleCbor = await cborValue.innerText();
+  expect(visibleCbor.length).toBeLessThan(txCbor.length);
+
+  await cborRow.getByRole("button", { name: "Copy CBOR" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(txCbor);
+
+  await txIdRow.getByRole("button", { name: "Copy Tx id/hash" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(contingencyTxId);
+});
+
 test("renders the transaction RDF graph after decode", async ({ page }) => {
   await decodeFixture(page);
 
