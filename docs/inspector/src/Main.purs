@@ -924,7 +924,7 @@ inspectorComponent initial =
   renderDecodedTreeRow state rows row =
     let
       hasChildren = Array.any (\candidate -> candidate.parentId == row.id) rows
-      expanded = row.parentId == "" || row.depth >= 1 || Array.elem row.id state.decodedTreeExpanded
+      expanded = row.parentId == "" || Array.elem row.id state.decodedTreeExpanded
       rowClasses =
         if hasChildren && expanded then
           [ "decoded-tree-row", "is-expanded", "decoded-tree-depth-" <> show row.depth ]
@@ -2516,6 +2516,14 @@ inspectorComponent initial =
   closePath path paths =
     Array.filter (_ /= path) paths
 
+  defaultDecodedTreeExpanded lens =
+    case lens of
+      Nothing -> []
+      Just decoded ->
+        decoded.rows
+          # Array.filter (\row -> row.parentId == "" || row.depth <= 2)
+          # map _.id
+
   rootBrowserNodes browser =
     [ { path: browser.currentPath, browser } ]
 
@@ -3140,7 +3148,7 @@ inspectorComponent initial =
                   if operationResult.exitOk && browser.valid then rootBrowserNodes browser
                   else []
               , expandedPaths = []
-              , decodedTreeExpanded = []
+              , decodedTreeExpanded = defaultDecodedTreeExpanded lenses.decodedTreeLens
               , browserPath = browser.currentPath
               }
     Copy -> do
