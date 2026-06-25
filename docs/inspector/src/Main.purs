@@ -714,6 +714,37 @@ inspectorComponent initial =
       overlayCount = Array.length (selectedOverlayParts state)
       blueprintCount = Array.length (selectedBlueprintParts state)
       shaclCount = Array.length (selectedShaclParts state)
+      txHash = loadedTxHash state
+      txIdPath = "loaded-header:tx-id"
+      cborPath = "loaded-header:cbor"
+      renderContextItem label extraClasses content =
+        HH.div
+          [ classNames ([ "loaded-context-item" ] <> extraClasses) ]
+          ([ HH.span_ [ HH.text label ] ] <> content)
+      renderCopyContextValue label path fullValue displayValue =
+        HH.div
+          [ classNames [ "loaded-context-value" ] ]
+          [ HH.code
+              [ classNames [ "summary-copy-target" ]
+              , HP.title fullValue
+              , HE.onClick (\_ -> CopyValue path fullValue)
+              ]
+              [ HH.text displayValue ]
+          , HH.element (HH.ElemName "md-outlined-button")
+              [ HE.onClick (\_ -> CopyValue path fullValue)
+              , classNames [ "inline-action", "loaded-context-copy" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , HH.attr (HH.AttrName "aria-label") ("Copy " <> label)
+              , mdControl "inline"
+              ]
+              [ HH.text
+                  ( if state.copiedPath == Just path then
+                      "Copied"
+                    else
+                      "Copy"
+                  )
+              ]
+          ]
     in
       HH.section
         [ classNames [ "loaded-inspector-header" ]
@@ -721,27 +752,23 @@ inspectorComponent initial =
         ]
         [ HH.div
             [ classNames [ "loaded-inspector-context" ] ]
-            [ HH.div
-                [ classNames [ "loaded-context-item" ] ]
-                [ HH.span_ [ HH.text "Source" ]
-                , HH.strong_ [ HH.text (modeLabel state.mode) ]
-                ]
-            , HH.div
-                [ classNames [ "loaded-context-item" ] ]
-                [ HH.span_ [ HH.text "Provider" ]
-                , HH.strong_ [ HH.text (Provider.providerName state.provider) ]
-                ]
-            , HH.div
-                [ classNames [ "loaded-context-item" ] ]
-                [ HH.span_ [ HH.text "Network" ]
-                , HH.strong_ [ HH.text (networkName state.network) ]
-                ]
-            , HH.div
-                [ classNames [ "loaded-context-item", "loaded-context-hash" ] ]
-                [ HH.span_ [ HH.text "Tx id/hash" ]
-                , HH.code_ [ HH.text (loadedTxHash state) ]
-                ]
-            ]
+            ( [ renderContextItem "Source" [] [ HH.strong_ [ HH.text (modeLabel state.mode) ] ]
+              , renderContextItem "Provider" [] [ HH.strong_ [ HH.text (Provider.providerName state.provider) ] ]
+              , renderContextItem "Network" [] [ HH.strong_ [ HH.text (networkName state.network) ] ]
+              , renderContextItem "Tx id/hash"
+                  [ "loaded-context-hash" ]
+                  [ renderCopyContextValue "Tx id/hash" txIdPath txHash txHash ]
+              ]
+                <> (case state.txCbor of
+                  Just cbor ->
+                    [ renderContextItem "CBOR"
+                        [ "loaded-context-cbor" ]
+                        [ renderCopyContextValue "CBOR" cborPath cbor (middleTruncate 16 8 cbor) ]
+                    ]
+                  Nothing ->
+                    []
+                )
+            )
         , HH.div
             [ classNames [ "loaded-book-context" ] ]
             [ HH.span_ [ HH.text (show (Array.length selected) <> " selected") ]
