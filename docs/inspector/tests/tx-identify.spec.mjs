@@ -21,6 +21,10 @@ const validationFixturePath = path.join(
   repoRoot,
   "specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json",
 );
+const cardanoShaclShapesPath = path.join(
+  repoRoot,
+  "docs/inspector/protocols/cardano-rdf/shapes.ttl",
+);
 const packagedSiteDir = path.resolve(
   process.cwd(),
   process.env.TX_INSPECTOR_SITE_DIR || "result",
@@ -57,8 +61,37 @@ cardano:TransactionShape
 cardano:RequiresSentinelShape
   sh:path cardano:requiresSentinel ;
   sh:minCount 1 ;
+  sh:severity sh:Warning ;
   sh:message "Transactions must include sentinel off-spec marker." .
 `;
+
+function classATurtle({ includeInput = true, txPredicates = [], body = "" } = {}) {
+  const predicates = [
+    "cardano:hasTxId <urn:cardano:id:TxId:class-a>",
+    ...(includeInput ? ["cardano:hasInput _:input1"] : []),
+    ...txPredicates,
+  ];
+  const inputBody = includeInput
+    ? `
+_:input1 a cardano:Input ;
+  cardano:txOutRef "0000000000000000000000000000000000000000000000000000000000000001#0" .
+`
+    : "";
+  return `
+@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:cardano:tx:class-a>
+  a cardano:Transaction ;
+  ${predicates.join(" ;\n  ")} .
+
+<urn:cardano:id:TxId:class-a> a cardano:Identifier ;
+  cardano:leafType "TxId" ;
+  cardano:bytesHex "class-a" .
+${inputBody}
+${body}
+`;
+}
 
 const conwayBodyFields = [
   { key: 0, label: "inputs" },
@@ -2813,18 +2846,151 @@ test("renders selected library SHACL conformance for bundled Cardano RDF shapes"
   await expect(
     conformancePanel
       .locator(".metric-card", { hasText: "Author gate" })
-      .getByText("fail", { exact: true }),
+      .getByText("pass", { exact: true }),
   ).toBeVisible();
   await expect(
     conformancePanel
       .locator(".metric-card", { hasText: "Auditor classifier" })
-      .getByText("foreign/off-spec", { exact: true }),
+      .getByText("canonical-pipeline match", { exact: true }),
   ).toBeVisible();
-  const violationRow = conformancePanel.locator(".shacl-violation-row").filter({
-    hasText: "Cardano transactions must include a transaction id.",
-  });
-  await expect(violationRow).toBeVisible();
-  await expect(violationRow).toContainText("hasTxId");
+  await expect(conformancePanel.getByText("No phase-1 issues.")).toBeVisible();
+});
+
+test("Class A SHACL shapes fire on crafted phase-1 violations", async ({ page }) => {
+  const shapes = await readFile(cardanoShaclShapesPath, "utf8");
+  const cases = [
+    {
+      name: "empty input set",
+      expected: "InputSetEmptyUTxO",
+      fallback: "cardano#hasInput",
+      data: classATurtle({ includeInput: false }),
+    },
+    {
+      name: "reference input overlap",
+      expected: "ReferenceInputOverlapsWithInput",
+      data: classATurtle({
+        txPredicates: ["cardano:hasReferenceInput _:referenceInput1"],
+        body: `
+_:referenceInput1 a cardano:Input ;
+  cardano:txOutRef "0000000000000000000000000000000000000000000000000000000000000001#0" .
+`,
+      }),
+    },
+    {
+      name: "genesis legacy certificate",
+      expected: "UnsupportedLegacyCertificate",
+      fallback: "GenesisKeyDelegation",
+      data: classATurtle({
+        txPredicates: ["cardano:hasCertificate _:legacyCert"],
+        body: "_:legacyCert a cardano:GenesisKeyDelegation .",
+      }),
+    },
+    {
+      name: "MIR legacy certificate",
+      expected: "UnsupportedLegacyCertificate",
+      fallback: "MIRCertificate",
+      data: classATurtle({
+        txPredicates: ["cardano:hasCertificate _:mirCert"],
+        body: "_:mirCert a cardano:MIRCertificate .",
+      }),
+    },
+    {
+      name: "zero treasury withdrawal",
+      expected: "TreasuryWithdrawalZero",
+      data: classATurtle({
+        txPredicates: ["cardano:hasProposal _:proposal1"],
+        body: `
+_:proposal1 a cardano:Proposal ;
+  cardano:hasGovAction _:treasuryAction1 .
+_:treasuryAction1 a cardano:TreasuryWithdrawals ;
+  cardano:hasWithdrawal _:treasuryWithdrawal1 .
+_:treasuryWithdrawal1 a cardano:Withdrawal ;
+  cardano:hasLovelace 0 .
+`,
+      }),
+    },
+    {
+      name: "conflicting committee update",
+      expected: "CommitteeUpdateConflict",
+      data: classATurtle({
+        txPredicates: ["cardano:hasProposal _:proposal1"],
+        body: `
+_:proposal1 a cardano:Proposal ;
+  cardano:hasGovAction _:committeeAction1 .
+_:committeeAction1 a cardano:UpdateCommittee ;
+  cardano:removesMember <urn:cardano:id:CommitteeColdKey:bad> ;
+  cardano:addsMember _:committeeAddition1 .
+_:committeeAddition1 a cardano:CommitteeAddition ;
+  cardano:hasIdentifier <urn:cardano:id:CommitteeColdKey:bad> .
+`,
+      }),
+    },
+    {
+      name: "auxiliary data hash missing",
+      expected: "AuxiliaryDataHashMissing",
+      data: classATurtle({
+        txPredicates: ["cardano:hasAuxiliaryData _:auxiliaryData1"],
+        body: "_:auxiliaryData1 a cardano:AuxiliaryData .",
+      }),
+    },
+    {
+      name: "auxiliary data hash unexpected",
+      expected: "AuxiliaryDataHashPresentButNotExpected",
+      data: classATurtle({
+        txPredicates: [
+          "cardano:auxiliaryDataHash <urn:cardano:id:AuxiliaryDataHash:unexpected>",
+        ],
+      }),
+    },
+    {
+      name: "input canonical order warning",
+      expected: "InputsNotCanonicallySorted",
+      data: classATurtle({
+        txPredicates: ["cardano:hasInput _:input2"],
+        body: `
+_:input1 cardano:inputOrder 0 .
+_:input2 a cardano:Input ;
+  cardano:inputOrder 1 ;
+  cardano:txOutRef "0000000000000000000000000000000000000000000000000000000000000000#0" .
+`,
+      }),
+    },
+    {
+      name: "withdrawal canonical order warning",
+      expected: "WithdrawalsNotCanonicallySorted",
+      data: classATurtle({
+        txPredicates: [
+          "cardano:hasWithdrawal _:withdrawal1",
+          "cardano:hasWithdrawal _:withdrawal2",
+        ],
+        body: `
+_:withdrawal1 a cardano:Withdrawal ;
+  cardano:withdrawalOrder 0 ;
+  cardano:withdrawalAccount <urn:cardano:id:StakeKey:2> .
+_:withdrawal2 a cardano:Withdrawal ;
+  cardano:withdrawalOrder 1 ;
+  cardano:withdrawalAccount <urn:cardano:id:StakeKey:1> .
+`,
+      }),
+    },
+  ];
+
+  await page.goto("/");
+  await page.waitForFunction(() => typeof globalThis.txInspectorValidateShacl === "function");
+
+  for (const scenario of cases) {
+    const report = await page.evaluate(
+      ({ data, shapes }) => globalThis.txInspectorValidateShacl(data, shapes),
+      { data: scenario.data, shapes },
+    );
+    const payload = JSON.stringify(report);
+    expect(report.conforms, `${scenario.name} should violate Class A shapes`).toBe(false);
+    expect(
+      payload.includes(scenario.expected) ||
+        (scenario.fallback !== undefined && payload.includes(scenario.fallback)),
+      scenario.name,
+    ).toBe(true);
+  }
 });
 
 test("renders non-conforming SHACL violations for pasted shapes", async ({
@@ -2863,6 +3029,8 @@ test("renders non-conforming SHACL violations for pasted shapes", async ({
   await expect(violationRow.getByText("Focus node", { exact: true })).toBeVisible();
   await expect(violationRow.getByText("Path", { exact: true })).toBeVisible();
   await expect(violationRow.getByText("Source shape", { exact: true })).toBeVisible();
+  await expect(violationRow.getByText("warning", { exact: true })).toBeVisible();
+  await expect(violationRow.getByRole("link", { name: "Transaction" })).toBeVisible();
   await expect(violationRow).toContainText("requiresSentinel");
   await expect(violationRow).toContainText("RequiresSentinelShape");
 });
