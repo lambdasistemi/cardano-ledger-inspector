@@ -964,7 +964,9 @@ inspectorComponent initial =
         else ""
     in
       [ HH.div
-          [ classNames rowClasses ]
+          [ classNames rowClasses
+          , HP.id row.id
+          ]
           [ HH.div
               [ classNames [ "decoded-tree-main" ] ]
               [ HH.div
@@ -1553,7 +1555,7 @@ inspectorComponent initial =
       Just rdf ->
         if exitOk && rdf.valid then
           [ renderRdfGraph rdf, renderOverlayBooks state ]
-            <> renderShaclConformanceMaybe state.shaclConformance
+            <> renderShaclConformanceMaybe state state.shaclConformance
             <> renderResolvedLabelsLensMaybe state.resolvedLabelsLens
             <> renderTypedFieldsLensMaybe state.typedFieldsLens
             <> renderSparqlLensMaybe state.sparqlLens
@@ -1674,7 +1676,7 @@ inspectorComponent initial =
               <> renderWitnessPlanMaybe state
           ValidationTab ->
             renderValidationMaybe state
-              <> renderShaclConformanceMaybe state.shaclConformance
+              <> renderShaclConformanceMaybe state state.shaclConformance
           GraphRdfTab ->
             renderCompactIdentificationMaybe state
               <> renderGraphRdfMaybe state
@@ -1974,12 +1976,12 @@ inspectorComponent initial =
   selectedBlueprintArgs state =
     OverlayBook.blueprintArgs (selectedBlueprintParts state)
 
-  renderShaclConformanceMaybe conformance =
+  renderShaclConformanceMaybe state conformance =
     case conformance of
-      Just value -> [ renderShaclConformance value ]
+      Just value -> [ renderShaclConformance state value ]
       Nothing -> []
 
-  renderShaclConformance conformance =
+  renderShaclConformance state conformance =
     HH.div
       [ classNames [ "shacl-conformance-panel" ]
       , mdSurface "decoded"
@@ -2024,7 +2026,7 @@ inspectorComponent initial =
                                 "foreign/off-spec"
                           }
                       ]
-                  , renderShaclViolations report
+                  , renderShaclViolations state report
                   ]
               Nothing ->
                 HH.div
@@ -2041,32 +2043,80 @@ inspectorComponent initial =
       , HH.code_ [ HH.text label ]
       ]
 
-  renderShaclViolations report =
+  renderShaclViolations state report =
     if Array.null report.violations then
       HH.div
         [ classNames [ "witness-empty" ] ]
-        [ HH.text "No SHACL violations." ]
+        [ HH.text "No phase-1 issues." ]
     else
       HH.div
         [ classNames [ "witness-section" ] ]
         [ HH.div
             [ classNames [ "identity-section-title" ] ]
-            [ HH.text "SHACL violations" ]
+            [ HH.text "Phase-1 issues" ]
         , HH.div
             [ classNames [ "sparql-lens-row-list" ] ]
-            (map renderShaclViolationRow report.violations)
+            (map (renderShaclViolationRow state) report.violations)
         ]
 
-  renderShaclViolationRow violation =
+  renderShaclViolationRow state violation =
+    let
+      severity = normalizedShaclSeverity violation.severity
+    in
     HH.div
-      [ classNames [ "sparql-lens-row", "shacl-violation-row" ] ]
-      [ renderShaclViolationCell "Focus node" violation.focusNode
+      [ classNames [ "sparql-lens-row", "shacl-violation-row", "shacl-" <> severity ] ]
+      [ renderShaclViolationCell "Severity" severity
+      , renderShaclViolationLocationCell state violation
+      , renderShaclViolationCell "Focus node" violation.focusNode
       , renderShaclViolationCell "Path" violation.path
       , renderShaclViolationCell "Source shape" violation.sourceShape
       , renderShaclViolationCell "Message" violation.message
       , renderShaclViolationCell "Constraint" violation.sourceConstraintComponent
-      , renderShaclViolationCell "Severity" violation.severity
       ]
+
+  normalizedShaclSeverity severity =
+    if severity == "warning" then "warning"
+    else if severity == "info" then "info"
+    else "error"
+
+  renderShaclViolationLocationCell state violation =
+    HH.div
+      [ classNames [ "sparql-lens-cell" ] ]
+      [ HH.span
+          [ classNames [ "identity-section-title" ] ]
+          [ HH.text "Location" ]
+      , case shaclFocusRow state violation.focusNode of
+          Just row ->
+            HH.a
+              [ classNames [ "decoded-tree-iri", "shacl-location-link" ]
+              , HP.href ("#" <> row.id)
+              , HP.title row.entityIri
+              , HE.onClick (\_ -> SelectResultTab StructureTab)
+              ]
+              [ HH.text (shaclFocusRowLabel row) ]
+          Nothing ->
+            HH.text (if violation.focusNode == "" then "transaction graph" else violation.focusNode)
+      ]
+
+  shaclFocusRow state focusNode =
+    case state.decodedTreeLens of
+      Just lens ->
+        if focusNode == "" then
+          Nothing
+        else
+          Array.find
+            ( \row ->
+                row.entityIri == focusNode
+                  || row.value == focusNode
+                  || row.raw == focusNode
+                  || row.annotationValue == focusNode
+            )
+            lens.rows
+      Nothing -> Nothing
+
+  shaclFocusRowLabel row =
+    if row.resolvedLabel /= "" then row.resolvedLabel
+    else row.label
 
   renderShaclViolationCell label value =
     HH.div

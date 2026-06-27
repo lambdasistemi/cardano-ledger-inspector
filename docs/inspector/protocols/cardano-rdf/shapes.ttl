@@ -1,13 +1,159 @@
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 cardano:TransactionShape
   a sh:NodeShape ;
   sh:targetClass cardano:Transaction ;
-  sh:property cardano:TransactionIdShape .
+  sh:property cardano:TransactionIdShape ;
+  sh:property cardano:ClassAInputSetNotEmptyShape ;
+  sh:sparql cardano:ClassAReferenceInputOverlapConstraint ;
+  sh:sparql cardano:ClassAZeroTreasuryWithdrawalConstraint ;
+  sh:sparql cardano:ClassACommitteeUpdateConflictConstraint ;
+  sh:sparql cardano:ClassAAuxiliaryDataHashMissingConstraint ;
+  sh:sparql cardano:ClassAAuxiliaryDataHashUnexpectedConstraint ;
+  sh:sparql cardano:ClassAInputOrderWarningConstraint ;
+  sh:sparql cardano:ClassAWithdrawalOrderWarningConstraint .
 
 cardano:TransactionIdShape
-    sh:path cardano:hasTxId ;
-    sh:minCount 1 ;
-    sh:class cardano:Identifier ;
-    sh:message "Cardano transactions must reference a transaction id identifier." .
+  sh:path cardano:hasTxId ;
+  sh:minCount 1 ;
+  sh:severity sh:Violation ;
+  sh:message "Cardano transactions must include a transaction id." .
+
+cardano:ClassAInputSetNotEmptyShape
+  sh:path cardano:hasInput ;
+  sh:minCount 1 ;
+  sh:severity sh:Violation ;
+  sh:message "InputSetEmptyUTxO: transaction input set must not be empty." .
+
+cardano:ClassAReferenceInputOverlapConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Violation ;
+  sh:message "ReferenceInputOverlapsWithInput: a reference input must not also be spent as an input." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    SELECT $this ?value
+    WHERE {
+      $this cardano:hasInput ?spendInput ;
+            cardano:hasReferenceInput ?referenceInput .
+      ?spendInput cardano:txOutRef ?value .
+      ?referenceInput cardano:txOutRef ?value .
+    }
+  """ .
+
+cardano:ClassAZeroTreasuryWithdrawalConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Violation ;
+  sh:message "TreasuryWithdrawalZero: treasury withdrawal governance actions must withdraw a positive amount." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    SELECT $this ?value
+    WHERE {
+      $this cardano:hasProposal ?proposal .
+      ?proposal cardano:hasGovAction ?action .
+      ?action a cardano:TreasuryWithdrawals ;
+              cardano:hasWithdrawal ?value .
+      ?value cardano:hasLovelace ?lovelace .
+      FILTER(xsd:integer(?lovelace) = 0)
+    }
+  """ .
+
+cardano:ClassACommitteeUpdateConflictConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Violation ;
+  sh:message "CommitteeUpdateConflict: a committee member cannot be added and removed by the same update." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    SELECT $this ?value
+    WHERE {
+      $this cardano:hasProposal ?proposal .
+      ?proposal cardano:hasGovAction ?action .
+      ?action a cardano:UpdateCommittee ;
+              cardano:removesMember ?value ;
+              cardano:addsMember ?addition .
+      ?addition cardano:hasIdentifier ?value .
+    }
+  """ .
+
+cardano:ClassAAuxiliaryDataHashMissingConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Violation ;
+  sh:message "AuxiliaryDataHashMissing: auxiliary data is present but the transaction body has no auxiliary-data hash." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    SELECT $this ?value
+    WHERE {
+      $this cardano:hasAuxiliaryData ?value .
+      FILTER NOT EXISTS { $this cardano:auxiliaryDataHash ?hash . }
+    }
+  """ .
+
+cardano:ClassAAuxiliaryDataHashUnexpectedConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Violation ;
+  sh:message "AuxiliaryDataHashPresentButNotExpected: transaction body has an auxiliary-data hash but no auxiliary data." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    SELECT $this ?value
+    WHERE {
+      $this cardano:auxiliaryDataHash ?value .
+      FILTER NOT EXISTS { $this cardano:hasAuxiliaryData ?auxiliaryData . }
+    }
+  """ .
+
+cardano:ClassAInputOrderWarningConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Warning ;
+  sh:message "InputsNotCanonicallySorted: input order does not match ascending txOutRef order." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    SELECT $this ?value
+    WHERE {
+      $this cardano:hasInput ?leftInput ;
+            cardano:hasInput ?rightInput .
+      ?leftInput cardano:inputOrder ?leftOrder ;
+                 cardano:txOutRef ?value .
+      ?rightInput cardano:inputOrder ?rightOrder ;
+                  cardano:txOutRef ?rightRef .
+      FILTER(xsd:integer(?leftOrder) < xsd:integer(?rightOrder))
+      FILTER(STR(?value) > STR(?rightRef))
+    }
+  """ .
+
+cardano:ClassAWithdrawalOrderWarningConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Warning ;
+  sh:message "WithdrawalsNotCanonicallySorted: withdrawal order does not match ascending reward-account order." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    SELECT $this ?value
+    WHERE {
+      $this cardano:hasWithdrawal ?leftWithdrawal ;
+            cardano:hasWithdrawal ?rightWithdrawal .
+      ?leftWithdrawal cardano:withdrawalOrder ?leftOrder ;
+                      cardano:withdrawalAccount ?value .
+      ?rightWithdrawal cardano:withdrawalOrder ?rightOrder ;
+                       cardano:withdrawalAccount ?rightAccount .
+      FILTER(xsd:integer(?leftOrder) < xsd:integer(?rightOrder))
+      FILTER(STR(?value) > STR(?rightAccount))
+    }
+  """ .
+
+cardano:UnsupportedLegacyCertificateShape
+  a sh:NodeShape ;
+  sh:targetClass cardano:GenesisKeyDelegation ;
+  sh:targetClass cardano:MoveInstantaneousRewardsCertificate ;
+  sh:targetClass cardano:MIRCertificate ;
+  sh:property cardano:UnsupportedLegacyCertificateTypeShape .
+
+cardano:UnsupportedLegacyCertificateTypeShape
+  sh:path rdf:type ;
+  sh:minCount 0 ;
+  sh:maxCount 0 ;
+  sh:severity sh:Violation ;
+  sh:message "UnsupportedLegacyCertificate: genesis-key-delegation and MIR certificates are not supported in Conway phase-1 validation." .

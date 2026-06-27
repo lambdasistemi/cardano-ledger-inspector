@@ -1092,58 +1092,223 @@ const normalizeDecodedTreeRows = (graphTtl) => {
 const reportText = (value) =>
   value === null || value === undefined ? "" : String(value);
 
-const shapeMetadataByPath = (shapesTtl) => {
-  const query = `
+const upsertShapeMetadata = (metadata, key, fields) => {
+  if (key === "") return;
+  const existing = metadata.get(key) || {};
+  metadata.set(key, {
+    sourceShape: fields.sourceShape || existing.sourceShape || "",
+    path: fields.path || existing.path || "",
+    message: fields.message || existing.message || "",
+    severity: fields.severity || existing.severity || "",
+  });
+};
+
+const shapeMetadata = (shapesTtl) => {
+  const queries = [
+    `
 PREFIX sh: <http://www.w3.org/ns/shacl#>
-SELECT ?sourceShape ?path ?message
+SELECT ?sourceShape ?path ?message ?severity
 WHERE {
   ?sourceShape sh:path ?path .
   OPTIONAL { ?sourceShape sh:message ?message . }
+  OPTIONAL { ?sourceShape sh:severity ?severity . }
 }
-`;
+`,
+    `
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+SELECT ?sourceShape ?path ?message ?severity
+WHERE {
+  ?sourceShape sh:message ?message .
+  OPTIONAL { ?sourceShape sh:path ?path . }
+  OPTIONAL { ?sourceShape sh:message ?message . }
+  OPTIONAL { ?sourceShape sh:severity ?severity . }
+}
+`,
+    `
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+SELECT ?sourceShape ?constraint ?message ?severity ?shapeSeverity
+WHERE {
+  ?sourceShape sh:sparql ?constraint .
+  OPTIONAL { ?constraint sh:message ?message . }
+  OPTIONAL { ?constraint sh:severity ?severity . }
+  OPTIONAL { ?sourceShape sh:severity ?shapeSeverity . }
+}
+`,
+  ];
   const metadata = new Map();
 
-  try {
-    const result = globalThis.rdfShapes.query(shapesTtl, query);
-    const bindings = result?.json?.results?.bindings;
-    if (!Array.isArray(bindings)) return metadata;
+  for (const query of queries) {
+    try {
+      const result = globalThis.rdfShapes.query(shapesTtl, query);
+      const bindings = result?.json?.results?.bindings;
+      if (!Array.isArray(bindings)) continue;
 
-    for (const binding of bindings) {
-      const path = bindingValue(binding.path);
-      if (path === "" || metadata.has(path)) continue;
-      metadata.set(path, {
-        sourceShape: bindingValue(binding.sourceShape),
-        message: bindingValue(binding.message),
-      });
+      for (const binding of bindings) {
+        const sourceShape = bindingValue(binding.sourceShape);
+        const path = bindingValue(binding.path);
+        const constraint = bindingValue(binding.constraint);
+        const message = bindingValue(binding.message);
+        const severity = firstBindingValue(binding.severity, binding.shapeSeverity);
+        upsertShapeMetadata(metadata, sourceShape, {
+          sourceShape,
+          path,
+          message: constraint === "" ? message : "",
+          severity,
+        });
+        upsertShapeMetadata(metadata, constraint, {
+          sourceShape: constraint,
+          path,
+          message,
+          severity,
+        });
+        upsertShapeMetadata(metadata, path, {
+          sourceShape,
+          path,
+          message,
+          severity,
+        });
+      }
+    } catch (_) {
+      continue;
     }
-  } catch (_) {
-    return metadata;
   }
 
   return metadata;
 };
 
-const normalizeViolation = (violation, shapeMetadata) => {
-  const path = reportText(violation?.path);
-  const metadata = shapeMetadata.get(path) || {};
-  const sourceShape =
-    reportText(violation?.source_shape ?? violation?.sourceShape) ||
-    metadata.sourceShape ||
-    "";
-  const message = metadata.message || reportText(violation?.message);
+const normalizedSeverity = (rawSeverity, metadata) => {
+  const severity = String(rawSeverity || metadata.severity || "");
+  if (severity.includes("Warning")) return "warning";
+  if (severity.includes("Info")) return "info";
+  return "error";
+};
 
+const metadataForViolation = (violation, metadata) => {
+  const sourceShape = reportText(
+    violation?.source_shape ??
+      violation?.sourceShape ??
+      violation?.source ??
+      violation?.shape,
+  );
+  const path = reportText(violation?.path ?? violation?.result_path);
   return {
-    focusNode: reportText(violation?.focus_node),
-    path,
-    value: reportText(violation?.value),
     sourceShape,
-    sourceConstraintComponent: reportText(violation?.source_constraint_component),
-    message,
-    severity: reportText(violation?.severity),
+    path,
+    metadata:
+      metadata.get(sourceShape) ||
+      metadata.get(path) ||
+      {},
   };
 };
 
-const normalizeValidationReport = (result, shapesTtl) => {
+const reportSeverity = (violation) =>
+  reportText(
+    violation?.result_severity ??
+      violation?.resultSeverity ??
+      violation?.severity,
+  );
+
+const sparqlConstraintsQuery = `
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+SELECT ?sourceShape ?constraint ?select ?message ?severity ?shapeSeverity
+WHERE {
+  ?sourceShape sh:sparql ?constraint .
+  ?constraint sh:select ?select .
+  OPTIONAL { ?constraint sh:message ?message . }
+  OPTIONAL { ?constraint sh:severity ?severity . }
+  OPTIONAL { ?sourceShape sh:severity ?shapeSeverity . }
+}
+`;
+
+const normalizeViolation = (violation, metadata) => {
+  const lookup = metadataForViolation(violation, metadata);
+  const sourceShape = lookup.sourceShape || lookup.metadata.sourceShape || "";
+  const path = lookup.path || lookup.metadata.path || "";
+  const message = lookup.metadata.message || reportText(violation?.message);
+
+  return {
+    focusNode: reportText(
+      violation?.focus_node ??
+        violation?.focusNode ??
+        violation?.focus,
+    ),
+    path,
+    value: reportText(violation?.value ?? violation?.result_value),
+    sourceShape,
+    sourceConstraintComponent: reportText(
+      violation?.source_constraint_component ??
+        violation?.sourceConstraintComponent,
+    ),
+    message,
+    severity: normalizedSeverity(reportSeverity(violation), lookup.metadata),
+  };
+};
+
+const sparqlConstraintViolations = (dataTtl, shapesTtl) => {
+  let constraints = [];
+  try {
+    constraints = queryBindings(shapesTtl, sparqlConstraintsQuery);
+  } catch (_) {
+    return [];
+  }
+
+  const violations = [];
+  for (const constraint of constraints) {
+    const select = bindingValue(constraint.select);
+    if (select === "") continue;
+    const sourceShape = firstBindingValue(constraint.constraint, constraint.sourceShape);
+    const message = bindingValue(constraint.message);
+    const severity = normalizedSeverity(
+      firstBindingValue(constraint.severity, constraint.shapeSeverity),
+      {},
+    );
+    const query = select.replaceAll("$this", "?this");
+
+    let rows = [];
+    try {
+      rows = queryBindings(dataTtl, query);
+    } catch (_) {
+      continue;
+    }
+
+    for (const row of rows) {
+      violations.push({
+        focusNode: firstBindingValue(row.this, row.focusNode, row.focus_node),
+        path: "",
+        value: bindingValue(row.value),
+        sourceShape,
+        sourceConstraintComponent: "http://www.w3.org/ns/shacl#SPARQLConstraint",
+        message,
+        severity,
+      });
+    }
+  }
+
+  return violations;
+};
+
+const violationKey = (violation) =>
+  [
+    violation.focusNode,
+    violation.path,
+    violation.value,
+    violation.sourceShape,
+    violation.message,
+  ].join("\u0000");
+
+const mergeViolations = (left, right) => {
+  const seen = new Set();
+  const merged = [];
+  for (const violation of [...left, ...right]) {
+    const key = violationKey(violation);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(violation);
+  }
+  return merged;
+};
+
+const normalizeValidationReport = (dataTtl, result, shapesTtl) => {
   if (!result || typeof result !== "object") {
     throw new Error("validate did not return an object");
   }
@@ -1151,17 +1316,27 @@ const normalizeValidationReport = (result, shapesTtl) => {
     throw new Error("validate result missing conforms boolean");
   }
 
-  const shapeMetadata = shapeMetadataByPath(shapesTtl);
+  const metadata = shapeMetadata(shapesTtl);
+  const rudofViolations = Array.isArray(result.violations)
+    ? result.violations.map((violation) =>
+        normalizeViolation(violation, metadata),
+      )
+    : [];
+  const sparqlViolations = sparqlConstraintViolations(dataTtl, shapesTtl);
+  const violations = mergeViolations(rudofViolations, sparqlViolations);
 
   return {
-    conforms: result.conforms,
-    violations: Array.isArray(result.violations)
-      ? result.violations.map((violation) =>
-          normalizeViolation(violation, shapeMetadata),
-        )
-      : [],
+    conforms: result.conforms && violations.length === 0,
+    violations,
   };
 };
+
+globalThis.txInspectorValidateShacl = (dataTtl, shapesTtl) =>
+  normalizeValidationReport(
+    dataTtl,
+    globalThis.rdfShapes.validate(dataTtl, shapesTtl),
+    shapesTtl,
+  );
 
 export const queryImpl = (left) => (right) => (graphTtl) => (sparql) => () => {
   try {
@@ -1209,10 +1384,7 @@ export const queryDecodedTreeImpl = (left) => (right) => (graphTtl) => () => {
 export const validateImpl = (left) => (right) => (dataTtl) => (shapesTtl) => () => {
   try {
     return right(
-      normalizeValidationReport(
-        globalThis.rdfShapes.validate(dataTtl, shapesTtl),
-        shapesTtl,
-      ),
+      globalThis.txInspectorValidateShacl(dataTtl, shapesTtl),
     );
   } catch (err) {
     return left(errText(err));
