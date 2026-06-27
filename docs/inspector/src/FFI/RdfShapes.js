@@ -22,7 +22,7 @@ PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardan
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX overlay: <https://lambdasistemi.github.io/cardano-ledger-inspector/overlay/amaru-treasury#>
-SELECT ?label ?entity ?type ?scriptRole ?fromTxOutRef ?bech32 ?slug
+SELECT ?label ?entity ?type ?scriptRole ?txOutRef ?fromTxOutRef ?bech32 ?slug
 WHERE {
   ?entity rdfs:label ?label .
   FILTER(
@@ -31,6 +31,7 @@ WHERE {
   )
   OPTIONAL { ?entity a ?type . }
   OPTIONAL { ?entity overlay:scriptRole ?scriptRole . }
+  OPTIONAL { ?entity cardano:txOutRef ?txOutRef . }
   OPTIONAL { ?entity cardano:fromTxOutRef ?fromTxOutRef . }
   OPTIONAL { ?entity cardano:bech32 ?bech32 . }
   OPTIONAL { ?entity overlay:slug ?slug . }
@@ -139,7 +140,7 @@ ORDER BY ?sort ?label ?value ?entity
 const decodedInputsQuery = `
 PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?section ?entity ?txIdHex ?index ?sort ?resolvedLabel ?resolvedType
+SELECT ?section ?entity ?txOutRef ?txIdHex ?index ?sort ?resolvedLabel ?resolvedType
 WHERE {
   ?transaction a cardano:Transaction .
   {
@@ -155,6 +156,7 @@ WHERE {
     BIND("Collateral inputs" AS ?section)
     BIND("30" AS ?sort)
   }
+  OPTIONAL { ?entity cardano:txOutRef ?txOutRef . }
   OPTIONAL {
     ?entity cardano:fromTxOutRef ?ref .
     OPTIONAL { ?ref cardano:hasIndex ?index . }
@@ -163,8 +165,16 @@ WHERE {
       OPTIONAL { ?txId cardano:bytesHex ?txIdHex . }
     }
   }
-  OPTIONAL { ?entity rdfs:label ?resolvedLabel . }
-  OPTIONAL { ?entity a ?resolvedType . }
+  OPTIONAL { ?entity rdfs:label ?directResolvedLabel . }
+  OPTIONAL { ?entity a ?directResolvedType . }
+  OPTIONAL {
+    FILTER(BOUND(?txOutRef))
+    ?txOutRefEntity cardano:txOutRef ?txOutRef ;
+      rdfs:label ?txOutRefResolvedLabel .
+    OPTIONAL { ?txOutRefEntity a ?txOutRefResolvedType . }
+  }
+  BIND(COALESCE(?directResolvedLabel, ?txOutRefResolvedLabel) AS ?resolvedLabel)
+  BIND(COALESCE(?directResolvedType, ?txOutRefResolvedType) AS ?resolvedType)
 }
 ORDER BY ?sort ?txIdHex ?index ?entity
 `;
@@ -265,12 +275,13 @@ ORDER BY ?label ?metadata ?text
 const decodedLabelMatchesQuery = `
 PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?entity ?label ?type ?bech32 ?bytesHex ?fromTxOutRef ?rawBytes ?datumHashHex
+SELECT ?entity ?label ?type ?bech32 ?bytesHex ?txOutRef ?fromTxOutRef ?rawBytes ?datumHashHex
 WHERE {
   ?entity rdfs:label ?label .
   OPTIONAL { ?entity a ?type . }
   OPTIONAL { ?entity cardano:bech32 ?bech32 . }
   OPTIONAL { ?entity cardano:bytesHex ?bytesHex . }
+  OPTIONAL { ?entity cardano:txOutRef ?txOutRef . }
   OPTIONAL { ?entity cardano:fromTxOutRef ?fromTxOutRef . }
   OPTIONAL { ?entity cardano:hasRawBytes ?rawBytes . }
   OPTIONAL {
@@ -349,6 +360,7 @@ const normalizeResolvedLabelRows = (result) => {
     role: humanToken(firstBindingValue(binding.scriptRole, binding.type)),
     entity: bindingValue(binding.entity),
     matched: firstBindingValue(
+      binding.txOutRef,
       binding.fromTxOutRef,
       binding.bech32,
       binding.slug,
@@ -395,6 +407,11 @@ const compact = (value, max = 72) => {
 const txOutRefFromUtxoUri = (value) => {
   const match = String(value || "").match(/^urn:cardano:utxo:([0-9a-f]{64}):([0-9]+)$/i);
   return match ? `${match[1]}#${match[2]}` : "";
+};
+
+const txOutRefParts = (value) => {
+  const match = String(value || "").match(/^([0-9a-f]{64})#([0-9]+)$/i);
+  return match ? { tx: match[1], index: match[2] } : { tx: "", index: "" };
 };
 
 const isIri = (value) => /^https?:\/\//.test(String(value || "")) || String(value || "").startsWith("urn:");
@@ -503,6 +520,7 @@ const decodedLabelMatches = (graphTtl) => {
     addMatchValue(matches, bindingValue(row.entity), match);
     addMatchValue(matches, bindingValue(row.bech32), match);
     addMatchValue(matches, bindingValue(row.bytesHex), match);
+    addMatchValue(matches, bindingValue(row.txOutRef), match);
     addMatchValue(matches, bindingValue(row.fromTxOutRef), match);
     addMatchValue(matches, bindingValue(row.rawBytes), match);
     addMatchValue(matches, bindingValue(row.datumHashHex), match);
@@ -695,13 +713,17 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     addContainerField("decoded-body", 3, order, label, countText(rowsForSection.length, "input"));
     rowsForSection.forEach((input, index) => {
       const section = bindingValue(input.section);
-      const tx = bindingValue(input.txIdHex);
-      const inputIndex = bindingValue(input.index);
+      const flatTxOutRef = bindingValue(input.txOutRef);
+      const flatParts = txOutRefParts(flatTxOutRef);
+      const tx = bindingValue(input.txIdHex) || flatParts.tx;
+      const inputIndex = bindingValue(input.index) || flatParts.index;
       const value =
         tx === "" && inputIndex === ""
           ? bindingValue(input.entity)
           : `${compact(tx, 28)}#${inputIndex}`;
-      const raw = tx === "" ? bindingValue(input.entity) : `${tx}#${inputIndex}`;
+      const raw =
+        flatTxOutRef ||
+        (tx === "" ? bindingValue(input.entity) : `${tx}#${inputIndex}`);
       const resolved = resolvedFrom(
         labelMatches,
         bindingValue(input.resolvedLabel),
@@ -722,7 +744,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           entityIri: annotationEntityIri(bindingValue(input.entity), "tx-out-ref", raw),
           resolvedLabel: resolved.resolvedLabel,
           resolvedType: resolved.resolvedType,
-          annotationPredicate: raw === "" ? "" : "cardano:fromTxOutRef",
+          annotationPredicate: raw === "" ? "" : "cardano:txOutRef",
           annotationValue: raw,
         },
       );
@@ -811,7 +833,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
           entityIri: outputValue,
           resolvedLabel: outputResolved.resolvedLabel,
           resolvedType: outputResolved.resolvedType,
-          annotationPredicate: outputTxOutRef === "" ? "" : "cardano:fromTxOutRef",
+          annotationPredicate: outputTxOutRef === "" ? "" : "cardano:txOutRef",
           annotationValue: outputTxOutRef,
         }),
       );

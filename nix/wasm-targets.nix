@@ -73,7 +73,7 @@ in
     # dependenciesHash distinct from wasm-ledger-smoke because the inspector
     # pulls additional Hackage tarballs (aeson, base16-bytestring, text,
     # microlens, ...) that expand the cabal cache.
-    dependenciesHash = "sha256-KmY5jyyPc2NFXZSP133Tq6rQWp3d7STwT4O51h7Ukys=";
+    dependenciesHash = "sha256-Fn+8MGGv3zAMXvGwDaqlCFDm+v47kytXut6TY2cNuF8=";
   };
 
   # Spike depends on cardano-ledger-wasm via an external path package injected

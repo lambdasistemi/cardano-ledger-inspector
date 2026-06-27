@@ -186,8 +186,8 @@
 
           expectedTxRdfCore = {
             location = "https://github.com/lambdasistemi/cardano-ledger-rdf";
-            rev = "6769e28535aafee20743710ebdff53e652e8a22b";
-            sha256 = "0m1yj9cdzdh1bcrz1wn5d34fw8y6rh7gl624qh5h3idyni8jdqnw";
+            rev = "1ef103a923dc64fae7ef94cafd6e18665fefbb91";
+            sha256 = "03mdkmk90pcxcbkq7wcbki4dr5lnsl1vcrkal3mqyjxhhhfc9vf5";
           };
 
           expectedPlutusPin = {
