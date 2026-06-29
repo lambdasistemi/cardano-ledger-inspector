@@ -64,6 +64,8 @@ cardano:RequiresSentinelShape
   sh:severity sh:Warning ;
   sh:message "Transactions must include sentinel off-spec marker." .
 `;
+const networkConsistencyMessage =
+  "NetworkConsistency: cardano:network literals must agree with each other and the transaction body network id.";
 
 function classATurtle({ includeInput = true, txPredicates = [], body = "" } = {}) {
   const predicates = [
@@ -91,6 +93,52 @@ _:input1 a cardano:Input ;
 ${inputBody}
 ${body}
 `;
+}
+
+function networkConsistencyTurtle(addressNetwork) {
+  return classATurtle({
+    txPredicates: [
+      "cardano:networkId 1",
+      "cardano:hasOutput _:output1",
+      "cardano:hasWithdrawal _:withdrawal1",
+      "cardano:hasProposal _:proposal1",
+    ],
+    body: `
+_:output1 a cardano:Output ;
+  cardano:hasIndex 0 ;
+  cardano:lovelace 1000000 ;
+  cardano:atAddress <urn:cardano:address:network-consistency-output> .
+<urn:cardano:address:network-consistency-output> a cardano:Address ;
+  cardano:network ${addressNetwork} .
+_:withdrawal1 a cardano:Withdrawal ;
+  cardano:network 1 ;
+  cardano:hasLovelace 1 .
+_:proposal1 a cardano:Proposal ;
+  cardano:network 1 ;
+  cardano:hasGovAction _:networkConsistencyAction1 .
+_:networkConsistencyAction1 a cardano:NoConfidence .
+`,
+  });
+}
+
+function mixedNetworkTurtle() {
+  return classATurtle({
+    txPredicates: [
+      "cardano:hasOutput _:output1",
+      "cardano:hasWithdrawal _:withdrawal1",
+    ],
+    body: `
+_:output1 a cardano:Output ;
+  cardano:hasIndex 0 ;
+  cardano:lovelace 1000000 ;
+  cardano:atAddress <urn:cardano:address:mixed-network-output> .
+<urn:cardano:address:mixed-network-output> a cardano:Address ;
+  cardano:network 1 .
+_:withdrawal1 a cardano:Withdrawal ;
+  cardano:network 0 ;
+  cardano:hasLovelace 1 .
+`,
+  });
 }
 
 const conwayBodyFields = [
@@ -2991,6 +3039,164 @@ _:withdrawal2 a cardano:Withdrawal ;
       scenario.name,
     ).toBe(true);
   }
+});
+
+test("network consistency SHACL shape validates RDF network literals", async ({ page }) => {
+  const shapes = await readFile(cardanoShaclShapesPath, "utf8");
+
+  await page.goto("/");
+  await page.waitForFunction(() => typeof globalThis.txInspectorValidateShacl === "function");
+
+  const mismatchReport = await page.evaluate(
+    ({ data, shapes }) => globalThis.txInspectorValidateShacl(data, shapes),
+    { data: networkConsistencyTurtle(0), shapes },
+  );
+  expect(
+    mismatchReport.conforms,
+    "body network id 1 with output address network 0 should violate network consistency",
+  ).toBe(false);
+  expect(JSON.stringify(mismatchReport)).toContain(networkConsistencyMessage);
+  expect(JSON.stringify(mismatchReport)).toContain(
+    "urn:cardano:address:network-consistency-output",
+  );
+
+  const mixedReport = await page.evaluate(
+    ({ data, shapes }) => globalThis.txInspectorValidateShacl(data, shapes),
+    { data: mixedNetworkTurtle(), shapes },
+  );
+  expect(
+    mixedReport.conforms,
+    "network-bearing entities with mixed network literals should violate network consistency",
+  ).toBe(false);
+  expect(JSON.stringify(mixedReport)).toContain(networkConsistencyMessage);
+
+  const consistentReport = await page.evaluate(
+    ({ data, shapes }) => globalThis.txInspectorValidateShacl(data, shapes),
+    { data: networkConsistencyTurtle(1), shapes },
+  );
+  expect(
+    consistentReport.violations.some((violation) =>
+      violation.message.includes("NetworkConsistency"),
+    ),
+    "consistent network-bearing nodes should not trigger the network consistency shape",
+  ).toBe(false);
+  expect(consistentReport.conforms).toBe(true);
+});
+
+test("renders network consistency SHACL violations with error location links", async ({
+  page,
+}) => {
+  const shapes = await readFile(cardanoShaclShapesPath, "utf8");
+
+  await decodeFixture(page);
+  await selectResultTab(page, "Graph / RDF");
+
+  const turtleText = await page.locator(".rdf-panel .rdf-turtle").innerText();
+  const networkAddress = await page.evaluate((graph) => {
+    const result = globalThis.rdfShapes.query(
+      graph,
+      `
+        PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+        SELECT ?transaction ?address ?network WHERE {
+          ?transaction a cardano:Transaction ;
+            cardano:hasOutput ?output .
+          ?output cardano:atAddress ?address .
+          ?address cardano:network ?network .
+        }
+        LIMIT 1
+      `,
+    );
+    const row = result.json.results.bindings[0];
+    return {
+      transaction: row.transaction.value,
+      address: row.address.value,
+      network: Number(row.network.value),
+    };
+  }, turtleText);
+  expect(networkAddress.transaction).toMatch(/^[a-z][a-z0-9+.-]*:/i);
+  expect(networkAddress.address).toBeTruthy();
+  expect([0, 1]).toContain(networkAddress.network);
+
+  const candidateSubject = networkAddress.address.startsWith("_:")
+    ? networkAddress.address
+    : `<${networkAddress.address}>`;
+  const subjectBlocks = turtleText
+    .split(/\n(?=\S)/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const matchingBlock =
+    subjectBlocks.find(
+      (block) =>
+        block.startsWith(candidateSubject) &&
+        new RegExp(`cardano:network\\s+${networkAddress.network}\\b`).test(block),
+    ) ||
+    subjectBlocks.find(
+      (block) =>
+        /cardano:(?:Address|bech32)/.test(block) &&
+        /cardano:network\s+[01]\b/.test(block),
+    );
+  expect(matchingBlock).toBeTruthy();
+
+  const addressSubject = matchingBlock.match(/^(\S+)/)?.[1] || candidateSubject;
+  const addressNetwork = Number(
+    matchingBlock.match(/cardano:network\s+([01])\b/)?.[1] ?? networkAddress.network,
+  );
+  const oppositeNetwork = addressNetwork === 0 ? 1 : 0;
+
+  const overlayTurtle = `
+@prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
+@prefix fixture: <https://example.test/cardano-ledger-inspector/network-consistency#> .
+
+${addressSubject}
+  cardano:network ${oppositeNetwork} .
+
+<${networkAddress.transaction}>
+  cardano:hasOutput fixture:linkableNetworkOutput .
+
+fixture:linkableNetworkOutput
+  a cardano:Output ;
+  cardano:hasIndex 1000 ;
+  cardano:lovelace 1 ;
+  cardano:atAddress fixture:linkableNetworkAddress .
+
+fixture:linkableNetworkAddress
+  a cardano:Address ;
+  cardano:network ${oppositeNetwork} .
+`;
+
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await expect(page).toHaveURL(/\/library$/);
+  const library = page.locator(".library-page");
+  await library.getByLabel("Book Turtle").fill(overlayTurtle);
+  await library.getByRole("button", { name: "Add book" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Pasted overlay Turtle" }),
+  ).toBeVisible();
+  await library.getByLabel("Book Turtle").fill(shapes);
+  await library.getByRole("button", { name: "Add book" }).click();
+  await expect(
+    library.getByRole("heading", { name: "Pasted SHACL shapes" }),
+  ).toBeVisible();
+
+  await openInspectViaShell(page);
+  await selectResultTab(page, "Graph / RDF");
+  await page
+    .locator(".overlay-book-panel")
+    .getByRole("button", { name: "Apply selected books" })
+    .click();
+  await selectResultTab(page, "Validation");
+
+  const violationRow = page
+    .locator(".shacl-violation-row")
+    .filter({
+      hasText: "NetworkConsistency",
+      has: page.locator("a.shacl-location-link"),
+    })
+    .first();
+  await expect(violationRow).toBeVisible();
+  await expect(violationRow.getByText("error", { exact: true })).toBeVisible();
+  await expect(violationRow).toContainText("cardano:network");
+  await expect(violationRow.getByRole("link")).toBeVisible();
 });
 
 test("renders non-conforming SHACL violations for pasted shapes", async ({
