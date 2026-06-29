@@ -90,9 +90,22 @@ build-pages-site:
     mkdir -p _site/openapi
     cp -rL result-openapi/* _site/openapi/
 
-deploy-surge-preview:
-    nix build .#packages.x86_64-linux.tx-inspector-ui
-    rm -rf /tmp/cardano-ledger-inspector-surge
-    mkdir -p /tmp/cardano-ledger-inspector-surge
-    cp -rL result/* /tmp/cardano-ledger-inspector-surge/
-    nix shell 'nixpkgs#nodejs_20' -c npx --yes surge /tmp/cardano-ledger-inspector-surge cardano-tx-inspector.surge.sh
+deploy-preview pr_number="130":
+    nix --quiet build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
+    nix --quiet build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
+    rm -rf preview-site
+    nix develop --quiet -c mkdocs build --strict --site-dir preview-site
+    mkdir -p preview-site/inspector
+    cp -RL result-inspector/. preview-site/inspector/
+    test "$(find preview-site/inspector -maxdepth 1 -name 'inspector.*.wasm' | wc -l)" -eq 1
+    test "$(find preview-site/inspector -maxdepth 1 -name 'rdf_shapes_wasm_bg.*.wasm' | wc -l)" -eq 1
+    for wasm in preview-site/inspector/inspector.*.wasm preview-site/inspector/rdf_shapes_wasm_bg.*.wasm; do test -f "$wasm"; test -f "$wasm.gz"; test -f "$wasm.br"; done
+    test -f preview-site/inspector/index.js.gz
+    test -f preview-site/inspector/index.js.br
+    mkdir -p preview-site/openapi
+    cp -L result-openapi/* preview-site/openapi/
+    chmod -R u+w preview-site
+    sudo env INPUT_PATH=preview-site INPUT_OWNER=lambdasistemi INPUT_REPOSITORY=cardano-ledger-inspector INPUT_PR_NUMBER='{{pr_number}}' bash /code/dev-assets/static-preview/scripts/preview.sh
+
+deploy-surge-preview pr_number="130":
+    just deploy-preview '{{pr_number}}'
