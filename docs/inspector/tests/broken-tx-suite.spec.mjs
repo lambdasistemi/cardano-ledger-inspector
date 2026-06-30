@@ -19,17 +19,30 @@ const brokenDir = path.join(
 const manifest = JSON.parse(readFileSync(path.join(brokenDir, "manifest.json"), "utf8"));
 const shapes = readFileSync(shapesPath, "utf8");
 
-async function decodeHex(page, hex) {
-  // The 36MB wasm bundle can exceed the default 60s navigation timeout when the
-  // shared runner is under load; give it room so this gate is not flaky.
-  page.setDefaultNavigationTimeout(120_000);
+// Navigate without waiting for the ~36MB wasm to finish the `load` event
+// (that is what hangs under runner load); wait explicitly for the decoder to
+// initialise instead, and retry the navigation a couple of times to stay robust.
+async function gotoApp(page) {
   page.setDefaultTimeout(30_000);
-  await page.goto("/");
-  await page.waitForFunction(
-    () => typeof globalThis.txInspectorValidateShacl === "function",
-    undefined,
-    { timeout: 120_000 },
-  );
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await page.waitForFunction(
+        () => typeof globalThis.txInspectorValidateShacl === "function",
+        undefined,
+        { timeout: 90_000 },
+      );
+      return;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
+async function decodeHex(page, hex) {
+  await gotoApp(page);
   await page.getByRole("radio", { name: "CBOR hex" }).check();
   await page.getByPlaceholder("Conway tx CBOR hex...").fill(hex);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -62,3 +75,17 @@ for (const ex of manifest) {
     ).toBe(true);
   });
 }
+
+test("examples picker loads and decodes a broken tx end to end", async ({ page }) => {
+  test.setTimeout(180_000);
+  await gotoApp(page);
+  await page.getByRole("button", { name: /Empty input set/ }).click();
+  const resultPanel = page.locator(".result-panel");
+  await expect(
+    resultPanel.getByRole("tab", { name: "Structure" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await resultPanel.getByRole("tab", { name: "Validation" }).click();
+  await expect(page.locator(".shacl-conformance-panel")).toContainText(
+    "InputSetEmptyUTxO",
+  );
+});
