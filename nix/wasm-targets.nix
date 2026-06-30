@@ -87,6 +87,6 @@ in
     packages = [ "wasm-extism-spike" ];
     srpForks = fullLedgerForks;
     withCLibs = true;
-    dependenciesHash = "sha256-I6srK/QXzWcr5dbOFBV1cPJ7C5iNPCgSs1oshVoMvpU=";
+    dependenciesHash = "sha256-5z2OZvYjxMFtLrK4ZteG3J/uI6RQB6NJ3Ry8GoPvcGk=";
   };
 }
