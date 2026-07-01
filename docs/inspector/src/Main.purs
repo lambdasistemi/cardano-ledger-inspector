@@ -13,6 +13,7 @@ import Effect.Aff (attempt)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (message)
+import Examples as Examples
 import FFI.Blockfrost (Network(..), networkName)
 import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
@@ -218,6 +219,7 @@ data Action
   | SelectNetwork Network
   | SetTxHash String
   | SetTxHex String
+  | LoadExample String
   | SetLibraryInput String
   | SetLibraryUrl String
   | AddLibraryBook
@@ -1405,7 +1407,40 @@ inspectorComponent initial =
               ]
           ]
       , renderBody state
+      , renderExamplesPicker
       ]
+
+  renderExamplesPicker =
+    HH.div
+      [ classNames [ "examples-picker" ] ]
+      [ HH.div
+          [ classNames [ "examples-heading" ] ]
+          [ HH.h3_ [ HH.text "Examples" ]
+          , HH.p_
+              [ HH.text
+                  "Load a sample transaction — valid, or deliberately broken — to see the phase-1 validation fire."
+              ]
+          ]
+      , HH.div
+          [ classNames [ "example-chips" ] ]
+          (map renderExampleChip Examples.examples)
+      ]
+
+  renderExampleChip ex =
+    HH.element (HH.ElemName "md-outlined-button")
+      [ classNames [ "example-chip", "example-" <> ex.severity ]
+      , HH.attr (HH.AttrName "role") "button"
+      , HP.title ex.description
+      , HE.onClick (\_ -> LoadExample ex.cbor)
+      ]
+      [ HH.span [ classNames [ "example-sev" ] ] [ HH.text (severityIcon ex.severity) ]
+      , HH.span [ classNames [ "example-label" ] ] [ HH.text ex.label ]
+      ]
+
+  severityIcon sev = case sev of
+    "valid" -> "✓"
+    "warning" -> "⚠"
+    _ -> "✗"
 
   modeRadio state mode label =
     HH.label
@@ -2836,6 +2871,9 @@ inspectorComponent initial =
       liftEffect (Storage.setItem networkKey (networkName n))
     SetTxHash s -> H.modify_ _ { txHash = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
     SetTxHex s -> H.modify_ _ { txHex = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
+    LoadExample hex -> do
+      H.modify_ _ { mode = ByHex, txHex = hex, copied = false, copiedPath = Nothing, fetchError = Nothing }
+      handleAction Decode
     SetLibraryInput s -> H.modify_ _ { libraryInput = s, libraryError = Nothing }
     SetLibraryUrl s -> H.modify_ _ { libraryUrl = s, libraryError = Nothing }
     AddLibraryBook -> do

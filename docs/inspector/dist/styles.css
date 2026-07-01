@@ -1929,3 +1929,41 @@ pre {
     flex-direction: column;
   }
 }
+
+/* Examples picker — load valid / deliberately-broken sample transactions */
+.examples-picker {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--md-sys-color-outline-variant, #cdc7be);
+}
+.examples-heading h3 {
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+}
+.examples-heading p {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.example-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.example-chip .example-sev {
+  font-weight: 700;
+}
+.example-valid .example-sev {
+  color: var(--md-sys-color-primary, #3b6939);
+}
+.example-warning .example-sev {
+  color: var(--warning);
+}
+.example-violation .example-sev {
+  color: var(--danger);
+}

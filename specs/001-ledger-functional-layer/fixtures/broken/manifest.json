@@ -1,0 +1,42 @@
+[
+  {
+    "slug": "empty-inputs",
+    "label": "Empty input set",
+    "severity": "violation",
+    "shape": "InputSetEmptyUTxO",
+    "description": "Transaction spends nothing \u2014 the input set is empty.",
+    "bytes": 1880
+  },
+  {
+    "slug": "reference-input-overlap",
+    "label": "Reference input overlaps a spent input",
+    "severity": "violation",
+    "shape": "ReferenceInputOverlapsWithInput",
+    "description": "A UTxO appears as both a spent input and a reference input.",
+    "bytes": 1880
+  },
+  {
+    "slug": "network-mismatch",
+    "label": "Network id mismatch",
+    "severity": "violation",
+    "shape": "NetworkConsistency",
+    "description": "Body network id is testnet while the output addresses are mainnet.",
+    "bytes": 1918
+  },
+  {
+    "slug": "aux-hash-unexpected",
+    "label": "Auxiliary-data hash without metadata",
+    "severity": "violation",
+    "shape": "AuxiliaryDataHashPresentButNotExpected",
+    "description": "Body carries an auxiliary-data hash but the transaction has no metadata.",
+    "bytes": 1399
+  },
+  {
+    "slug": "aux-hash-missing",
+    "label": "Metadata without auxiliary-data hash",
+    "severity": "violation",
+    "shape": "AuxiliaryDataHashMissing",
+    "description": "Transaction has metadata but the body omits its auxiliary-data hash.",
+    "bytes": 1881
+  }
+]
