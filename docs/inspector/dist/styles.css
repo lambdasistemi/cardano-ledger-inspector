@@ -1967,3 +1967,37 @@ pre {
 .example-violation .example-sev {
   color: var(--danger);
 }
+
+/* Books demoted to a slim summary strip once a transaction is decoded (P1 hierarchy) */
+.books-collapsed {
+  padding: 0.5rem 0.9rem;
+}
+.books-collapsed-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.books-collapsed-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.books-collapsed .tech-pills {
+  margin: 0;
+}
+
+/* Dim empty (NULL) leaf fields so populated fields stand out; every CDDL field is still
+   present and in order (the faithful-decode contract). (P1 tree_readability) */
+.decoded-tree-row.decoded-tree-empty-field {
+  opacity: 0.42;
+}
+.decoded-tree-row.decoded-tree-empty-field .decoded-tree-main {
+  padding-top: 0.12rem;
+  padding-bottom: 0.12rem;
+}
+.decoded-tree-row.decoded-tree-empty-field .kind-badge {
+  display: none;
+}
