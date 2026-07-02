@@ -863,20 +863,10 @@ inspectorComponent initial =
           [ HH.text "Apply selected books" ]
     in
       if collapsed then
-        -- Once a transaction is decoded, demote Books to a slim summary strip so the
-        -- decoded structure is the star; the full library stays one click away.
-        HH.element (HH.ElemName "md-elevated-card")
-          [ classNames [ "panel", "books-panel", "books-collapsed" ]
-          , mdSurface "books"
-          ]
-          [ HH.div
-              [ classNames [ "books-collapsed-row" ] ]
-              [ HH.span [ classNames [ "books-collapsed-title" ] ] [ HH.text "Books" ]
-              , pills
-              , libraryLink
-              , applyButton
-              ]
-          ]
+        -- Once a transaction is decoded, the loaded-inspector header already shows the
+        -- books summary + Library/Apply controls, so drop the separate Books panel
+        -- entirely rather than duplicate that bar; the decoded structure becomes the star.
+        HH.text ""
       else
         HH.element (HH.ElemName "md-elevated-card")
           [ classNames [ "panel", "books-panel" ]
