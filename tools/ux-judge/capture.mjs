@@ -13,6 +13,11 @@ const OUT = path.join(here, "out");
 const BASE =
   process.env.UX_BASE_URL ||
   "https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/";
+// Optional: configure a Blockfrost provider so chain-context validation runs for real
+// instead of hitting the credentials wall. The key is read from the environment at run
+// time (never committed); pass it via UX_BLOCKFROST_KEY. It is injected into localStorage
+// (not typed into a visible field), so it never appears in a screenshot.
+const BF_KEY = process.env.UX_BLOCKFROST_KEY || "";
 
 // Navigate without waiting on the full 36MB-wasm `load` event; wait for the decoder to
 // initialise instead, and retry — the same robustness the Playwright suite needed.
@@ -75,6 +80,18 @@ await mkdir(OUT, { recursive: true });
 const results = [];
 for (const s of scenarios) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  if (BF_KEY) {
+    await ctx.addInitScript((key) => {
+      try {
+        localStorage.setItem("persist_api_keys", "true");
+        localStorage.setItem("provider", "Blockfrost");
+        localStorage.setItem("network", "mainnet");
+        localStorage.setItem("blockfrost_project_id", key);
+      } catch (e) {
+        // localStorage unavailable — ignore, scenario just runs without a provider
+      }
+    }, BF_KEY);
+  }
   const page = await ctx.newPage();
   try {
     await s.run(page);
