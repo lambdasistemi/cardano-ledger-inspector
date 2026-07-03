@@ -157,7 +157,7 @@ code {
 }
 
 .page-frame {
-  width: min(100% - 16px, 1424px);
+  width: min(100% - 16px, 1080px);
   margin-inline: auto;
 }
 
