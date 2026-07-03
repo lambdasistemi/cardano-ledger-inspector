@@ -4,7 +4,7 @@
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const { firefox } = require("playwright");
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, rm, writeFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -85,6 +85,9 @@ const scenarios = [
 ];
 
 const browser = await firefox.launch();
+// Clear prior artifacts so a run's report never double-counts stale screenshots/judgments
+// (e.g. single-viewport captures from an earlier run).
+await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 const results = [];
 for (const vp of VIEWPORTS) {
