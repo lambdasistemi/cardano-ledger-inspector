@@ -379,8 +379,8 @@ fieldset {
 }
 
 .loaded-inspector-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -392,10 +392,13 @@ fieldset {
 
 .loaded-inspector-context {
   display: grid;
-  grid-template-columns: repeat(3, minmax(96px, auto)) repeat(2, minmax(180px, 1fr));
+  /* Fluid: context items wrap into as many columns as fit instead of forcing a rigid
+     ~648px 5-column grid that collides with the action buttons in the mid-width band. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 320px;
 }
 
 .loaded-context-item {
