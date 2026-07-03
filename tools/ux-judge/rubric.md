@@ -37,6 +37,13 @@ CQuisitor's closed resolution cannot do. Reward when resolution is visible and l
    The Examples / CBOR-paste path must work immediately.
 7. **resolution** — when a book is applied, does opaque data resolve to names clearly? (null if N/A on this screen.)
 
+## Viewport / responsive
+Screenshots are captured at multiple viewports (desktop 1440, laptop 1024, mobile 390) and
+each is judged at its stated width. A narrow viewport must be **composed for its width** —
+single-column, readable, every control reachable, **no horizontal scroll, no clipped or
+overlapping elements** — not a squished desktop. Fold responsive fitness into hierarchy,
+affordances, and polish for that screen.
+
 ## Output — STRICT JSON only, no prose, no markdown fences
 { "scenario": "<name>", "scores": { "first_impression": n, "hierarchy": n,
   "tree_readability": n, "affordances": n, "polish": n, "first_run": n, "resolution": n or null },

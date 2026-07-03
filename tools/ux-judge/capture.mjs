@@ -46,31 +46,40 @@ async function shot(page, name) {
   await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
 }
 
+// Judge the UI at multiple viewports — a real tool must hold up wide and narrow, and this
+// is exactly where reflow problems (cramped forms, clipped controls, horizontal scroll)
+// hide. Each scenario is captured at every viewport as <scenario>@<viewport>.png.
+const VIEWPORTS = [
+  { tag: "desktop-1440", width: 1440, height: 900 },
+  { tag: "laptop-1024", width: 1024, height: 768 },
+  { tag: "mobile-390", width: 390, height: 844 },
+];
+
 const scenarios = [
   {
     name: "01-initial",
-    async run(page) {
+    async run(page, tag) {
       await ready(page);
-      await shot(page, "01-initial");
+      await shot(page, `01-initial@${tag}`);
     },
   },
   {
     name: "02-decoded-valid",
-    async run(page) {
+    async run(page, tag) {
       await ready(page);
       await page.locator("md-outlined-button.example-valid").click();
       await page.locator(".result-panel .decoded-tree-row").first().waitFor({ timeout: 60_000 });
-      await shot(page, "02-decoded-valid");
+      await shot(page, `02-decoded-valid@${tag}`);
     },
   },
   {
     name: "03-validation-broken",
-    async run(page) {
+    async run(page, tag) {
       await ready(page);
       await page.locator("md-outlined-button.example-violation").first().click();
       await page.locator(".result-panel").getByRole("tab", { name: "Validation" }).click();
       await page.locator(".shacl-conformance-panel").first().waitFor({ timeout: 60_000 });
-      await shot(page, "03-validation-broken");
+      await shot(page, `03-validation-broken@${tag}`);
     },
   },
 ];
@@ -78,30 +87,33 @@ const scenarios = [
 const browser = await firefox.launch();
 await mkdir(OUT, { recursive: true });
 const results = [];
-for (const s of scenarios) {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  if (BF_KEY) {
-    await ctx.addInitScript((key) => {
-      try {
-        localStorage.setItem("persist_api_keys", "true");
-        localStorage.setItem("provider", "Blockfrost");
-        localStorage.setItem("network", "mainnet");
-        localStorage.setItem("blockfrost_project_id", key);
-      } catch (e) {
-        // localStorage unavailable — ignore, scenario just runs without a provider
-      }
-    }, BF_KEY);
+for (const vp of VIEWPORTS) {
+  for (const s of scenarios) {
+    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+    if (BF_KEY) {
+      await ctx.addInitScript((key) => {
+        try {
+          localStorage.setItem("persist_api_keys", "true");
+          localStorage.setItem("provider", "Blockfrost");
+          localStorage.setItem("network", "mainnet");
+          localStorage.setItem("blockfrost_project_id", key);
+        } catch (e) {
+          // localStorage unavailable — ignore, scenario just runs without a provider
+        }
+      }, BF_KEY);
+    }
+    const page = await ctx.newPage();
+    const label = `${s.name}@${vp.tag}`;
+    try {
+      await s.run(page, vp.tag);
+      results.push({ name: label, ok: true });
+      console.log("captured", label);
+    } catch (err) {
+      results.push({ name: label, ok: false, error: String(err).slice(0, 200) });
+      console.log("FAILED", label, String(err).slice(0, 200));
+    }
+    await ctx.close();
   }
-  const page = await ctx.newPage();
-  try {
-    await s.run(page);
-    results.push({ name: s.name, ok: true });
-    console.log("captured", s.name);
-  } catch (err) {
-    results.push({ name: s.name, ok: false, error: String(err).slice(0, 200) });
-    console.log("FAILED", s.name, String(err).slice(0, 200));
-  }
-  await ctx.close();
 }
 await browser.close();
 await writeFile(path.join(OUT, "capture.json"), JSON.stringify({ base: BASE, results }, null, 2));
