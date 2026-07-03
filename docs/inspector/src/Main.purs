@@ -141,6 +141,7 @@ type State =
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , decodedTreeExpanded :: Array String
+  , decodedEmptyExpanded :: Array String
   , running :: Boolean
   , copied :: Boolean
   , copiedPath :: Maybe String
@@ -247,6 +248,7 @@ data Action
   | Copy
   | CopyValue String String
   | BrowseJson String
+  | ToggleDecodedEmpty String
   | ToggleDecodedTree String
   | SelectResultTab ResultTab
   | ChangeInput
@@ -294,6 +296,7 @@ inspectorComponent initial =
         , browserNodes: []
         , expandedPaths: []
         , decodedTreeExpanded: []
+        , decodedEmptyExpanded: []
         , running: false
         , copied: false
         , copiedPath: Nothing
@@ -966,9 +969,71 @@ inspectorComponent initial =
             (renderDecodedTreeRows state "" lens.rows)
 
   renderDecodedTreeRows state parentId rows =
-    rows
-      # Array.filter (\row -> row.parentId == parentId)
-      # Array.concatMap (renderDecodedTreeRow state rows)
+    groupDecodedEmpties state rows
+      (Array.filter (\row -> row.parentId == parentId) rows)
+
+  -- Collapse each run of >=2 consecutive empty (NULL) leaf siblings into one expandable
+  -- "N empty fields" chip in place, so populated fields are not buried under a wall of
+  -- nulls. CDDL order is preserved (the chip sits at the run's position) and faithfulness
+  -- is intact: the chip is a normal tree toggle, so expanding it re-renders every field.
+  groupDecodedEmpties state rows children =
+    let
+      isEmptyLeaf row =
+        row.kind == "null" && not (Array.any (\c -> c.parentId == row.id) rows)
+      flush run acc =
+        case Array.length run of
+          0 -> acc
+          1 -> acc <> Array.concatMap (renderDecodedTreeRow state rows) run
+          _ -> acc <> renderEmptyRun state rows run
+      step accRun row =
+        if isEmptyLeaf row then
+          accRun { run = Array.snoc accRun.run row }
+        else
+          { acc: flush accRun.run accRun.acc <> renderDecodedTreeRow state rows row, run: [] }
+      final = Array.foldl step { acc: [], run: [] } children
+    in
+      flush final.run final.acc
+
+  renderEmptyRun state rows run =
+    let
+      groupId = case Array.head run of
+        Just r -> "empty::" <> r.id
+        Nothing -> "empty::"
+      depth = case Array.head run of
+        Just r -> r.depth
+        Nothing -> 0
+      expanded = Array.elem groupId state.decodedEmptyExpanded
+      labels = String.joinWith ", " (map _.label run)
+      countLabel = show (Array.length run) <> " empty fields"
+      rowClasses =
+        [ "decoded-tree-row", "decoded-tree-empty-group", "decoded-tree-depth-" <> show depth ]
+          <> (if expanded then [ "is-expanded" ] else [])
+      chip =
+        HH.div
+          [ classNames rowClasses ]
+          [ HH.div
+              [ classNames [ "decoded-tree-main" ] ]
+              [ HH.div
+                  [ classNames [ "decoded-tree-keyline" ] ]
+                  [ HH.element (HH.ElemName "md-outlined-button")
+                      [ HE.onClick (\_ -> ToggleDecodedEmpty groupId)
+                      , classNames [ "inline-action", "decoded-tree-toggle" ]
+                      , HH.attr (HH.AttrName "role") "button"
+                      , HH.attr (HH.AttrName "aria-label") countLabel
+                      , mdControl "inline"
+                      ]
+                      [ HH.text countLabel ]
+                  , if expanded then HH.text ""
+                    else
+                      HH.span
+                        [ classNames [ "empty-group-labels" ] ]
+                        [ HH.text labels ]
+                  ]
+              ]
+          ]
+    in
+      [ chip ]
+        <> (if expanded then Array.concatMap (renderDecodedTreeRow state rows) run else [])
 
   renderDecodedTreeRow state rows row =
     let
@@ -3175,6 +3240,7 @@ inspectorComponent initial =
           , browserNodes = []
           , expandedPaths = []
           , decodedTreeExpanded = []
+          , decodedEmptyExpanded = []
           , annotationDraft = Nothing
           , copied = false
           , copiedPath = Nothing
@@ -3339,6 +3405,16 @@ inspectorComponent initial =
                   closePath rowId st.decodedTreeExpanded
                 else
                   expandPath rowId st.decodedTreeExpanded
+            }
+    ToggleDecodedEmpty groupId ->
+      H.modify_
+        \st ->
+          st
+            { decodedEmptyExpanded =
+                if Array.elem groupId st.decodedEmptyExpanded then
+                  Array.delete groupId st.decodedEmptyExpanded
+                else
+                  Array.cons groupId st.decodedEmptyExpanded
             }
     SelectResultTab tab ->
       H.modify_ _ { resultTab = tab }
