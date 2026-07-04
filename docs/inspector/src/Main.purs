@@ -141,6 +141,7 @@ type State =
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , decodedTreeExpanded :: Array String
+  , decodedEmptyExpanded :: Array String
   , running :: Boolean
   , copied :: Boolean
   , copiedPath :: Maybe String
@@ -247,6 +248,7 @@ data Action
   | Copy
   | CopyValue String String
   | BrowseJson String
+  | ToggleDecodedEmpty String
   | ToggleDecodedTree String
   | SelectResultTab ResultTab
   | ChangeInput
@@ -294,6 +296,7 @@ inspectorComponent initial =
         , browserNodes: []
         , expandedPaths: []
         , decodedTreeExpanded: []
+        , decodedEmptyExpanded: []
         , running: false
         , copied: false
         , copiedPath: Nothing
@@ -349,7 +352,7 @@ inspectorComponent initial =
                 renderLoadedInspectorHeader state
               else
                 renderLoadForm state
-            , renderBooksPanel state
+            , renderBooksPanel state false
             , HH.div
                 [ classNames [ "workspace-main" ] ]
                 [ renderResult state ]
@@ -828,61 +831,81 @@ inspectorComponent initial =
       if trimmedHash == "" then "decoded transaction"
       else trimmedHash
 
-  renderBooksPanel state =
+  renderBooksPanel state collapsed =
     let
       selected = selectedBooks state
       parts = selectedBookParts state
       overlayCount = Array.length (selectedOverlayParts state)
       blueprintCount = Array.length (selectedBlueprintParts state)
       shaclCount = Array.length (selectedShaclParts state)
-    in
-    HH.element (HH.ElemName "md-elevated-card")
-      [ classNames [ "panel", "books-panel" ]
-      , mdSurface "books"
-      ]
-      [ HH.div
-          [ classNames [ "panel-heading" ] ]
-          [ HH.div_
-              [ HH.h2_ [ HH.text "Books" ]
-              , HH.p_ [ HH.text "Selected overlay, blueprint, and SHACL sources." ]
-              ]
-          ]
-      , HH.div
+      plural n singular pluralForm = show n <> if n == 1 then singular else pluralForm
+      pills =
+        HH.div
           [ classNames [ "tech-pills" ] ]
           [ HH.span_ [ HH.text (show (Array.length selected) <> " selected") ]
-          , HH.span_ [ HH.text (show (Array.length parts) <> " parts") ]
-          , HH.span_ [ HH.text (show overlayCount <> " overlays") ]
-          , HH.span_ [ HH.text (show blueprintCount <> " blueprints") ]
-          , HH.span_ [ HH.text (show shaclCount <> " SHACL") ]
+          , HH.span_ [ HH.text (plural (Array.length parts) " part" " parts") ]
+          , HH.span_ [ HH.text (plural overlayCount " overlay" " overlays") ]
+          , HH.span_ [ HH.text (plural blueprintCount " blueprint" " blueprints") ]
+          , HH.span_ [ HH.text (plural shaclCount " SHACL shape" " SHACL shapes") ]
           ]
-      , HH.div
-          [ classNames [ "books-actions" ] ]
-          [ HH.a
-              [ classNames [ "header-link" ]
-              , HP.href (state.routeBase <> Routing.routePath RouteLibrary)
-              , HE.onClick (Navigate RouteLibrary)
-              ]
-              [ HH.text "Library" ]
-          , HH.element (HH.ElemName "md-filled-button")
-              [ classNames [ "primary-action" ]
-              , HH.attr (HH.AttrName "role") "button"
-              , mdControl "primary"
-              , HP.disabled state.running
-              , HE.onClick (\_ -> ApplySelectedBooks)
-              ]
-              [ HH.text "Apply selected books" ]
+      libraryLink =
+        HH.a
+          [ classNames [ "header-link" ]
+          , HP.href (state.routeBase <> Routing.routePath RouteLibrary)
+          , HE.onClick (Navigate RouteLibrary)
           ]
-      , HH.div
-          [ classNames [ "books-list" ] ]
-          ( if Array.null selected then
-              [ HH.div
-                  [ classNames [ "empty-state" ] ]
-                  [ HH.text "No selected books. Select books in Library." ]
+          [ HH.text "Library" ]
+      applyButton =
+        HH.element (HH.ElemName "md-filled-button")
+          [ classNames [ "primary-action" ]
+          , HH.attr (HH.AttrName "role") "button"
+          , mdControl "primary"
+          , HP.disabled state.running
+          , HE.onClick (\_ -> ApplySelectedBooks)
+          ]
+          [ HH.text "Apply selected books" ]
+    in
+      if collapsed then
+        -- Once a transaction is decoded, the loaded-inspector header already shows the
+        -- books summary + Library/Apply controls, so drop the separate Books panel
+        -- entirely rather than duplicate that bar; the decoded structure becomes the star.
+        HH.text ""
+      else
+        HH.element (HH.ElemName "md-elevated-card")
+          [ classNames [ "panel", "books-panel" ]
+          , mdSurface "books"
+          ]
+          [ HH.div
+              [ classNames [ "panel-heading" ] ]
+              [ HH.div_
+                  [ HH.h2_ [ HH.text "Books" ]
+                  , HH.p_ [ HH.text "Selected overlay, blueprint, and SHACL sources." ]
+                  ]
               ]
-            else
-              map renderSelectedBook selected
-          )
-      ]
+          , pills
+          , HH.div
+              [ classNames [ "books-actions" ] ]
+              [ libraryLink
+              , HH.element (HH.ElemName "md-filled-button")
+                  [ classNames [ "primary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
+                  , mdControl "primary"
+                  , HP.disabled state.running
+                  , HE.onClick (\_ -> ApplySelectedBooks)
+                  ]
+                  [ HH.text "Apply selected books" ]
+              ]
+          , HH.div
+              [ classNames [ "books-list" ] ]
+              ( if Array.null selected then
+                  [ HH.div
+                      [ classNames [ "empty-state" ] ]
+                      [ HH.text "No selected books. Select books in Library." ]
+                  ]
+                else
+                  map renderSelectedBook selected
+              )
+          ]
 
   renderSelectedBook book =
     HH.div
@@ -946,19 +969,85 @@ inspectorComponent initial =
             (renderDecodedTreeRows state "" lens.rows)
 
   renderDecodedTreeRows state parentId rows =
-    rows
-      # Array.filter (\row -> row.parentId == parentId)
-      # Array.concatMap (renderDecodedTreeRow state rows)
+    groupDecodedEmpties state rows
+      (Array.filter (\row -> row.parentId == parentId) rows)
+
+  -- Collapse each run of >=2 consecutive empty (NULL) leaf siblings into one expandable
+  -- "N empty fields" chip in place, so populated fields are not buried under a wall of
+  -- nulls. CDDL order is preserved (the chip sits at the run's position) and faithfulness
+  -- is intact: the chip is a normal tree toggle, so expanding it re-renders every field.
+  groupDecodedEmpties state rows children =
+    let
+      isEmptyLeaf row =
+        row.kind == "null" && not (Array.any (\c -> c.parentId == row.id) rows)
+      flush run acc =
+        case Array.length run of
+          0 -> acc
+          1 -> acc <> Array.concatMap (renderDecodedTreeRow state rows) run
+          _ -> acc <> renderEmptyRun state rows run
+      step accRun row =
+        if isEmptyLeaf row then
+          accRun { run = Array.snoc accRun.run row }
+        else
+          { acc: flush accRun.run accRun.acc <> renderDecodedTreeRow state rows row, run: [] }
+      final = Array.foldl step { acc: [], run: [] } children
+    in
+      flush final.run final.acc
+
+  renderEmptyRun state rows run =
+    let
+      groupId = case Array.head run of
+        Just r -> "empty::" <> r.id
+        Nothing -> "empty::"
+      depth = case Array.head run of
+        Just r -> r.depth
+        Nothing -> 0
+      expanded = Array.elem groupId state.decodedEmptyExpanded
+      labels = String.joinWith ", " (map _.label run)
+      countLabel = show (Array.length run) <> " empty fields"
+      rowClasses =
+        [ "decoded-tree-row", "decoded-tree-empty-group", "decoded-tree-depth-" <> show depth ]
+          <> (if expanded then [ "is-expanded" ] else [])
+      chip =
+        HH.div
+          [ classNames rowClasses ]
+          [ HH.div
+              [ classNames [ "decoded-tree-main" ] ]
+              [ HH.div
+                  [ classNames [ "decoded-tree-keyline" ] ]
+                  [ HH.element (HH.ElemName "md-outlined-button")
+                      [ HE.onClick (\_ -> ToggleDecodedEmpty groupId)
+                      , classNames [ "inline-action", "decoded-tree-toggle" ]
+                      , HH.attr (HH.AttrName "role") "button"
+                      , HH.attr (HH.AttrName "aria-label") countLabel
+                      , mdControl "inline"
+                      ]
+                      [ HH.text countLabel ]
+                  , if expanded then HH.text ""
+                    else
+                      HH.span
+                        [ classNames [ "empty-group-labels" ] ]
+                        [ HH.text labels ]
+                  ]
+              ]
+          ]
+    in
+      [ chip ]
+        <> (if expanded then Array.concatMap (renderDecodedTreeRow state rows) run else [])
 
   renderDecodedTreeRow state rows row =
     let
       hasChildren = Array.any (\candidate -> candidate.parentId == row.id) rows
       expanded = row.parentId == "" || Array.elem row.id state.decodedTreeExpanded
+      -- Dim empty (NULL) leaf fields so populated fields stand out, while keeping every
+      -- CDDL field present and in order (the faithful-decode contract).
+      emptyClass = if row.kind == "null" && not hasChildren then [ "decoded-tree-empty-field" ] else []
       rowClasses =
-        if hasChildren && expanded then
-          [ "decoded-tree-row", "is-expanded", "decoded-tree-depth-" <> show row.depth ]
-        else
-          [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
+        ( if hasChildren && expanded then
+            [ "decoded-tree-row", "is-expanded", "decoded-tree-depth-" <> show row.depth ]
+          else
+            [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
+        ) <> emptyClass
       summaryText =
         if row.summary == "" then row.value else row.summary
       metaText =
@@ -3151,6 +3240,7 @@ inspectorComponent initial =
           , browserNodes = []
           , expandedPaths = []
           , decodedTreeExpanded = []
+          , decodedEmptyExpanded = []
           , annotationDraft = Nothing
           , copied = false
           , copiedPath = Nothing
@@ -3315,6 +3405,16 @@ inspectorComponent initial =
                   closePath rowId st.decodedTreeExpanded
                 else
                   expandPath rowId st.decodedTreeExpanded
+            }
+    ToggleDecodedEmpty groupId ->
+      H.modify_
+        \st ->
+          st
+            { decodedEmptyExpanded =
+                if Array.elem groupId st.decodedEmptyExpanded then
+                  Array.delete groupId st.decodedEmptyExpanded
+                else
+                  Array.cons groupId st.decodedEmptyExpanded
             }
     SelectResultTab tab ->
       H.modify_ _ { resultTab = tab }

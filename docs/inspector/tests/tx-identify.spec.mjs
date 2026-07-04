@@ -477,7 +477,10 @@ async function expandDecodedStructure(panel) {
 async function decodedStructureRows(page) {
   const decodedPanel = page.locator(".decoded-structure-panel");
   await expandDecodedStructure(decodedPanel);
-  return decodedPanel.locator(".decoded-tree-row").evaluateAll((nodes) =>
+  // Exclude the "N empty fields" grouping chips — they are display sugar, not decoded
+  // fields; expandDecodedStructure has already expanded them so the real field rows are
+  // present, and the faithful-decode assertions must see fields only.
+  return decodedPanel.locator(".decoded-tree-row:not(.decoded-tree-empty-group)").evaluateAll((nodes) =>
     nodes.map((node, index) => {
       const depthClass = Array.from(node.classList).find((className) =>
         className.startsWith("decoded-tree-depth-"),
