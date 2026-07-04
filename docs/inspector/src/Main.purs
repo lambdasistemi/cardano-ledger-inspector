@@ -352,7 +352,7 @@ inspectorComponent initial =
                 renderLoadedInspectorHeader state
               else
                 renderLoadForm state
-            , renderBooksPanel state showLoadedHeader
+            , renderBooksPanel state false
             , HH.div
                 [ classNames [ "workspace-main" ] ]
                 [ renderResult state ]

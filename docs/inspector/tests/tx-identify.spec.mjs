@@ -1007,10 +1007,7 @@ async function expectCQuisitorInspectSurface(page, route) {
 
   await expect(page.locator(".workspace-left")).toHaveCount(0);
   await expect(page.locator(".workspace-right")).toHaveCount(0);
-  // Once a tx is decoded, the standalone Books panel is dropped — the loaded header
-  // above already carries the books summary + Library/Apply controls (asserted above),
-  // so the decoded structure is the star rather than a duplicated books bar.
-  await expect(booksPanel).toHaveCount(0);
+  await expect(booksPanel.getByRole("heading", { name: "Books" })).toBeVisible();
   const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
   await expect(tabs.getByRole("tab", { name: "Structure" })).toHaveAttribute(
     "aria-selected",
@@ -1043,15 +1040,16 @@ async function expectCQuisitorInspectSurface(page, route) {
     return {
       workspace: rectForElement(root),
       header: rectFor(".loaded-inspector-header"),
+      books: rectFor(".books-panel"),
       result: rectFor(".result-panel"),
     };
   });
-  // Post-decode the standalone Books panel is folded into the loaded header, so the
-  // vertical stack is header -> decoded result (no books section between them).
   expect(loadedStack.workspace).not.toBeNull();
   expect(loadedStack.header).not.toBeNull();
+  expect(loadedStack.books).not.toBeNull();
   expect(loadedStack.result).not.toBeNull();
-  expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
+  expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.books.top + 1);
+  expect(loadedStack.books.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
   expect(loadedStack.result.width).toBeGreaterThan(loadedStack.workspace.width * 0.92);
   expect(Math.abs(loadedStack.header.left - loadedStack.result.left)).toBeLessThanOrEqual(4);
 
