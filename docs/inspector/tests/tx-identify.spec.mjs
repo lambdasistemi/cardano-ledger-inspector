@@ -1156,6 +1156,34 @@ async function selectResultTab(page, name) {
   return panel;
 }
 
+async function expectDocumentNoHorizontalOverflow(page, label) {
+  const overflowPx = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflowPx, label).toBeLessThanOrEqual(1);
+}
+
+async function expectResultTabBarRightEdgeFlush(page, label) {
+  const metrics = await page.locator(".result-panel").evaluate((panel) => {
+    const tabBar = panel.querySelector(".result-tab-bar");
+    if (!tabBar) return null;
+    const panelRect = panel.getBoundingClientRect();
+    const tabBarRect = tabBar.getBoundingClientRect();
+    return {
+      panelRight: panelRect.right,
+      tabBarRight: tabBarRect.right,
+    };
+  });
+
+  expect(metrics, label).not.toBeNull();
+  expect(
+    Math.abs(metrics.tabBarRight - metrics.panelRight),
+    label,
+  ).toBeLessThanOrEqual(1);
+}
+
 async function configureChainData(page, options = {}) {
   const {
     provider = "Blockfrost",
@@ -3821,4 +3849,37 @@ test("keeps decoded transaction layout within the viewport", async ({ page }) =>
   expect(overflowPx).toBeLessThanOrEqual(1);
 
   await expect(decodedStructureIndentationViolations(page)).resolves.toEqual([]);
+});
+
+test("keeps responsive inspector states within viewport without tab bar overrun", async ({
+  page,
+}) => {
+  const widths = [390, 680, 768, 900, 1440];
+  const resultTabs = ["Structure", "Witness", "Validation", "Graph / RDF"];
+
+  await page.goto("/inspect");
+  await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectDocumentNoHorizontalOverflow(
+      page,
+      `input screen should not horizontally overflow at ${width}px`,
+    );
+  }
+
+  await decodeFixtureAt(page, "/inspect");
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const tab of resultTabs) {
+      await selectResultTab(page, tab);
+      await expectDocumentNoHorizontalOverflow(
+        page,
+        `${tab} tab should not horizontally overflow at ${width}px`,
+      );
+      await expectResultTabBarRightEdgeFlush(
+        page,
+        `${tab} tab bar should be flush at ${width}px`,
+      );
+    }
+  }
 });
