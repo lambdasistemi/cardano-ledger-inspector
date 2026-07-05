@@ -2097,6 +2097,10 @@ md-icon-button:focus-visible,
   overflow: visible;
 }
 
+.decoded-result-shell .result-tab-bar {
+  margin-inline: 0;
+}
+
 .decoded-screen,
 .decoded-structure-stack {
   display: grid;
