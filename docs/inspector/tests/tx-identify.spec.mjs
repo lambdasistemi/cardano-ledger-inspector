@@ -483,8 +483,10 @@ async function decodedRowText(row) {
   return row.locator(decodedTreeValueSelector).first().innerText();
 }
 
-async function decodedRowTitle(row) {
-  return row.locator(decodedTreeValueSelector).first().getAttribute("title");
+async function decodedRowRawText(row) {
+  const rawValue = row.locator(":scope > .decoded-tree-main .decoded-tree-raw-value").first();
+  if ((await rawValue.count()) > 0) return rawValue.innerText();
+  return decodedRowText(row);
 }
 
 async function expandDecodedStructure(panel) {
@@ -1771,19 +1773,22 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
 
   await expect(page.locator(".provider-panel")).toHaveCount(0);
   await expect(loadedHeader).toBeVisible();
-  await expect(resultPanel).toHaveAttribute("data-md3-surface", "result");
+  await expect(resultPanel).toHaveClass(/decoded-result-shell/);
   await selectResultTab(page, "Structure");
-  await expect(decodedTreePanel).toHaveAttribute("data-md3-surface", "decoded");
+  await expect(decodedTreePanel).toHaveClass(/decoded-screen/);
+  await expect(page.locator(".compact-identity-panel")).toHaveAttribute(
+    "data-md3-surface",
+    "decoded",
+  );
+  await expect(
+    decodedTreePanel.locator("md-outlined-button", { hasText: "Expand" }),
+  ).toHaveAttribute("data-md3-control", "secondary");
   await selectResultTab(page, "Validation");
   await expect(validationPanel).toHaveAttribute("data-md3-surface", "decoded");
   await selectResultTab(page, "Graph / RDF");
   await expect(rdfPanel).toHaveAttribute("data-md3-surface", "decoded");
   await expect(lensPanel).toHaveAttribute("data-md3-surface", "decoded");
 
-  await expect(page.locator("md-outlined-button", { hasText: "Copy JSON" })).toHaveAttribute(
-    "data-md3-control",
-    "secondary",
-  );
   await expect(page.locator("md-outlined-button", { hasText: "Copy current" })).toHaveAttribute(
     "data-md3-control",
     "inline",
@@ -2561,7 +2566,10 @@ fixture:decodedTreasuryAddress
     .filter({ hasText: resolvedLabel })
     .first();
   await expect(resolvedAddressRow).toContainText(resolvedLabel);
-  const resolvedRawAddress = await decodedRowText(resolvedAddressRow);
+  await expect(resolvedAddressRow.locator(".decoded-tree-resolved-name")).toContainText(
+    resolvedLabel,
+  );
+  const resolvedRawAddress = await decodedRowRawText(resolvedAddressRow);
   expect(resolvedRawAddress).toMatch(/^[0-9a-f]+$/);
   expect(resolvedRawAddress.length).toBeGreaterThanOrEqual(24);
 });
@@ -2643,6 +2651,26 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 }) => {
   await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
 
+  await selectResultTab(page, "Graph / RDF");
+  const graphTurtle = await page.locator(".rdf-panel .rdf-turtle").innerText();
+  const output0Subject = await page.evaluate((graph) => {
+    const result = globalThis.rdfShapes.query(
+      graph,
+      `
+        PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+        SELECT ?output WHERE {
+          ?transaction a cardano:Transaction ;
+            cardano:hasOutput ?output .
+          ?output cardano:hasIndex 0 .
+        }
+        LIMIT 1
+      `,
+    );
+    return result.json.results.bindings[0].output.value;
+  }, graphTurtle);
+  expect(output0Subject).toMatch(/^urn:cardano:utxo:/);
+
+  await selectResultTab(page, "Structure");
   const decodedTreePanel = decodedPanel(page);
   await expandDecodedStructure(decodedTreePanel);
 
@@ -2651,8 +2679,6 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
     .filter({ hasText: "Output 0" })
     .first();
   await expect(output0Row).toBeVisible();
-  const output0Subject = await decodedRowTitle(output0Row);
-  expect(output0Subject).toMatch(/^urn:cardano:utxo:/);
 
   const outputLabel = "Inline annotated fixture output";
   await expect(output0Row).not.toContainText(outputLabel);
@@ -2673,10 +2699,8 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await output0Row.getByLabel("New book name").fill("Inline fixture annotations");
   await output0Row.getByRole("button", { name: "Save label" }).click();
 
-  await expect(output0Row).toContainText(outputLabel);
-  await expect(
-    output0Row.getByRole("link", { name: "cardano:TransactionOutput" }),
-  ).toBeVisible();
+  await expect(output0Row).toHaveClass(/decoded-tree-row--resolved/);
+  await expect(output0Row.locator(".decoded-tree-raw-value")).toContainText(output0Subject);
   await expandDecodedStructure(decodedTreePanel);
 
   const addressRows = decodedTreePanel
@@ -2766,6 +2790,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   expect(generatedBook.raw).toContain(`<${output0Subject}>`);
   expect(generatedBook.raw).not.toContain("local:annotation-");
   expect(generatedBook.raw).toContain("cardano:bech32");
+  expect(generatedBook.raw).toContain("cardano:TransactionOutput");
   expect(generatedBook.raw).toContain(outputLabel);
   expect(generatedBook.raw).toContain(inlineLabel);
   expect(generatedBook.raw).toContain(appendedLabel);

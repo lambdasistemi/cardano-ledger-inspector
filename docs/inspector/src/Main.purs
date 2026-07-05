@@ -1128,6 +1128,13 @@ inspectorComponent initial =
       valueText = decodedTreeValueText row
       rawText = decodedTreeRawText row
       showScalarCopy = not hasChildren && not isResolved && not isNull && decodedTreeCanCopy row
+      trailingActions =
+        ( if showScalarCopy then
+            [ renderDecodedCopyIcon row.id rawText "Copy value" ]
+          else
+            []
+        )
+          <> [ renderDecodedTreeAnnotationAction state row ]
       typeClasses =
         if state.decodedRowStyle == "labeled" then
           [ "decoded-tree-type", "decoded-tree-type--labeled" ]
@@ -1210,17 +1217,10 @@ inspectorComponent initial =
               , renderDecodedTreeAnnotation state row
               ]
             ]
-              <> ( if showScalarCopy then
-                    [ HH.div
-                        [ classNames [ "decoded-tree-trailing" ] ]
-                        [ renderDecodedCopyIcon row.id rawText "Copy value" ]
-                    ]
-                  else
-                    [ HH.div
-                        [ classNames [ "decoded-tree-trailing" ] ]
-                        [ renderDecodedTreeAnnotationAction state row ]
-                    ]
-                 )
+              <> [ HH.div
+                    [ classNames [ "decoded-tree-trailing" ] ]
+                    trailingActions
+                 ]
           )
       ] <> if expanded && hasChildren then
         renderDecodedTreeRows state row.id rows
