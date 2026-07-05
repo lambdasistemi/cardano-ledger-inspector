@@ -142,6 +142,8 @@ type State =
   , expandedPaths :: Array String
   , decodedTreeExpanded :: Array String
   , decodedEmptyExpanded :: Array String
+  , decodedRowStyle :: String
+  , decodedBytesExpanded :: Boolean
   , running :: Boolean
   , copied :: Boolean
   , copiedPath :: Maybe String
@@ -250,6 +252,10 @@ data Action
   | BrowseJson String
   | ToggleDecodedEmpty String
   | ToggleDecodedTree String
+  | SetDecodedRowStyle String
+  | ExpandDecodedTree
+  | CollapseDecodedTree
+  | ToggleDecodedBytes
   | SelectResultTab ResultTab
   | ChangeInput
   | Navigate Route MouseEvent
@@ -297,6 +303,8 @@ inspectorComponent initial =
         , expandedPaths: []
         , decodedTreeExpanded: []
         , decodedEmptyExpanded: []
+        , decodedRowStyle: "quiet"
+        , decodedBytesExpanded: true
         , running: false
         , copied: false
         , copiedPath: Nothing
@@ -921,35 +929,18 @@ inspectorComponent initial =
       ]
 
   renderDecodedStructure state =
-    HH.element (HH.ElemName "md-elevated-card")
-      [ classNames [ "panel", "decoded-structure-panel" ]
-      , mdSurface "decoded"
-      ]
-      [ HH.div
-          [ classNames [ "panel-heading" ] ]
-          [ HH.div_
-              [ HH.h2_ [ HH.text "Decoded structure" ]
-              , HH.p_
-                  [ HH.text
-                      ( case state.result of
-                          Just r ->
-                            if r.exitOk then
-                              "Stable surface for the structured decoded transaction tree."
-                            else
-                              "Decode a transaction to populate the structured tree in the next slice."
-                          _ ->
-                            "Decode a transaction to populate the structured tree in the next slice."
-                      )
-                  ]
-              ]
-          ]
-      , case state.decodedTreeLens of
+    HH.section
+      [ classNames [ "decoded-screen" ] ]
+      [ case state.decodedTreeLens of
           Just lens ->
             renderDecodedTreeLens state lens
           Nothing ->
             HH.div
-              [ classNames [ "empty-state", "decoded-structure-placeholder" ] ]
-              [ HH.text "Tree renderer pending." ]
+              [ classNames [ "li-empty-state", "decoded-structure-placeholder" ] ]
+              [ HH.element (HH.ElemName "md-icon") [ classNames [ "li-empty-icon" ] ] [ HH.text "account_tree" ]
+              , HH.div [ classNames [ "li-empty-title" ] ] [ HH.text "No decoded tree yet" ]
+              , HH.p [ classNames [ "li-empty-copy" ] ] [ HH.text "Decode a transaction to populate the structured Conway tree." ]
+              ]
       ]
 
   renderDecodedTreeLens state lens =
@@ -961,19 +952,85 @@ inspectorComponent initial =
       Nothing ->
         if Array.null lens.rows then
           HH.div
-            [ classNames [ "empty-state" ] ]
-            [ HH.text "No decoded RDF tree rows." ]
+            [ classNames [ "li-empty-state" ] ]
+            [ HH.element (HH.ElemName "md-icon") [ classNames [ "li-empty-icon" ] ] [ HH.text "account_tree" ]
+            , HH.div [ classNames [ "li-empty-title" ] ] [ HH.text "No decoded RDF tree rows" ]
+            , HH.p [ classNames [ "li-empty-copy" ] ] [ HH.text "The decoded transaction did not expose structure rows." ]
+            ]
         else
           HH.div
-            [ classNames [ "decoded-tree-row-list" ] ]
-            (renderDecodedTreeRows state "" lens.rows)
+            [ classNames [ "decoded-structure-stack" ] ]
+            [ renderDecodedSummaryHeader state lens.rows
+            , renderDecodedQuickStats lens.rows
+            , renderDecodedToolbar state lens.rows
+            , HH.div
+                [ classNames [ "decoded-tree-container" ] ]
+                (renderDecodedTreeRows state "" lens.rows)
+            , renderDecodedBytesPanel state
+            ]
+
+  renderDecodedToolbar state rows =
+    HH.div
+      [ classNames [ "decoded-toolbar" ] ]
+      [ HH.div
+          [ classNames [ "decoded-resolved-readout" ] ]
+          [ HH.element (HH.ElemName "md-icon") [] [ HH.text "auto_awesome" ]
+          , HH.span_ [ HH.text (show (decodedResolvedCount rows) <> " identifiers resolved to names") ]
+          ]
+      , HH.div
+          [ classNames [ "decoded-row-style" ]
+          , HH.attr (HH.AttrName "aria-label") "Row style"
+          ]
+          [ HH.span_ [ HH.text "Row style" ]
+          , HH.div
+              [ classNames [ "decoded-row-style-toggle" ] ]
+              [ renderDecodedRowStyleButton state "quiet" "A - Quiet"
+              , renderDecodedRowStyleButton state "labeled" "B - Labeled"
+              ]
+          ]
+      , HH.div
+          [ classNames [ "decoded-toolbar-actions" ] ]
+          [ HH.element (HH.ElemName "md-outlined-button")
+              [ HE.onClick (\_ -> ExpandDecodedTree)
+              , classNames [ "decoded-toolbar-button" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , mdControl "secondary"
+              ]
+              [ HH.element (HH.ElemName "md-icon") [] [ HH.text "unfold_more" ]
+              , HH.text "Expand"
+              ]
+          , HH.element (HH.ElemName "md-outlined-button")
+              [ HE.onClick (\_ -> CollapseDecodedTree)
+              , classNames [ "decoded-toolbar-button" ]
+              , HH.attr (HH.AttrName "role") "button"
+              , mdControl "secondary"
+              ]
+              [ HH.element (HH.ElemName "md-icon") [] [ HH.text "unfold_less" ]
+              , HH.text "Collapse"
+              ]
+          ]
+      ]
+
+  renderDecodedRowStyleButton state style label =
+    HH.button
+      [ classNames
+          ( if state.decodedRowStyle == style then
+              [ "decoded-row-style-button", "is-selected" ]
+            else
+              [ "decoded-row-style-button" ]
+          )
+      , HH.attr (HH.AttrName "type") "button"
+      , HH.attr (HH.AttrName "aria-pressed") (if state.decodedRowStyle == style then "true" else "false")
+      , HE.onClick (\_ -> SetDecodedRowStyle style)
+      ]
+      [ HH.text label ]
 
   renderDecodedTreeRows state parentId rows =
     groupDecodedEmpties state rows
       (Array.filter (\row -> row.parentId == parentId) rows)
 
-  -- Collapse each run of >=2 consecutive empty (NULL) leaf siblings into one expandable
-  -- "N empty fields" chip in place, so populated fields are not buried under a wall of
+  -- Collapse each run of empty (NULL) leaf siblings into one expandable
+  -- "Absent fields (n)" chip in place, so populated fields are not buried under a wall of
   -- nulls. CDDL order is preserved (the chip sits at the run's position) and faithfulness
   -- is intact: the chip is a normal tree toggle, so expanding it re-renders every field.
   groupDecodedEmpties state rows children =
@@ -983,7 +1040,6 @@ inspectorComponent initial =
       flush run acc =
         case Array.length run of
           0 -> acc
-          1 -> acc <> Array.concatMap (renderDecodedTreeRow state rows) run
           _ -> acc <> renderEmptyRun state rows run
       step accRun row =
         if isEmptyLeaf row then
@@ -1004,25 +1060,34 @@ inspectorComponent initial =
         Nothing -> 0
       expanded = Array.elem groupId state.decodedEmptyExpanded
       labels = String.joinWith ", " (map _.label run)
-      countLabel = show (Array.length run) <> " empty fields"
+      countLabel = "Absent fields (" <> show (Array.length run) <> ")"
       rowClasses =
-        [ "decoded-tree-row", "decoded-tree-empty-group", "decoded-tree-depth-" <> show depth ]
+        [ "decoded-tree-row", "decoded-tree-row--group", "decoded-tree-empty-group", "decoded-tree-depth-" <> show depth ]
           <> (if expanded then [ "is-expanded" ] else [])
       chip =
         HH.div
-          [ classNames rowClasses ]
+          [ classNames rowClasses
+          , HH.attr (HH.AttrName "style") ("--depth: " <> show depth <> ";")
+          , HH.attr (HH.AttrName "role") "button"
+          , HH.attr (HH.AttrName "aria-expanded") (if expanded then "true" else "false")
+          , HE.onClick (\_ -> ToggleDecodedEmpty groupId)
+          ]
           [ HH.div
+              [ classNames [ "decoded-tree-gutter" ] ]
+              [ HH.element (HH.ElemName "md-icon")
+                  [ classNames [ "decoded-tree-chevron" ] ]
+                  [ HH.text "chevron_right" ]
+              ]
+          , HH.div
               [ classNames [ "decoded-tree-main" ] ]
               [ HH.div
-                  [ classNames [ "decoded-tree-keyline" ] ]
-                  [ HH.element (HH.ElemName "md-outlined-button")
-                      [ HE.onClick (\_ -> ToggleDecodedEmpty groupId)
-                      , classNames [ "inline-action", "decoded-tree-toggle" ]
-                      , HH.attr (HH.AttrName "role") "button"
-                      , HH.attr (HH.AttrName "aria-label") countLabel
-                      , mdControl "inline"
-                      ]
+                  [ classNames [ "decoded-tree-line" ] ]
+                  [ HH.span
+                      [ classNames [ "decoded-tree-key", "decoded-tree-key--group" ] ]
                       [ HH.text countLabel ]
+                  , HH.span
+                      [ classNames [ "li-chip", "decoded-tree-count" ] ]
+                      [ HH.text (show (Array.length run)) ]
                   , if expanded then HH.text ""
                     else
                       HH.span
@@ -1037,78 +1102,365 @@ inspectorComponent initial =
 
   renderDecodedTreeRow state rows row =
     let
-      hasChildren = Array.any (\candidate -> candidate.parentId == row.id) rows
+      hasChildren = decodedTreeHasChildren rows row
       expanded = row.parentId == "" || Array.elem row.id state.decodedTreeExpanded
-      -- Dim empty (NULL) leaf fields so populated fields stand out, while keeping every
-      -- CDDL field present and in order (the faithful-decode contract).
-      emptyClass = if row.kind == "null" && not hasChildren then [ "decoded-tree-empty-field" ] else []
+      isNull = row.kind == "null" && not hasChildren
+      isResolved = row.resolvedLabel /= ""
       rowClasses =
-        ( if hasChildren && expanded then
-            [ "decoded-tree-row", "is-expanded", "decoded-tree-depth-" <> show row.depth ]
+        [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
+          <> (if hasChildren then [ "decoded-tree-row--group" ] else [])
+          <> (if isResolved then [ "decoded-tree-row--resolved" ] else [])
+          <> (if isNull then [ "decoded-tree-empty-field" ] else [])
+          <> (if hasChildren && expanded then [ "is-expanded" ] else [])
+      rowAttrs =
+        [ classNames rowClasses
+        , HP.id row.id
+        , HH.attr (HH.AttrName "style") ("--depth: " <> show row.depth <> ";")
+        ]
+          <> ( if hasChildren then
+                [ HH.attr (HH.AttrName "role") "button"
+                , HH.attr (HH.AttrName "aria-expanded") (if expanded then "true" else "false")
+                , HE.onClick (\_ -> ToggleDecodedTree row.id)
+                ]
+              else
+                []
+            )
+      valueText = decodedTreeValueText row
+      rawText = decodedTreeRawText row
+      showScalarCopy = not hasChildren && not isResolved && not isNull && decodedTreeCanCopy row
+      typeClasses =
+        if state.decodedRowStyle == "labeled" then
+          [ "decoded-tree-type", "decoded-tree-type--labeled" ]
           else
-            [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
-        ) <> emptyClass
-      summaryText =
-        if row.summary == "" then row.value else row.summary
-      metaText =
-        if row.resolvedLabel /= "" then row.resolvedLabel
-        else ""
+          [ "decoded-tree-type", "decoded-tree-type--quiet" ]
     in
       [ HH.div
-          [ classNames rowClasses
-          , HP.id row.id
-          ]
-          [ HH.div
+          rowAttrs
+          ( [ HH.div
+                [ classNames [ "decoded-tree-gutter" ] ]
+                [ if hasChildren then
+                    HH.element (HH.ElemName "md-icon")
+                      [ classNames [ "decoded-tree-chevron" ] ]
+                      [ HH.text "chevron_right" ]
+                  else
+                    HH.text ""
+                ]
+            , HH.div
               [ classNames [ "decoded-tree-main" ] ]
               [ HH.div
-                  [ classNames [ "decoded-tree-keyline" ] ]
-                  [ if hasChildren then
-                      HH.element (HH.ElemName "md-outlined-button")
-                        [ HE.onClick (\_ -> ToggleDecodedTree row.id)
-                        , classNames [ "inline-action", "decoded-tree-toggle" ]
-                        , HH.attr (HH.AttrName "role") "button"
-                        , HH.attr
-                            (HH.AttrName "aria-label")
-                            (row.label <> if row.summary == "" then "" else " " <> row.summary)
-                        , mdControl "inline"
+                  [ classNames [ "decoded-tree-line" ] ]
+                  ( [ HH.span
+                        [ classNames
+                            ( if hasChildren then
+                                [ "decoded-tree-key", "decoded-tree-key--group" ]
+                              else
+                                [ "decoded-tree-key" ]
+                            )
                         ]
-                        [ HH.text (row.label <> if row.summary == "" then "" else " " <> row.summary) ]
-                    else
-                      HH.strong_ [ HH.text row.label ]
-                  , HH.span
-                      [ classNames [ "kind-badge" ] ]
-                      [ renderDecodedTreeKind row ]
-                  , HH.span
-                      [ classNames [ "decoded-tree-actions" ] ]
-                      [ renderDecodedTreeAnnotationAction state row ]
-                  ]
-              , if summaryText == "" then
-                  HH.text ""
-                else
+                        [ HH.text row.label ]
+                    ]
+                      <> ( if hasChildren then
+                            [ HH.span
+                                [ classNames [ "li-chip", "decoded-tree-count" ] ]
+                                [ HH.text (show (decodedTreeChildCount rows row.id)) ]
+                            ]
+                          else if isResolved then
+                            [ HH.span
+                                [ classNames [ "decoded-tree-resolved-name" ] ]
+                                [ HH.element (HH.ElemName "md-icon")
+                                    [ classNames [ "decoded-tree-kind-icon" ] ]
+                                    [ HH.text (decodedTreeKindIcon row) ]
+                                , HH.text row.resolvedLabel
+                                ]
+                            , HH.span
+                                [ classNames [ "li-chip", "decoded-tree-book-chip" ] ]
+                                [ HH.element (HH.ElemName "md-icon") [] [ HH.text "menu_book" ]
+                                , HH.text (decodedResolutionSourceLabel state)
+                                ]
+                            ]
+                          else
+                            [ HH.span
+                                [ classNames
+                                    ( if isNull then
+                                        [ "decoded-tree-value", "decoded-tree-value--null" ]
+                                      else
+                                        [ "decoded-tree-value" ]
+                                    )
+                                ]
+                                [ if isNull then HH.text "null" else renderDecodedTreeValue row valueText ]
+                            ]
+                         )
+                      <> [ HH.span
+                            [ classNames typeClasses ]
+                            [ HH.text row.kind ]
+                         ]
+                  )
+              , if isResolved then
                   HH.div
-                    (decodedTreeSummaryAttrs row summaryText)
-                    [ renderDecodedTreeSummary row summaryText ]
-              , if metaText == "" then
-                  HH.text ""
+                    [ classNames [ "decoded-tree-raw-line" ] ]
+                    [ HH.span
+                        [ classNames [ "decoded-tree-raw-value" ]
+                        , HP.title rawText
+                        ]
+                        [ HH.text rawText ]
+                    , renderDecodedCopyIcon row.id rawText "Copy raw value"
+                    ]
                 else
-                  HH.div
-                    [ classNames [ "decoded-tree-meta" ] ]
-                    [ HH.text metaText ]
+                  HH.text ""
               , renderDecodedTreeAnnotation state row
               ]
-          ]
+            ]
+              <> ( if showScalarCopy then
+                    [ HH.div
+                        [ classNames [ "decoded-tree-trailing" ] ]
+                        [ renderDecodedCopyIcon row.id rawText "Copy value" ]
+                    ]
+                  else
+                    [ HH.div
+                        [ classNames [ "decoded-tree-trailing" ] ]
+                        [ renderDecodedTreeAnnotationAction state row ]
+                    ]
+                 )
+          )
       ] <> if expanded && hasChildren then
-        [ HH.div
-            [ classNames [ "decoded-tree-children" ] ]
-            (renderDecodedTreeRows state row.id rows)
-        ]
+        renderDecodedTreeRows state row.id rows
       else []
 
-  renderDecodedTreeKind row =
-    if row.resolvedType == "" then
-      HH.text row.kind
+  renderDecodedTreeValue row valueText =
+    if decodedTreeFullSubject row valueText /= "" then
+      renderDecodedTreeSummary row valueText
     else
-      renderDecodedTreeIri row.resolvedType
+      renderDecodedTreeIri valueText
+
+  renderDecodedCopyIcon path value label =
+    if value == "" || value == "NULL" then
+      HH.text ""
+    else
+      HH.element (HH.ElemName "md-icon-button")
+        [ HE.onClick (\_ -> CopyValue path value)
+        , classNames [ "decoded-copy-button" ]
+        , HH.attr (HH.AttrName "role") "button"
+        , HH.attr (HH.AttrName "aria-label") label
+        , HP.title label
+        , mdControl "icon"
+        ]
+        [ HH.element (HH.ElemName "md-icon") [] [ HH.text "content_copy" ] ]
+
+  renderDecodedBytesPanel state =
+    let
+      bytes = case state.txCbor of
+        Just cbor -> hexBytePairs cbor
+        Nothing   -> []
+      shown = Array.take 220 bytes
+      total = Array.length bytes
+      shownCount = Array.length shown
+      byteCountLabel =
+        if total == shownCount then
+          show total <> " bytes"
+        else
+          show shownCount <> " / " <> show total <> " bytes"
+    in
+      HH.div
+        [ classNames [ "decoded-bytes-panel", "li-panel" ] ]
+        [ HH.button
+            [ classNames [ "decoded-bytes-toggle" ]
+            , HH.attr (HH.AttrName "type") "button"
+            , HH.attr (HH.AttrName "aria-expanded") (if state.decodedBytesExpanded then "true" else "false")
+            , HE.onClick (\_ -> ToggleDecodedBytes)
+            ]
+            [ HH.element (HH.ElemName "md-icon")
+                [ classNames [ "decoded-bytes-chevron" ] ]
+                [ HH.text "chevron_right" ]
+            , HH.element (HH.ElemName "md-icon")
+                [ classNames [ "decoded-bytes-icon" ] ]
+                [ HH.text "data_object" ]
+            , HH.span
+                [ classNames [ "decoded-bytes-title" ] ]
+                [ HH.text "CBOR bytes" ]
+            , HH.span
+                [ classNames [ "decoded-bytes-count" ] ]
+                [ HH.text byteCountLabel ]
+            , HH.span
+                [ classNames [ "decoded-bytes-hint" ] ]
+                [ HH.text "Byte ranges unavailable" ]
+            ]
+        , if state.decodedBytesExpanded then
+            HH.div
+              [ classNames [ "decoded-byte-grid" ] ]
+              ( if Array.null shown then
+                  [ HH.span
+                      [ classNames [ "decoded-bytes-empty" ] ]
+                      [ HH.text "No CBOR bytes loaded." ]
+                  ]
+                else
+                  map renderDecodedByte shown
+              )
+          else
+            HH.text ""
+        ]
+
+  renderDecodedByte value =
+    HH.span
+      [ classNames [ "decoded-byte" ] ]
+      [ HH.text value ]
+
+  hexBytePairs value =
+    hexBytePairsGo (String.trim value)
+
+  hexBytePairsGo value =
+    if StringCodeUnits.length value == 0 then
+      []
+    else
+      [ StringCodeUnits.take 2 value ]
+        <> hexBytePairsGo (StringCodeUnits.drop 2 value)
+
+  decodedTreeHasChildren rows row =
+    Array.any (\candidate -> candidate.parentId == row.id) rows
+
+  decodedTreeChildCount rows rowId =
+    Array.length (Array.filter (\candidate -> candidate.parentId == rowId) rows)
+
+  decodedTreeValueText row =
+    if row.kind == "null" then "null"
+    else if row.value /= "" && row.value /= "NULL" then row.value
+    else row.summary
+
+  decodedTreeRawText row =
+    if row.raw /= "" && row.raw /= "NULL" then row.raw
+    else decodedTreeValueText row
+
+  decodedTreeCanCopy row =
+    row.kind == "hash"
+      || row.kind == "raw-bytes"
+      || row.kind == "address"
+      || row.kind == "key"
+      || row.kind == "signature"
+      || row.annotationValue /= ""
+
+  decodedTreeKindIcon row =
+    if row.kind == "address" then "account_balance"
+    else if row.kind == "script" || row.kind == "script_hash" || row.kind == "hash" then "terminal"
+    else if row.kind == "policy" || row.kind == "asset" || row.kind == "mint" then "token"
+    else if row.kind == "pool" then "hub"
+    else if row.kind == "key" || row.kind == "key-witness" then "key"
+    else if row.kind == "drep" || row.kind == "vote" then "how_to_vote"
+    else if row.kind == "datum" || row.kind == "raw-bytes" then "data_object"
+    else if row.kind == "batcher" then "swap_horiz"
+    else "label"
+
+  decodedResolutionSourceLabel state =
+    case selectedBooks state of
+      [] -> "books"
+      [ book ] -> book.name
+      books -> show (Array.length books) <> " books"
+
+  decodedResolvedCount rows =
+    Array.length (Array.filter (\row -> row.resolvedLabel /= "") rows)
+
+  decodedEmptyGroupIds rows =
+    rows
+      # Array.filter (\row -> row.kind == "null" && not (decodedTreeHasChildren rows row))
+      # map (\row -> "empty::" <> row.id)
+
+  decodedTreeExpandableIds rows =
+    rows
+      # Array.filter (decodedTreeHasChildren rows)
+      # map _.id
+
+  renderDecodedSummaryHeader state rows =
+    let
+      txHash = loadedTxHash state
+      valid = decodedIsValid rows
+      validText = if valid then "true" else "false"
+      copied = state.copiedPath == Just "decoded-summary:tx-hash"
+    in
+      HH.div
+        [ classNames [ "decoded-summary-header" ] ]
+        [ HH.div
+            [ classNames [ "decoded-summary-title-group" ] ]
+            [ HH.div
+                [ classNames [ "decoded-summary-title-line" ] ]
+                [ HH.h1_ [ HH.text "Decoded transaction" ]
+                , HH.span
+                    [ classNames
+                        ( if valid then
+                            [ "li-chip", "li-chip--success", "decoded-validity-chip" ]
+                          else
+                            [ "li-chip", "li-chip--error", "decoded-validity-chip" ]
+                        )
+                    ]
+                    [ HH.element (HH.ElemName "md-icon") [] [ HH.text (if valid then "check_circle" else "error") ]
+                    , HH.text ("is_valid: " <> validText)
+                    ]
+                ]
+            , HH.div
+                [ classNames [ "decoded-tx-hash" ] ]
+                [ HH.element (HH.ElemName "md-icon") [] [ HH.text "tag" ]
+                , HH.span
+                    [ HP.title txHash ]
+                    [ HH.text txHash ]
+                , HH.element (HH.ElemName "md-icon-button")
+                    [ HE.onClick (\_ -> CopyValue "decoded-summary:tx-hash" txHash)
+                    , classNames [ "decoded-copy-button" ]
+                    , HH.attr (HH.AttrName "role") "button"
+                    , HH.attr (HH.AttrName "aria-label") "Copy tx hash"
+                    , HP.title "Copy tx hash"
+                    , mdControl "icon"
+                    ]
+                    [ HH.element (HH.ElemName "md-icon") [] [ HH.text (if copied then "check" else "content_copy") ] ]
+                ]
+            ]
+        ]
+
+  renderDecodedQuickStats rows =
+    HH.div
+      [ classNames [ "decoded-quick-stats" ] ]
+      (map renderDecodedQuickStat (decodedQuickStats rows))
+
+  renderDecodedQuickStat stat =
+    HH.div
+      [ classNames [ "decoded-quick-stat" ] ]
+      [ HH.div
+          [ classNames [ "decoded-quick-stat-value" ] ]
+          [ HH.text stat.value ]
+      , HH.div
+          [ classNames [ "decoded-quick-stat-label" ] ]
+          [ HH.text stat.label ]
+      ]
+
+  decodedQuickStats rows =
+    [ { value: decodedGroupCount "decoded-body-inputs" rows, label: "inputs" }
+    , { value: decodedGroupCount "decoded-body-outputs" rows, label: "outputs" }
+    , { value: decodedFieldValue "decoded-body-fee" rows, label: "fee" }
+    , { value: decodedPresentCount "decoded-body-mint" rows, label: "mint" }
+    , { value: decodedGroupCount "decoded-witness_set-vkeys" rows, label: "signatures" }
+    ]
+
+  decodedGroupCount rowId rows =
+    case decodedFindRow rowId rows of
+      Just row | row.kind == "null" -> "0"
+      Just _ -> show (decodedTreeChildCount rows rowId)
+      Nothing -> "0"
+
+  decodedPresentCount rowId rows =
+    case decodedFindRow rowId rows of
+      Just row | row.kind == "null" || row.value == "NULL" -> "0"
+      Just _ -> "1"
+      Nothing -> "0"
+
+  decodedFieldValue rowId rows =
+    case decodedFindRow rowId rows of
+      Just row | row.kind == "null" || row.value == "NULL" -> "0"
+      Just row -> decodedTreeValueText row
+      Nothing -> "0"
+
+  decodedIsValid rows =
+    case decodedFindRow "decoded-is-valid" rows of
+      Just row -> row.value /= "false" && row.raw /= "false"
+      Nothing -> true
+
+  decodedFindRow rowId rows =
+    Array.find (\row -> row.id == rowId) rows
 
   renderDecodedTreeSummary row summaryText =
     let
@@ -1124,17 +1476,6 @@ inspectorComponent initial =
           [ HH.text (middleTruncate 24 18 fullSubject) ]
       else
         renderDecodedTreeIri summaryText
-
-  decodedTreeSummaryAttrs row summaryText =
-    let
-      fullSubject = decodedTreeFullSubject row summaryText
-    in
-      if fullSubject == "" then
-        [ classNames [ "decoded-tree-summary" ] ]
-      else
-        [ classNames [ "decoded-tree-summary" ]
-        , HP.title fullSubject
-        ]
 
   decodedTreeFullSubject row summaryText =
     if isCardanoUrn row.value then row.value
@@ -1612,39 +1953,30 @@ inspectorComponent initial =
           let
             summary = Json.inspect r.stdout
           in
-            HH.element (HH.ElemName "md-elevated-card")
-              [ classNames [ "panel", "result-panel" ]
-              , mdSurface "result"
-              ]
-              ( [ HH.div
-                    [ classNames [ "panel-heading", "result-heading" ] ]
-                    [ HH.div_
-                        [ HH.h2_ [ HH.text (if r.exitOk then "Decoded structure" else "Error") ]
-                        , if r.exitOk && summary.valid
-                            then HH.p_ [ HH.text "Decoded transaction" ]
-                            else HH.text ""
-                        ]
-                    , if r.exitOk
-                        then
-                          HH.element (HH.ElemName "md-outlined-button")
-                            [ HE.onClick (\_ -> Copy)
-                            , classNames [ "secondary-action" ]
-                            , HH.attr (HH.AttrName "role") "button"
-                            , mdControl "secondary"
-                            ]
-                            [ HH.text (if state.copied then "Copied" else "Copy JSON") ]
-                        else HH.text ""
-                    ]
+            if r.exitOk then
+              HH.section
+                [ classNames [ "result-panel", "decoded-result-shell" ] ]
+                ( [ renderResultTabs state
+                  , renderSelectedResultTab state r.stdout
+                  ]
+                    <> renderStderr r.stderr
+                )
+            else
+              HH.element (HH.ElemName "md-elevated-card")
+                [ classNames [ "panel", "result-panel", "error-panel" ]
+                , mdSurface "result"
                 ]
-              <> ( if r.exitOk then
-                     [ renderResultTabs state
-                     , renderSelectedResultTab state r.stdout
-                     ]
-                   else
-                     [ renderRawJson r.stdout ]
-                 )
-              <> renderStderr r.stderr
-              )
+                ( [ HH.div
+                      [ classNames [ "panel-heading", "result-heading" ] ]
+                      [ HH.div_
+                          [ HH.h2_ [ HH.text "Error" ]
+                          , if summary.valid then HH.p_ [ HH.text summary.title ] else HH.text ""
+                          ]
+                      ]
+                  , renderRawJson r.stdout
+                  ]
+                    <> renderStderr r.stderr
+                )
 
   renderIntentMaybe state =
     case state.intent of
@@ -3241,6 +3573,7 @@ inspectorComponent initial =
           , expandedPaths = []
           , decodedTreeExpanded = []
           , decodedEmptyExpanded = []
+          , decodedBytesExpanded = true
           , annotationDraft = Nothing
           , copied = false
           , copiedPath = Nothing
@@ -3416,6 +3749,27 @@ inspectorComponent initial =
                 else
                   Array.cons groupId st.decodedEmptyExpanded
             }
+    SetDecodedRowStyle style ->
+      H.modify_ _ { decodedRowStyle = style }
+    ExpandDecodedTree ->
+      H.modify_
+        \st ->
+          case st.decodedTreeLens of
+            Just lens ->
+              st
+                { decodedTreeExpanded = decodedTreeExpandableIds lens.rows
+                , decodedEmptyExpanded = decodedEmptyGroupIds lens.rows
+                }
+            Nothing -> st
+    CollapseDecodedTree ->
+      H.modify_
+        \st ->
+          st
+            { decodedTreeExpanded = []
+            , decodedEmptyExpanded = []
+            }
+    ToggleDecodedBytes ->
+      H.modify_ \st -> st { decodedBytesExpanded = not st.decodedBytesExpanded }
     SelectResultTab tab ->
       H.modify_ _ { resultTab = tab }
     ChangeInput ->
