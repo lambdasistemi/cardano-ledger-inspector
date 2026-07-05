@@ -1033,6 +1033,9 @@ async function expectTabbedInspectResult(page) {
   await tabs.getByRole("tab", { name: "Validation" }).click();
   const validationPanel = resultPanel.getByRole("tabpanel", { name: "Validation" });
   await expect(validationPanel.locator(".validation-panel")).toBeVisible();
+  await expect(validationPanel.locator(".validation-verdict-banner")).toBeVisible();
+  await expect(validationPanel.locator(".validation-filter-chips")).toBeVisible();
+  await expect(validationPanel.locator(".validation-check-row").first()).toBeVisible();
   await expect(
     validationPanel.getByRole("heading", { name: "RDF SHACL conformance" }),
   ).toBeVisible();
@@ -2992,13 +2995,13 @@ test("renders selected library SHACL conformance for bundled Cardano RDF shapes"
   await expect(conformancePanel.getByText("Cardano transaction SHACL shapes")).toBeVisible();
   await expect(
     conformancePanel
-      .locator(".metric-card", { hasText: "Author gate" })
-      .getByText("pass", { exact: true }),
+      .locator(".validation-check-row", { hasText: "Author gate" })
+      .locator(".validation-status-badge", { hasText: "pass" }),
   ).toBeVisible();
   await expect(
     conformancePanel
-      .locator(".metric-card", { hasText: "Auditor classifier" })
-      .getByText("canonical-pipeline match", { exact: true }),
+      .locator(".validation-check-row", { hasText: "Auditor classifier" })
+      .locator(".validation-status-badge", { hasText: "canonical-pipeline match" }),
   ).toBeVisible();
   await expect(conformancePanel.getByText("No phase-1 issues.")).toBeVisible();
 });
@@ -3293,7 +3296,9 @@ fixture:linkableNetworkAddress
     })
     .first();
   await expect(violationRow).toBeVisible();
-  await expect(violationRow.getByText("error", { exact: true })).toBeVisible();
+  await expect(
+    violationRow.locator(".validation-status-badge", { hasText: "error" }),
+  ).toBeVisible();
   await expect(violationRow).toContainText("cardano:network");
   await expect(violationRow.getByRole("link")).toBeVisible();
 });
@@ -3318,13 +3323,13 @@ test("renders non-conforming SHACL violations for pasted shapes", async ({
   ).toBeVisible();
   await expect(
     conformancePanel
-      .locator(".metric-card", { hasText: "Author gate" })
-      .getByText("fail", { exact: true }),
+      .locator(".validation-check-row", { hasText: "Author gate" })
+      .locator(".validation-status-badge", { hasText: "fail" }),
   ).toBeVisible();
   await expect(
     conformancePanel
-      .locator(".metric-card", { hasText: "Auditor classifier" })
-      .getByText("foreign/off-spec", { exact: true }),
+      .locator(".validation-check-row", { hasText: "Auditor classifier" })
+      .locator(".validation-status-badge", { hasText: "foreign/off-spec" }),
   ).toBeVisible();
 
   const violationRow = conformancePanel.locator(".shacl-violation-row").filter({
@@ -3334,7 +3339,9 @@ test("renders non-conforming SHACL violations for pasted shapes", async ({
   await expect(violationRow.getByText("Focus node", { exact: true })).toBeVisible();
   await expect(violationRow.getByText("Path", { exact: true })).toBeVisible();
   await expect(violationRow.getByText("Source shape", { exact: true })).toBeVisible();
-  await expect(violationRow.getByText("warning", { exact: true })).toBeVisible();
+  await expect(
+    violationRow.locator(".validation-status-badge", { hasText: "warning" }),
+  ).toBeVisible();
   await expect(violationRow.getByRole("link", { name: "Transaction" })).toBeVisible();
   await expect(violationRow).toContainText("requiresSentinel");
   await expect(violationRow).toContainText("RequiresSentinelShape");
@@ -3389,9 +3396,13 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
     validationPanel.getByRole("heading", { name: "Ledger validation" }),
   ).toBeVisible();
   await expect(validationPanel.getByText("Status")).toBeVisible();
-  await expect(validationPanel.getByText("incomplete")).toBeVisible();
   await expect(
-    validationPanel.locator(".identity-section-title", {
+    validationPanel
+      .locator(".validation-check-row", { hasText: "Status" })
+      .locator(".validation-status-badge", { hasText: "incomplete" }),
+  ).toBeVisible();
+  await expect(
+    validationPanel.locator(".validation-section-title", {
       hasText: "Missing context",
     }),
   ).toBeVisible();
@@ -3405,20 +3416,20 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
     validationPanel.getByText("Missing source outputs (3)."),
   ).toBeVisible();
   const missingContextSection = validationPanel
-    .locator(".witness-section")
+    .locator(".validation-section")
     .filter({ hasText: "Missing context" });
   await expect(
-    missingContextSection.locator(".witness-row").filter({ hasText: "protocol parameters" }),
+    missingContextSection.locator(".validation-check-row").filter({ hasText: "protocol parameters" }),
   ).toHaveCount(0);
   await expect(validationPanel.getByText("koios.tip+cli_protocol_params")).toBeVisible();
   await expect(
     validationPanel
-      .locator(".witness-section", { hasText: "Checks" })
+      .locator(".validation-section", { hasText: "Checks" })
       .getByRole("button", { name: "Copy" }),
   ).toHaveCount(0);
 
   const sourceOutputRow = missingContextSection
-    .locator(".witness-row")
+    .locator(".validation-check-row")
     .filter({ hasText: "source output" })
     .first();
   await sourceOutputRow.getByRole("button", { name: "Copy" }).click();
@@ -3446,17 +3457,17 @@ test("keeps copy controls off non-value missing context rows", async ({ page }) 
 
   await selectResultTab(page, "Validation");
   const missingContextSection = page
-    .locator(".validation-panel .witness-section")
+    .locator(".validation-panel .validation-section")
     .filter({ hasText: "Missing context" });
   const protocolParametersRow = missingContextSection
-    .locator(".witness-row")
+    .locator(".validation-check-row")
     .filter({ hasText: "protocol parameters" })
     .first();
   await expect(protocolParametersRow).toBeVisible();
   await expect(protocolParametersRow.getByRole("button", { name: "Copy" })).toHaveCount(0);
 
   const sourceOutputRow = missingContextSection
-    .locator(".witness-row")
+    .locator(".validation-check-row")
     .filter({ hasText: "source output" })
     .first();
   await expect(sourceOutputRow.getByRole("button", { name: "Copy" })).toBeVisible();
@@ -3527,7 +3538,9 @@ test("passes producer transaction CBOR into witness planning", async ({
   ).toBeVisible();
   await selectResultTab(page, "Validation");
   await expect(
-    page.locator(".validation-panel .metric-card", { hasText: "Resolved inputs" }),
+    page
+      .locator(".validation-panel .validation-section", { hasText: "Validation summary" })
+      .locator(".validation-check-row", { hasText: "Resolved inputs" }),
   ).toBeVisible();
   await selectResultTab(page, "Witness");
   await expect(
@@ -3538,13 +3551,13 @@ test("passes producer transaction CBOR into witness planning", async ({
   await selectResultTab(page, "Validation");
   await expect(
     page
-      .locator(".validation-panel .identity-section-title", { hasText: "Resolved inputs" })
+      .locator(".validation-panel .validation-section-title", { hasText: "Resolved inputs" })
       .first(),
   ).toBeVisible();
   await expect(
     page
-      .locator(".validation-panel .metric-card", { hasText: "Status" })
-      .getByText("valid", { exact: true }),
+      .locator(".validation-panel .validation-check-row", { hasText: "Status" })
+      .locator(".validation-status-badge", { hasText: "valid" }),
   ).toBeVisible();
   expect(producerCborRequests).toBeGreaterThan(0);
   expect(latestBlockRequests).toBe(1);
@@ -3669,7 +3682,7 @@ test("surfaces hard provider context resolution failures", async ({
 
   await selectResultTab(page, "Validation");
   const providerResolution = page
-    .locator(".validation-panel .witness-section")
+    .locator(".validation-panel .validation-section")
     .filter({ hasText: "Provider resolution" });
   await expect(providerResolution.getByText("provider error").first()).toBeVisible();
   await expect(providerResolution).toContainText(/provider context|Unexpected token|JSON/);
@@ -3732,12 +3745,14 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
   ).toBeVisible();
   await selectResultTab(page, "Validation");
   await expect(
-    page.locator(".validation-panel .metric-card", { hasText: "Resolved inputs" }),
+    page
+      .locator(".validation-panel .validation-section", { hasText: "Validation summary" })
+      .locator(".validation-check-row", { hasText: "Resolved inputs" }),
   ).toBeVisible();
   await expect(
     page
-      .locator(".validation-panel .metric-card", { hasText: "Status" })
-      .getByText("valid", { exact: true }),
+      .locator(".validation-panel .validation-check-row", { hasText: "Status" })
+      .locator(".validation-status-badge", { hasText: "valid" }),
   ).toBeVisible();
   expect(koiosCborRequests).toBeGreaterThan(0);
   expect(koiosTipRequests).toBe(1);

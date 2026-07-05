@@ -1469,7 +1469,8 @@ md-icon-button:focus-visible,
 .rdf-panel,
 .overlay-book-panel,
 .resolved-labels-panel,
-.sparql-lens-panel {
+.sparql-lens-panel,
+.shacl-conformance-panel {
   display: grid;
   gap: 12px;
   border: 1px solid var(--border);
@@ -1731,6 +1732,177 @@ md-icon-button:focus-visible,
   padding: 0.72rem 0.8rem;
   color: var(--md-sys-color-on-warning-container);
   font-size: 0.86rem;
+}
+
+.validation-verdict-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.validation-verdict-banner--success {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--divider));
+  background: var(--success-container);
+  color: var(--on-success-container);
+}
+
+.validation-verdict-banner--error {
+  border-color: color-mix(in srgb, var(--error) 34%, var(--divider));
+  background: var(--error-container);
+  color: var(--on-error-container);
+}
+
+.validation-verdict-icon {
+  flex: none;
+  font-size: 2.1rem;
+  font-variation-settings: "FILL" 1;
+}
+
+.validation-verdict-banner strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.validation-verdict-banner p {
+  margin: 3px 0 0;
+  font-size: 0.86rem;
+}
+
+.validation-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.validation-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  font: 500 0.78rem / 1 var(--font-sans);
+  padding: 0 13px;
+}
+
+.validation-filter-chip.is-selected {
+  border-color: var(--primary);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+
+.validation-section {
+  gap: 9px;
+}
+
+.validation-section-title {
+  letter-spacing: 0;
+}
+
+.validation-row-list {
+  gap: 8px;
+}
+
+.validation-check-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 11px;
+  border-color: var(--outline-variant);
+  background: var(--surface-container-lowest);
+  padding: 0.74rem 0.8rem;
+}
+
+.validation-status-icon {
+  align-self: start;
+  flex: none;
+  font-size: 1.38rem;
+  line-height: 1;
+}
+
+.validation-row--success .validation-status-icon {
+  color: var(--success);
+}
+
+.validation-row--warning .validation-status-icon {
+  color: var(--warning);
+}
+
+.validation-row--error .validation-status-icon {
+  color: var(--error);
+}
+
+.validation-row-body {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.validation-row-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.validation-row-title-line strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.91rem;
+}
+
+.validation-row-message {
+  margin: 0;
+  color: var(--on-surface-variant);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.validation-rule-chip,
+.validation-context-chip,
+.validation-status-badge {
+  max-width: 100%;
+}
+
+.validation-rule-chip,
+.validation-context-chip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.validation-context-chip {
+  justify-self: start;
+  background: var(--surface-container);
+}
+
+.validation-row-trailing {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.validation-row-meta.sparql-lens-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  padding: 4px 0 0;
+}
+
+.validation-empty {
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  background: var(--surface-container-lowest);
+  padding: 0.72rem 0.8rem;
 }
 
 .metric-grid {
@@ -2749,7 +2921,12 @@ pre {
   .library-book-controls,
   .library-source-heading,
   .overlay-selection-grid,
-  .sparql-lens-row {
+  .sparql-lens-row,
+  .validation-check-row {
+    grid-template-columns: 1fr;
+  }
+
+  .validation-row-meta.sparql-lens-row {
     grid-template-columns: 1fr;
   }
 

@@ -107,6 +107,14 @@ data ResultTab = StructureTab | WitnessTab | ValidationTab | GraphRdfTab
 
 derive instance eqResultTab :: Eq ResultTab
 
+data ValidationFilter = ValidationAll | ValidationPassed | ValidationWarnings | ValidationViolations
+
+derive instance eqValidationFilter :: Eq ValidationFilter
+
+data ValidationTone = ValidationPass | ValidationWarn | ValidationFail
+
+derive instance eqValidationTone :: Eq ValidationTone
+
 type State =
   { provider :: Provider
   , blockfrostKey :: String
@@ -144,6 +152,7 @@ type State =
   , decodedEmptyExpanded :: Array String
   , decodedRowStyle :: String
   , decodedBytesExpanded :: Boolean
+  , validationFilter :: ValidationFilter
   , running :: Boolean
   , copied :: Boolean
   , copiedPath :: Maybe String
@@ -256,6 +265,7 @@ data Action
   | ExpandDecodedTree
   | CollapseDecodedTree
   | ToggleDecodedBytes
+  | SetValidationFilter ValidationFilter
   | SelectResultTab ResultTab
   | ChangeInput
   | Navigate Route MouseEvent
@@ -305,6 +315,7 @@ inspectorComponent initial =
         , decodedEmptyExpanded: []
         , decodedRowStyle: "quiet"
         , decodedBytesExpanded: true
+        , validationFilter: ValidationAll
         , running: false
         , copied: false
         , copiedPath: Nothing
@@ -2398,13 +2409,188 @@ inspectorComponent initial =
               , HH.p_ [ HH.text validation.subtitle ]
               ]
           ]
-      , HH.div
-          [ classNames [ "metric-grid" ] ]
-          (map renderMetric validation.metrics)
-      , renderWitnessWarnings validation.warnings
+      , renderValidationVerdictBanner state validation
+      , renderValidationFilters state.validationFilter (validationSurfaceCounts validation state.shaclConformance)
+      , renderValidationRowGroup state.validationFilter "Validation summary"
+          (map (renderValidationMetricRow state) validation.metrics)
+      , renderValidationRowGroup state.validationFilter "Warnings"
+          (map (renderValidationWarningRow state) validation.warnings)
       , HH.div_
-          (map (renderValidationSection state) validation.sections)
+          (map (renderValidationSection state state.validationFilter) validation.sections)
       ]
+
+  renderValidationVerdictBanner state validation =
+    let
+      counts = validationSurfaceCounts validation state.shaclConformance
+      conforms = validation.valid && shaclConformancePasses state.shaclConformance
+      tone = if conforms then ValidationPass else ValidationFail
+      title =
+        if conforms then "Validation passed"
+        else "Validation needs attention"
+      detail =
+        if conforms then validationTallyText counts
+        else show (shaclViolationCount state.shaclConformance) <> " violations / " <> validationTallyText counts
+    in
+      HH.div
+        [ classNames
+            [ "validation-verdict-banner"
+            , "validation-verdict-banner--" <> validationToneClass tone
+            ]
+        ]
+        [ HH.element (HH.ElemName "md-icon")
+            [ classNames [ "validation-verdict-icon" ] ]
+            [ HH.text (if conforms then "verified" else "error") ]
+        , HH.div_
+            [ HH.strong_ [ HH.text title ]
+            , HH.p_ [ HH.text detail ]
+            ]
+        ]
+
+  shaclConformancePasses conformance =
+    case conformance of
+      Just value ->
+        case value.error of
+          Just _ -> false
+          Nothing ->
+            case value.report of
+              Just report -> report.conforms
+              Nothing     -> true
+      Nothing -> true
+
+  renderValidationFilters selected counts =
+    HH.div
+      [ classNames [ "validation-filter-chips" ]
+      , HH.attr (HH.AttrName "role") "toolbar"
+      , HH.attr (HH.AttrName "aria-label") "Validation filters"
+      ]
+      [ renderValidationFilterChip selected ValidationAll ("All " <> show (validationCountsTotal counts))
+      , renderValidationFilterChip selected ValidationPassed ("Passed " <> show counts.passed)
+      , renderValidationFilterChip selected ValidationWarnings ("Warnings " <> show counts.warnings)
+      , renderValidationFilterChip selected ValidationViolations ("Violations " <> show counts.violations)
+      ]
+
+  renderValidationFilterChip selected validationFilter label =
+    let
+      active = selected == validationFilter
+    in
+      HH.button
+        [ classNames
+            ( if active then
+                [ "validation-filter-chip", "is-selected" ]
+              else
+                [ "validation-filter-chip" ]
+            )
+        , HH.attr (HH.AttrName "type") "button"
+        , HH.attr (HH.AttrName "aria-pressed") (if active then "true" else "false")
+        , HE.onClick (\_ -> SetValidationFilter validationFilter)
+        ]
+        [ HH.text label ]
+
+  renderValidationMetricRow state metric =
+    let
+      tone = validationMetricTone metric
+    in
+      { tone
+      , node:
+          renderValidationCheckRow state tone metric.label "ledger:metric" metric.value "" metric.value false "" "" [] []
+      }
+
+  renderValidationWarningRow state warning =
+    { tone: ValidationWarn
+    , node:
+        renderValidationCheckRow state ValidationWarn "Warning" "ledger:warning" warning "" "warning" false "" "" [] []
+    }
+
+  renderValidationCheckRow state tone title rule message context badge canCopy copyPath copyValue extra rowClasses =
+    HH.div
+      [ classNames
+          ( [ "identity-row"
+            , "witness-row"
+            , "validation-check-row"
+            , "validation-row--" <> validationToneClass tone
+            ]
+              <> rowClasses
+          )
+      ]
+      [ HH.element (HH.ElemName "md-icon")
+          [ classNames [ "validation-status-icon" ] ]
+          [ HH.text (validationToneIcon tone) ]
+      , HH.div
+          [ classNames [ "validation-row-body" ] ]
+          ( [ HH.div
+                [ classNames [ "validation-row-title-line" ] ]
+                [ HH.strong_ [ HH.text title ]
+                , renderValidationRuleChip rule
+                ]
+            , HH.p
+                [ classNames [ "validation-row-message" ] ]
+                [ HH.text message ]
+            , renderValidationContextChip context
+            ]
+              <> extra
+          )
+      , HH.div
+          [ classNames [ "validation-row-trailing" ] ]
+          ( [ renderValidationStatusBadge tone badge ]
+              <> if canCopy then
+                [ HH.element (HH.ElemName "md-outlined-button")
+                    [ HE.onClick (\_ -> CopyValue copyPath copyValue)
+                    , classNames [ "inline-action" ]
+                    , HH.attr (HH.AttrName "role") "button"
+                    , mdControl "inline"
+                    ]
+                    [ HH.text
+                        ( if state.copiedPath == Just copyPath then
+                            "Copied"
+                          else
+                            "Copy"
+                        )
+                    ]
+                ]
+              else
+                []
+          )
+      ]
+
+  renderValidationRuleChip rule =
+    if rule == "" then HH.text ""
+    else
+      HH.code
+        [ classNames [ "li-chip", "validation-rule-chip" ] ]
+        [ HH.text rule ]
+
+  renderValidationContextChip context =
+    if context == "" then HH.text ""
+    else
+      HH.code
+        [ classNames [ "li-chip", "validation-context-chip" ] ]
+        [ HH.text context ]
+
+  renderValidationStatusBadge tone badge =
+    HH.span
+      [ classNames
+          [ "li-chip"
+          , "validation-status-badge"
+          , validationToneChipClass tone
+          ]
+      ]
+      [ HH.text badge ]
+
+  renderValidationRowGroup selected title rows =
+    let
+      visibleRows = Array.filter (\row -> validationFilterAllows selected row.tone) rows
+    in
+      if Array.null visibleRows then HH.text ""
+      else
+        HH.div
+          [ classNames [ "witness-section", "validation-section" ] ]
+          [ HH.div
+              [ classNames [ "identity-section-title", "validation-section-title" ] ]
+              [ HH.text title ]
+          , HH.div
+              [ classNames [ "witness-row-list", "validation-row-list" ] ]
+              (map _.node visibleRows)
+          ]
 
   renderRdfGraph rdf =
     HH.div
@@ -2545,31 +2731,26 @@ inspectorComponent initial =
               , HH.p_ [ HH.text "Selected SHACL shapes validate the composed RDF graph." ]
               ]
           ]
-      , HH.div
-          [ classNames [ "witness-section" ] ]
-          [ HH.div
-              [ classNames [ "identity-section-title" ] ]
-              [ HH.text "Selected shapes" ]
-          , HH.div
-              [ classNames [ "witness-row-list" ] ]
-              (map renderSelectedShape conformance.shapeLabels)
-          ]
+      , renderValidationRowGroup state.validationFilter "Selected shapes"
+          (map (renderSelectedShape state) conformance.shapeLabels)
       , case conformance.error of
           Just err ->
-            HH.div
-              [ classNames [ "sparql-lens-error" ] ]
-              [ HH.text ("SHACL validation failed: " <> err) ]
+            renderValidationRowGroup state.validationFilter "SHACL report"
+              [ { tone: ValidationFail
+                , node:
+                    renderValidationCheckRow state ValidationFail "SHACL validation failed" "sh:ValidationReport" err "" "error" false "" "" [] []
+                }
+              ]
           Nothing ->
             case conformance.report of
               Just report ->
                 HH.div_
-                  [ HH.div
-                      [ classNames [ "metric-grid" ] ]
-                      [ renderMetric
+                  [ renderValidationRowGroup state.validationFilter "SHACL verdict"
+                      [ renderShaclMetricRow state
                           { label: "Author gate"
                           , value: if report.conforms then "pass" else "fail"
                           }
-                      , renderMetric
+                      , renderShaclMetricRow state
                           { label: "Auditor classifier"
                           , value:
                               if report.conforms then
@@ -2586,45 +2767,63 @@ inspectorComponent initial =
                   [ HH.text "No SHACL report." ]
       ]
 
-  renderSelectedShape label =
-    HH.div
-      [ classNames [ "identity-row", "witness-row" ] ]
-      [ HH.span
-          [ classNames [ "identity-label" ] ]
-          [ HH.text "Shape book" ]
-      , HH.code_ [ HH.text label ]
-      ]
+  renderSelectedShape state label =
+    { tone: ValidationPass
+    , node:
+        renderValidationCheckRow state ValidationPass "Shape book" "sh:NodeShape" label "" "selected" false "" "" [] []
+    }
+
+  renderShaclMetricRow state metric =
+    let
+      tone = validationMetricTone metric
+    in
+      { tone
+      , node:
+          renderValidationCheckRow state tone metric.label "sh:ValidationReport" metric.value "" metric.value false "" "" [] []
+      }
 
   renderShaclViolations state report =
     if Array.null report.violations then
-      HH.div
-        [ classNames [ "witness-empty" ] ]
-        [ HH.text "No phase-1 issues." ]
-    else
-      HH.div
-        [ classNames [ "witness-section" ] ]
-        [ HH.div
-            [ classNames [ "identity-section-title" ] ]
-            [ HH.text "Phase-1 issues" ]
-        , HH.div
-            [ classNames [ "sparql-lens-row-list" ] ]
-            (map (renderShaclViolationRow state) report.violations)
+      renderValidationRowGroup state.validationFilter "Phase-1 issues"
+        [ { tone: ValidationPass
+          , node:
+              renderValidationCheckRow state ValidationPass "Phase-1 issues" "sh:ValidationReport" "No phase-1 issues." "" "pass" false "" "" [] []
+          }
         ]
+    else
+      renderValidationRowGroup state.validationFilter "Phase-1 issues"
+        (map (renderShaclViolationRow state) report.violations)
 
   renderShaclViolationRow state violation =
     let
       severity = normalizedShaclSeverity violation.severity
+      tone = validationSeverityTone severity
+      context = shaclViolationContext state violation
     in
-    HH.div
-      [ classNames [ "sparql-lens-row", "shacl-violation-row", "shacl-" <> severity ] ]
-      [ renderShaclViolationCell "Severity" severity
-      , renderShaclViolationLocationCell state violation
-      , renderShaclViolationCell "Focus node" violation.focusNode
-      , renderShaclViolationCell "Path" violation.path
-      , renderShaclViolationCell "Source shape" violation.sourceShape
-      , renderShaclViolationCell "Message" violation.message
-      , renderShaclViolationCell "Constraint" violation.sourceConstraintComponent
-      ]
+      { tone
+      , node:
+          renderValidationCheckRow state tone "SHACL violation" violation.sourceShape violation.message context severity false "" ""
+            [ HH.div
+                [ classNames [ "validation-row-meta", "sparql-lens-row" ] ]
+                [ renderShaclViolationCell "Severity" severity
+                , renderShaclViolationLocationCell state violation
+                , renderShaclViolationCell "Focus node" violation.focusNode
+                , renderShaclViolationCell "Path" violation.path
+                , renderShaclViolationCell "Source shape" violation.sourceShape
+                , renderShaclViolationCell "Message" violation.message
+                , renderShaclViolationCell "Constraint" violation.sourceConstraintComponent
+                ]
+            ]
+            [ "shacl-violation-row", "shacl-" <> severity ]
+      }
+
+  shaclViolationContext state violation =
+    case shaclFocusRow state violation.focusNode of
+      Just row -> shaclFocusRowLabel row
+      Nothing ->
+        if violation.path /= "" then violation.path
+        else if violation.focusNode == "" then "transaction graph"
+        else violation.focusNode
 
   normalizedShaclSeverity severity =
     if severity == "warning" then "warning"
@@ -2863,33 +3062,189 @@ inspectorComponent initial =
           ]
       ]
 
-  renderValidationSection state section =
-    HH.div
-      [ classNames [ "witness-section" ] ]
-      [ HH.div
-          [ classNames [ "identity-section-title" ] ]
-          [ HH.text section.title ]
-      , if Array.null section.rows then
-          HH.div
-            [ classNames [ "witness-empty" ] ]
+  renderValidationSection state selected section =
+    if Array.null section.rows then
+      HH.div
+        [ classNames [ "witness-section", "validation-section" ] ]
+        [ HH.div
+            [ classNames [ "identity-section-title", "validation-section-title" ] ]
+            [ HH.text section.title ]
+        , HH.div
+            [ classNames [ "witness-empty", "validation-empty" ] ]
             [ HH.text section.empty ]
-        else
-          HH.div
-            [ classNames [ "witness-row-list" ] ]
-            (map (renderValidationRow state section.title) section.rows)
-      ]
+        ]
+    else
+      renderValidationRowGroup selected section.title
+        (map (renderValidationRow state section.title) section.rows)
 
   renderValidationRow state sectionTitle row =
     let
       presented = presentValidationRow sectionTitle row
+      tone = validationSectionRowTone sectionTitle presented
+      message =
+        if presented.detail == "" then presented.value
+        else presented.detail
+      context =
+        if sectionTitle == "Checks" || presented.detail == "" then ""
+        else presented.value
+      badge =
+        if sectionTitle == "Checks" then presented.value
+        else validationToneBadge tone
+      canCopy = validationRowCanCopy sectionTitle presented
     in
-      renderWitnessRowWithCopy state (validationRowCanCopy sectionTitle presented) presented
+      { tone
+      , node:
+          renderValidationCheckRow state tone presented.label sectionTitle message context badge canCopy presented.path presented.copyValue [] []
+      }
 
   validationRowCanCopy sectionTitle row =
     case sectionTitle of
       "Checks" -> false
       "Missing context" -> StringCodeUnits.length row.copyValue == 64
       _ -> true
+
+  validationSurfaceCounts validation conformance =
+    let
+      validationCounts = validationToneCounts (validationPanelTones validation)
+      shaclCounts = validationToneCounts (shaclConformanceTones conformance)
+    in
+      { passed: validationCounts.passed + shaclCounts.passed
+      , warnings: validationCounts.warnings + shaclCounts.warnings
+      , violations: validationCounts.violations + shaclCounts.violations
+      }
+
+  validationPanelTones validation =
+    map validationMetricTone validation.metrics
+      <> map (\_ -> ValidationWarn) validation.warnings
+      <> Array.concat (map validationSectionTones validation.sections)
+
+  validationSectionTones section =
+    map
+      (\row -> validationSectionRowTone section.title (presentValidationRow section.title row))
+      section.rows
+
+  shaclConformanceTones conformance =
+    case conformance of
+      Nothing -> []
+      Just value ->
+        map (\_ -> ValidationPass) value.shapeLabels
+          <> case value.error of
+            Just _ -> [ ValidationFail ]
+            Nothing ->
+              case value.report of
+                Just report -> shaclReportTones report
+                Nothing     -> []
+
+  shaclReportTones report =
+    [ validationMetricTone
+        { label: "Author gate"
+        , value: if report.conforms then "pass" else "fail"
+        }
+    , validationMetricTone
+        { label: "Auditor classifier"
+        , value:
+            if report.conforms then
+              "canonical-pipeline match"
+            else
+              "foreign/off-spec"
+        }
+    ]
+      <> if Array.null report.violations then
+        [ ValidationPass ]
+      else
+        map (\violation -> validationSeverityTone (normalizedShaclSeverity violation.severity)) report.violations
+
+  validationToneCounts tones =
+    { passed: validationToneCount ValidationPass tones
+    , warnings: validationToneCount ValidationWarn tones
+    , violations: validationToneCount ValidationFail tones
+    }
+
+  validationToneCount tone tones =
+    Array.length (Array.filter (_ == tone) tones)
+
+  validationCountsTotal counts =
+    counts.passed + counts.warnings + counts.violations
+
+  validationTallyText counts =
+    show (validationCountsTotal counts)
+      <> " checks evaluated / "
+      <> show counts.passed
+      <> " passed / "
+      <> show counts.warnings
+      <> " warnings / "
+      <> show counts.violations
+      <> " violations"
+
+  shaclViolationCount conformance =
+    case conformance of
+      Just value ->
+        case value.report of
+          Just report -> Array.length report.violations
+          Nothing     -> 0
+      Nothing -> 0
+
+  validationMetricTone metric =
+    if validationTextIsFailure metric.value then ValidationFail
+    else if validationTextIsWarning metric.value then ValidationWarn
+    else ValidationPass
+
+  validationSectionRowTone sectionTitle row =
+    if sectionTitle == "Missing context" then ValidationWarn
+    else if validationTextIsFailure row.value then ValidationFail
+    else if validationTextIsWarning row.value then ValidationWarn
+    else ValidationPass
+
+  validationSeverityTone severity =
+    if severity == "warning" || severity == "info" then ValidationWarn
+    else ValidationFail
+
+  validationTextIsFailure value =
+    value == "fail"
+      || value == "failed"
+      || value == "invalid"
+      || value == "foreign/off-spec"
+      || value == "provider error"
+      || value == "error"
+
+  validationTextIsWarning value =
+    value == "incomplete"
+      || value == "not evaluated"
+      || value == "not_evaluated"
+      || value == "needs context"
+      || value == "warning"
+      || value == "warn"
+
+  validationFilterAllows selected tone =
+    case selected of
+      ValidationAll        -> true
+      ValidationPassed     -> tone == ValidationPass
+      ValidationWarnings   -> tone == ValidationWarn
+      ValidationViolations -> tone == ValidationFail
+
+  validationToneClass tone =
+    case tone of
+      ValidationPass -> "success"
+      ValidationWarn -> "warning"
+      ValidationFail -> "error"
+
+  validationToneChipClass tone =
+    case tone of
+      ValidationPass -> "li-chip--success"
+      ValidationWarn -> "li-chip--warning"
+      ValidationFail -> "li-chip--error"
+
+  validationToneIcon tone =
+    case tone of
+      ValidationPass -> "check_circle"
+      ValidationWarn -> "warning"
+      ValidationFail -> "error"
+
+  validationToneBadge tone =
+    case tone of
+      ValidationPass -> "pass"
+      ValidationWarn -> "warning"
+      ValidationFail -> "error"
 
   presentValidationRow sectionTitle row =
     case sectionTitle of
@@ -3670,6 +4025,7 @@ inspectorComponent initial =
           , decodedTreeExpanded = []
           , decodedEmptyExpanded = []
           , decodedBytesExpanded = true
+          , validationFilter = ValidationAll
           , annotationDraft = Nothing
           , copied = false
           , copiedPath = Nothing
@@ -3866,6 +4222,8 @@ inspectorComponent initial =
             }
     ToggleDecodedBytes ->
       H.modify_ \st -> st { decodedBytesExpanded = not st.decodedBytesExpanded }
+    SetValidationFilter validationFilter ->
+      H.modify_ _ { validationFilter = validationFilter }
     SelectResultTab tab ->
       H.modify_ _ { resultTab = tab }
     ChangeInput ->
