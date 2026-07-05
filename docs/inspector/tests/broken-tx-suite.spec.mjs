@@ -43,8 +43,8 @@ async function gotoApp(page) {
 
 async function decodeHex(page, hex) {
   await gotoApp(page);
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(hex);
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(hex);
   await page.getByRole("button", { name: "Decode" }).click();
   const resultPanel = page.locator(".result-panel");
   await expect(

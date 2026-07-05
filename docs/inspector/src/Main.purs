@@ -360,7 +360,10 @@ inspectorComponent initial =
                 renderLoadedInspectorHeader state
               else
                 renderLoadForm state
-            , renderBooksPanel state false
+            , if showLoadedHeader then
+                renderBooksPanel state false
+              else
+                HH.text ""
             , HH.div
                 [ classNames [ "workspace-main" ] ]
                 [ renderResult state ]
@@ -373,8 +376,12 @@ inspectorComponent initial =
   renderLoadForm state =
     HH.div
       [ classNames [ "load-form-stack" ] ]
-      [ renderSettingsSummary state
-      , renderModeTabs state
+      [ renderModeTabs state
+      , HH.div
+          [ classNames [ "initial-support-grid" ] ]
+          [ renderBooksPanel state false
+          , renderSettingsSummary state
+          ]
       ]
 
   renderSettings state =
@@ -693,31 +700,51 @@ inspectorComponent initial =
 
   renderSettingsSummary state =
     HH.element (HH.ElemName "md-elevated-card")
-      [ classNames [ "settings-summary" ]
-      , mdSurface "provider"
+      [ classNames [ "settings-summary", "decode-config-panel" ]
+      , mdSurface "input"
       ]
       [ HH.div
-          [ classNames [ "settings-summary-copy" ] ]
-          [ HH.span
-              [ classNames [ "identity-section-title" ] ]
-              [ HH.text "Chain data" ]
-          , HH.strong_
-              [ HH.text
-                  (Provider.providerName state.provider <> " / " <> networkName state.network)
+          [ classNames [ "li-panel-header", "decode-config-header" ] ]
+          [ HH.div
+              [ classNames [ "panel-title-lockup" ] ]
+              [ HH.element (HH.ElemName "md-icon") [] [ HH.text "tune" ]
+              , HH.div_
+                  [ HH.h2
+                      [ classNames [ "li-panel-title" ] ]
+                      [ HH.text "Decode config" ]
+                  , HH.p_ [ HH.text "Provider context used when a hash lookup needs chain data." ]
+                  ]
               ]
-          , HH.div
-              [ classNames [ "settings-meta-row" ] ]
-              [ HH.span_ [ HH.text "Provider" ]
-              , HH.span_ [ HH.text "Network" ]
-              , HH.span_ [ HH.text "Key setting" ]
+          , HH.a
+              [ classNames [ "header-link" ]
+              , HP.href (state.routeBase <> Routing.routePath RouteSettings)
+              , HE.onClick (Navigate RouteSettings)
               ]
+              [ HH.text "Settings" ]
           ]
-      , HH.a
-          [ classNames [ "header-link" ]
-          , HP.href (state.routeBase <> Routing.routePath RouteSettings)
-          , HE.onClick (Navigate RouteSettings)
+      , HH.div
+          [ classNames [ "decode-config-body" ] ]
+          [ renderConfigRow "hub" "Provider" (Provider.providerName state.provider)
+          , renderConfigRow "public" "Network" (networkName state.network)
+          , renderConfigRow
+              "vpn_key"
+              "Credentials"
+              ( if state.persistKeys then
+                  "Persistent browser storage"
+                else
+                  "Session only"
+              )
           ]
-          [ HH.text "Settings" ]
+      ]
+
+  renderConfigRow icon label value =
+    HH.div
+      [ classNames [ "decode-config-row" ] ]
+      [ HH.element (HH.ElemName "md-icon") [] [ HH.text icon ]
+      , HH.div_
+          [ HH.span_ [ HH.text label ]
+          , HH.strong_ [ HH.text value ]
+          ]
       ]
 
   renderLoadedInspectorHeader state =
@@ -863,15 +890,6 @@ inspectorComponent initial =
           , HE.onClick (Navigate RouteLibrary)
           ]
           [ HH.text "Library" ]
-      applyButton =
-        HH.element (HH.ElemName "md-filled-button")
-          [ classNames [ "primary-action" ]
-          , HH.attr (HH.AttrName "role") "button"
-          , mdControl "primary"
-          , HP.disabled state.running
-          , HE.onClick (\_ -> ApplySelectedBooks)
-          ]
-          [ HH.text "Apply selected books" ]
     in
       if collapsed then
         -- Once a transaction is decoded, the loaded-inspector header already shows the
@@ -880,52 +898,94 @@ inspectorComponent initial =
         HH.text ""
       else
         HH.element (HH.ElemName "md-elevated-card")
-          [ classNames [ "panel", "books-panel" ]
+          [ classNames [ "panel", "books-panel", "resolution-books-panel" ]
           , mdSurface "books"
           ]
           [ HH.div
-              [ classNames [ "panel-heading" ] ]
-              [ HH.div_
-                  [ HH.h2_ [ HH.text "Books" ]
-                  , HH.p_ [ HH.text "Selected overlay, blueprint, and SHACL sources." ]
+              [ classNames [ "li-panel-header", "books-panel-header" ] ]
+              [ HH.div
+                  [ classNames [ "panel-title-lockup" ] ]
+                  [ HH.element (HH.ElemName "md-icon") [] [ HH.text "menu_book" ]
+                  , HH.div_
+                      [ HH.h2
+                          [ classNames [ "li-panel-title" ] ]
+                          [ HH.text "Resolution books" ]
+                      , HH.p_ [ HH.text "RDF sources that name on-chain identifiers." ]
+                      ]
+                  ]
+              , HH.a
+                  [ classNames [ "header-link", "books-add-link" ]
+                  , HP.href (state.routeBase <> Routing.routePath RouteLibrary)
+                  , HE.onClick (Navigate RouteLibrary)
+                  ]
+                  [ HH.element (HH.ElemName "md-icon") [] [ HH.text "add" ]
+                  , HH.text "Add"
                   ]
               ]
-          , pills
           , HH.div
-              [ classNames [ "books-actions" ] ]
-              [ libraryLink
-              , HH.element (HH.ElemName "md-filled-button")
-                  [ classNames [ "primary-action" ]
-                  , HH.attr (HH.AttrName "role") "button"
-                  , mdControl "primary"
-                  , HP.disabled state.running
-                  , HE.onClick (\_ -> ApplySelectedBooks)
-                  ]
-                  [ HH.text "Apply selected books" ]
+              [ classNames [ "books-panel-body" ] ]
+              [ pills
+              , HH.div
+                  [ classNames [ "books-list" ] ]
+                  ( if Array.null selected then
+                      [ HH.div
+                          [ classNames [ "li-empty-state", "books-empty-state" ] ]
+                          [ HH.element (HH.ElemName "md-icon") [ classNames [ "li-empty-icon" ] ] [ HH.text "menu_book" ]
+                          , HH.div [ classNames [ "li-empty-title" ] ] [ HH.text "No selected books" ]
+                          , HH.p [ classNames [ "li-empty-copy" ] ] [ HH.text "Select books in Library to resolve ledger names." ]
+                          ]
+                      ]
+                    else
+                      map renderSelectedBook selected
+                  )
               ]
           , HH.div
-              [ classNames [ "books-list" ] ]
-              ( if Array.null selected then
-                  [ HH.div
-                      [ classNames [ "empty-state" ] ]
-                      [ HH.text "No selected books. Select books in Library." ]
+              [ classNames [ "books-panel-footer" ] ]
+              [ HH.div
+                  [ classNames [ "sparql-status" ] ]
+                  [ HH.element (HH.ElemName "md-icon") [] [ HH.text "hub" ]
+                  , HH.span_
+                      [ HH.text
+                          ( "SPARQL engine ready - "
+                              <> show (Array.length selected)
+                              <> " books loaded"
+                          )
+                      ]
                   ]
-                else
-                  map renderSelectedBook selected
-              )
+              , HH.div
+                  [ classNames [ "books-actions" ] ]
+                  [ libraryLink
+                  , HH.element (HH.ElemName "md-filled-button")
+                      [ classNames [ "primary-action" ]
+                      , HH.attr (HH.AttrName "role") "button"
+                      , mdControl "primary"
+                      , HP.disabled state.running
+                      , HE.onClick (\_ -> ApplySelectedBooks)
+                      ]
+                      [ HH.text "Apply selected books" ]
+                  ]
+              ]
           ]
 
   renderSelectedBook book =
     HH.div
       [ classNames [ "book-summary-row" ] ]
-      [ HH.strong_ [ HH.text book.name ]
-      , HH.span_
-          [ HH.text
-              ( libraryBookSummary book
-                  <> " - "
-                  <> book.source
-              )
+      [ HH.span
+          [ classNames [ "book-status-dot" ] ]
+          []
+      , HH.div
+          [ classNames [ "book-summary-copy" ] ]
+          [ HH.strong_ [ HH.text book.name ]
+          , HH.code
+              [ classNames [ "book-source" ] ]
+              [ HH.text book.source ]
           ]
+      , HH.span
+          [ classNames [ "book-term-count" ] ]
+          [ HH.text (libraryBookSummary book) ]
+      , HH.element (HH.ElemName "md-icon")
+          [ classNames [ "book-status-icon" ] ]
+          [ HH.text "check_circle" ]
       ]
 
   renderDecodedStructure state =
@@ -1823,21 +1883,55 @@ inspectorComponent initial =
       , mdSurface "input"
       ]
       [ HH.div
-          [ classNames [ "panel-heading" ] ]
-          [ HH.h2_ [ HH.text "Paste here" ]
-          , HH.p_ [ HH.text "Fetch by transaction hash or paste raw CBOR hex." ]
-          ]
-      , HH.fieldset
-          [ classNames [ "control-group" ] ]
-          [ HH.legend_ [ HH.text "Mode" ]
+          [ classNames [ "input-panel-header" ] ]
+          [ HH.div
+              [ classNames [ "input-panel-title" ] ]
+              [ HH.h1_ [ HH.text "Inspect a Cardano transaction" ]
+              , HH.p_ [ HH.text "Decodes locally in browser; nothing is sent to a server." ]
+              ]
           , HH.div
-              [ classNames [ "mode-options" ] ]
-              [ modeRadio state ByHash "Tx hash"
-              , modeRadio state ByHex  "CBOR hex"
+              [ classNames [ "input-trust-row" ] ]
+              [ HH.span
+                  [ classNames [ "li-chip", "li-chip--success" ] ]
+                  [ HH.element (HH.ElemName "md-icon") [] [ HH.text "lock" ]
+                  , HH.text "Local browser decode"
+                  ]
+              , HH.span
+                  [ classNames [ "li-chip", "li-chip--primary" ] ]
+                  [ HH.element (HH.ElemName "md-icon") [] [ HH.text "rule" ]
+                  , HH.text "Phase-1 validation"
+                  ]
               ]
           ]
-      , renderBody state
+      , HH.div
+          [ classNames [ "li-tabs", "input-mode-tabs" ]
+          , HH.attr (HH.AttrName "role") "tablist"
+          , HH.attr (HH.AttrName "aria-label") "Input mode"
+          ]
+          [ renderModeTab state ByHex "Paste CBOR" "data_object"
+          , renderModeTab state ByHash "Fetch by hash" "tag"
+          ]
+      , HH.div
+          [ classNames [ "input-mode-panel" ]
+          , HH.attr (HH.AttrName "role") "tabpanel"
+          ]
+          [ renderBody state ]
       , renderExamplesPicker
+      ]
+
+  renderModeTab state mode label icon =
+    HH.button
+      [ classNames
+          ( [ "li-tab", "input-mode-tab" ]
+              <> if state.mode == mode then [ "is-active" ] else []
+          )
+      , HH.attr (HH.AttrName "type") "button"
+      , HH.attr (HH.AttrName "role") "tab"
+      , HH.attr (HH.AttrName "aria-selected") (if state.mode == mode then "true" else "false")
+      , HE.onClick (\_ -> SelectMode mode)
+      ]
+      [ HH.element (HH.ElemName "md-icon") [] [ HH.text icon ]
+      , HH.text label
       ]
 
   renderExamplesPicker =
@@ -1845,22 +1939,18 @@ inspectorComponent initial =
       [ classNames [ "examples-picker" ] ]
       [ HH.div
           [ classNames [ "examples-heading" ] ]
-          [ HH.h3_ [ HH.text "Examples" ]
-          , HH.p_
-              [ HH.text
-                  "Load a sample transaction — valid, or deliberately broken — to see the phase-1 validation fire."
-              ]
-          ]
+          [ HH.h3_ [ HH.text "Examples" ] ]
       , HH.div
           [ classNames [ "example-chips" ] ]
           (map renderExampleChip Examples.examples)
       ]
 
   renderExampleChip ex =
-    HH.element (HH.ElemName "md-outlined-button")
+    HH.element (HH.ElemName (if ex.severity == "valid" then "md-filled-tonal-button" else "md-outlined-button"))
       [ classNames [ "example-chip", "example-" <> ex.severity ]
       , HH.attr (HH.AttrName "role") "button"
       , HP.title ex.description
+      , mdControl (if ex.severity == "valid" then "primary" else "secondary")
       , HE.onClick (\_ -> LoadExample ex.cbor)
       ]
       [ HH.span [ classNames [ "example-sev" ] ] [ HH.text (severityIcon ex.severity) ]
@@ -1891,8 +1981,9 @@ inspectorComponent initial =
       HH.div
         [ classNames [ "decode-form", "hash-form" ] ]
         [ HH.input
-            [ HP.type_ HP.InputText
-            , HP.placeholder "64-char tx hash"
+            [ classNames [ "li-field" ]
+            , HP.type_ HP.InputText
+            , HP.placeholder "Transaction hash (64 hex chars)"
             , HP.value state.txHash
             , HE.onValueInput SetTxHash
             ]
@@ -1903,14 +1994,15 @@ inspectorComponent initial =
             , mdControl "primary"
             , HE.onClick (\_ -> Decode)
             ]
-            [ HH.text (if state.running then "Fetching..." else "Fetch and decode") ]
+            [ HH.text (if state.running then "Fetching..." else "Decode") ]
         ]
     ByHex ->
       HH.div
         [ classNames [ "decode-form" ] ]
         [ HH.textarea
-            [ HP.value state.txHex
-            , HP.placeholder "Conway tx CBOR hex..."
+            [ classNames [ "li-textarea" ]
+            , HP.value state.txHex
+            , HP.placeholder "Paste Conway transaction CBOR hex"
             , HP.rows 9
             , HE.onValueInput SetTxHex
             ]
@@ -1939,15 +2031,19 @@ inspectorComponent initial =
       Nothing -> case state.result of
         Nothing ->
           HH.element (HH.ElemName "md-elevated-card")
-            [ classNames [ "panel", "result-panel", "empty-result" ]
+            [ classNames [ "panel", "result-panel", "empty-result", "friendly-empty-result" ]
             , mdSurface "result"
             ]
             [ HH.div
-                [ classNames [ "panel-heading" ] ]
-                [ HH.h2_ [ HH.text "Decoded structure" ] ]
-            , HH.div
-                [ classNames [ "empty-state" ] ]
-                [ HH.text "No result yet." ]
+                [ classNames [ "li-empty-state", "initial-decoded-empty" ] ]
+                [ HH.element (HH.ElemName "md-icon") [ classNames [ "li-empty-icon" ] ] [ HH.text "account_tree" ]
+                , HH.h2
+                    [ classNames [ "li-empty-title" ] ]
+                    [ HH.text "No transaction decoded yet" ]
+                , HH.p
+                    [ classNames [ "li-empty-copy" ] ]
+                    [ HH.text "Paste CBOR above or pick an example. The decoded body, witnesses, and validation results will appear here with hashes resolved to names by your books." ]
+                ]
             ]
         Just r ->
           let

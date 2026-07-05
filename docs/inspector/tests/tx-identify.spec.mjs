@@ -980,12 +980,12 @@ async function decodeTxCbor(page, route, txCbor) {
 }
 
 async function submitTxCbor(page, txCbor) {
-  const cborMode = page.getByRole("radio", { name: "CBOR hex" });
+  const cborMode = page.getByRole("tab", { name: "Paste CBOR" });
   if ((await cborMode.count()) === 0) {
     await page.getByRole("button", { name: "Change input" }).click();
   }
-  await cborMode.check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await cborMode.click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   const resultPanel = page.locator(".result-panel");
@@ -1085,7 +1085,7 @@ async function expectCQuisitorInspectSurface(page, route) {
 
   await expect(page.locator(".workspace-left")).toHaveCount(0);
   await expect(page.locator(".workspace-right")).toHaveCount(0);
-  await expect(booksPanel.getByRole("heading", { name: "Books" })).toBeVisible();
+  await expect(booksPanel.getByRole("heading", { name: "Resolution books" })).toBeVisible();
   const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
   await expect(tabs.getByRole("tab", { name: "Structure" })).toHaveAttribute(
     "aria-selected",
@@ -1639,7 +1639,7 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(navigation.getByRole("link", { name: "Inspect" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Library" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "CBOR hex" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Decode" })).toBeVisible();
 
   const initialTheme = await page.evaluate(
@@ -1677,7 +1677,7 @@ test("MD3 shell keeps route navigation inside deployed subpaths", async ({
   await withPrefixedInspectorSite(async (baseUrl) => {
     const routes = [
       { path: "inspect", assert: async () => {
-        await expect(page.getByRole("radio", { name: "CBOR hex" })).toBeVisible();
+        await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
       } },
       { path: "settings", assert: async () => {
         await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
@@ -1703,7 +1703,7 @@ test("MD3 shell keeps route navigation inside deployed subpaths", async ({
 
     const navigation = page.getByRole("banner").getByRole("navigation");
     await navigation.getByRole("link", { name: "Inspect" }).click();
-    await expect(page.getByRole("radio", { name: "CBOR hex" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
     expect(page.url().startsWith(`${baseUrl}inspect`)).toBe(true);
     expect(new URL(page.url()).pathname).not.toBe("/inspect");
   });
@@ -1795,13 +1795,14 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   );
 });
 
-test("inspect stacks load form, books, and decoded result vertically", async ({
+test("inspect lays out input, support panels, and decoded result", async ({
   page,
 }) => {
   await page.goto("/inspect");
 
   await expect(page.locator(".provider-panel")).toHaveCount(0);
   const workspace = page.locator(".workspace");
+  const supportGrid = workspace.locator(".initial-support-grid");
   const settingsSummary = workspace.locator(".settings-summary");
   const inputPanel = workspace.locator(".input-panel");
   const booksPanel = workspace.locator(".books-panel");
@@ -1814,9 +1815,16 @@ test("inspect stacks load form, books, and decoded result vertically", async ({
   await expect(settingsSummary).toContainText("mainnet");
   await expect(settingsSummary.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(inputPanel).toBeVisible();
-  await expect(booksPanel.getByRole("heading", { name: "Books" })).toBeVisible();
+  await expect(inputPanel.getByRole("heading", { name: "Inspect a Cardano transaction" })).toBeVisible();
+  await expect(inputPanel).toContainText("Decodes locally in browser");
+  await expect(inputPanel.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
+  await expect(inputPanel.getByRole("tab", { name: "Fetch by hash" })).toBeVisible();
+  await expect(inputPanel.locator(".example-valid")).toBeVisible();
+  await expect(inputPanel.locator(".example-violation").first()).toBeVisible();
+  await expect(supportGrid).toBeVisible();
+  await expect(booksPanel.getByRole("heading", { name: "Resolution books" })).toBeVisible();
   await expect(inputPanel.locator(".books-panel")).toHaveCount(0);
-  await expect(resultPanel.getByRole("heading", { name: "Decoded structure" })).toBeVisible();
+  await expect(resultPanel.getByRole("heading", { name: "No transaction decoded yet" })).toBeVisible();
   await expect(decodedPanel(resultPanel).locator(".decoded-tree-container")).toHaveCount(0);
 
   const emptyStack = await workspace.evaluate((root) => {
@@ -1826,6 +1834,7 @@ test("inspect stacks load form, books, and decoded result vertically", async ({
         top: rect.top,
         bottom: rect.bottom,
         left: rect.left,
+        right: rect.right,
         width: rect.width,
       };
     };
@@ -1836,19 +1845,39 @@ test("inspect stacks load form, books, and decoded result vertically", async ({
     return {
       workspace: rectForElement(root),
       input: rectFor(".input-panel"),
+      support: rectFor(".initial-support-grid"),
       books: rectFor(".books-panel"),
+      config: rectFor(".settings-summary"),
       result: rectFor(".result-panel"),
     };
   });
   expect(emptyStack.workspace).not.toBeNull();
   expect(emptyStack.input).not.toBeNull();
+  expect(emptyStack.support).not.toBeNull();
   expect(emptyStack.books).not.toBeNull();
+  expect(emptyStack.config).not.toBeNull();
   expect(emptyStack.result).not.toBeNull();
-  expect(emptyStack.input.bottom).toBeLessThanOrEqual(emptyStack.books.top + 1);
-  expect(emptyStack.books.bottom).toBeLessThanOrEqual(emptyStack.result.top + 1);
+  expect(emptyStack.input.bottom).toBeLessThanOrEqual(emptyStack.support.top + 1);
+  expect(emptyStack.support.bottom).toBeLessThanOrEqual(emptyStack.result.top + 1);
+  expect(Math.abs(emptyStack.books.top - emptyStack.config.top)).toBeLessThanOrEqual(1);
+  expect(emptyStack.books.right).toBeLessThanOrEqual(emptyStack.config.left + 1);
   expect(emptyStack.input.width).toBeGreaterThan(emptyStack.workspace.width * 0.92);
+  expect(emptyStack.support.width).toBeGreaterThan(emptyStack.workspace.width * 0.92);
   expect(emptyStack.result.width).toBeGreaterThan(emptyStack.workspace.width * 0.92);
   expect(Math.abs(emptyStack.input.left - emptyStack.result.left)).toBeLessThanOrEqual(4);
+
+  for (const width of [640, 960]) {
+    await page.setViewportSize({ width, height: 900 });
+    const overflow = await page.evaluate(() => {
+      const scrollWidth = Math.max(
+        document.documentElement.scrollWidth,
+        document.body.scrollWidth,
+      );
+      return scrollWidth - window.innerWidth;
+    });
+    expect(overflow).toBeLessThanOrEqual(1);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   const booksList = booksPanel.locator(".books-list");
   const booksOverflow = await booksList.evaluate((element) => {
@@ -1866,8 +1895,8 @@ test("inspect stacks load form, books, and decoded result vertically", async ({
   expect(booksOverflow.overflowY).not.toBe("hidden");
   expect(booksOverflow.clientHeight).toBeGreaterThanOrEqual(booksOverflow.scrollHeight);
 
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill("not-a-conway-hex");
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill("not-a-conway-hex");
   await page.getByRole("button", { name: "Decode" }).click();
   await expect(resultPanel).toContainText(/malformed_hex|invalid/i);
   await expect(page.locator(".loaded-inspector-header")).toHaveCount(0);
@@ -1891,16 +1920,17 @@ test("inspect stacks load form, books, and decoded result vertically", async ({
     return {
       workspace: rectForElement(root),
       input: rectFor(".input-panel"),
+      support: rectFor(".initial-support-grid"),
       books: rectFor(".books-panel"),
       result: rectFor(".result-panel"),
     };
   });
-  expect(errorStack.input.bottom).toBeLessThanOrEqual(errorStack.books.top + 1);
-  expect(errorStack.books.bottom).toBeLessThanOrEqual(errorStack.result.top + 1);
+  expect(errorStack.input.bottom).toBeLessThanOrEqual(errorStack.support.top + 1);
+  expect(errorStack.support.bottom).toBeLessThanOrEqual(errorStack.result.top + 1);
   expect(errorStack.result.width).toBeGreaterThan(errorStack.workspace.width * 0.92);
 
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   const loadedHeader = page.locator(".loaded-inspector-header");
@@ -1945,7 +1975,7 @@ test("inspect stacks load form, books, and decoded result vertically", async ({
   await loadedHeader.getByRole("button", { name: "Change input" }).click();
   await expect(inputPanel).toBeVisible();
   await expect(decodedPanel(resultPanel)).toBeVisible();
-  await expect(page.getByPlaceholder("Conway tx CBOR hex...")).toHaveValue(txCbor);
+  await expect(page.getByPlaceholder("Paste Conway transaction CBOR hex")).toHaveValue(txCbor);
 
   await page.getByRole("button", { name: "Decode" }).click();
   await expect(loadedHeader).toBeVisible();
@@ -2012,9 +2042,9 @@ test("settings changes provider state used by inspect hash decode", async ({ pag
   await expect(page.locator(".settings-summary")).toContainText("Koios");
   await expect(page.locator(".settings-summary")).toContainText("preview");
   await page
-    .getByPlaceholder("64-char tx hash")
+    .getByPlaceholder("Transaction hash (64 hex chars)")
     .fill("0".repeat(64));
-  await page.getByRole("button", { name: "Fetch and decode" }).click();
+  await page.getByRole("button", { name: "Decode" }).click();
 
   await expect(
     page.getByRole("heading", { name: "Identity metadata" }),
@@ -2307,8 +2337,8 @@ test("decodes genuine Conway fixture into RDF tree", async ({
   await mockKoiosValidationContext(page, validationContext);
 
   await page.goto("/");
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   const body = page.locator("body");
@@ -3410,8 +3440,8 @@ test("keeps copy controls off non-value missing context rows", async ({ page }) 
   });
 
   await page.goto("/");
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   await selectResultTab(page, "Validation");
@@ -3487,8 +3517,8 @@ test("passes producer transaction CBOR into witness planning", async ({
     blockfrostKey: "mainnet-test-project",
   });
   await openInspectViaShell(page);
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   await selectResultTab(page, "Witness");
@@ -3587,8 +3617,8 @@ test("passes producer transaction CBOR into RDF resolved value flow", async ({
     blockfrostKey: "mainnet-test-project",
   });
   await openInspectViaShell(page);
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   await selectResultTab(page, "Graph / RDF");
@@ -3633,8 +3663,8 @@ test("surfaces hard provider context resolution failures", async ({
     blockfrostKey: "mainnet-test-project",
   });
   await openInspectViaShell(page);
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   await selectResultTab(page, "Validation");
@@ -3692,8 +3722,8 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
     koiosBearer: "koios-test-token",
   });
   await openInspectViaShell(page);
-  await page.getByRole("radio", { name: "CBOR hex" }).check();
-  await page.getByPlaceholder("Conway tx CBOR hex...").fill(txCbor);
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
 
   await selectResultTab(page, "Witness");
