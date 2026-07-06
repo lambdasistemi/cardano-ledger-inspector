@@ -3304,8 +3304,14 @@ fixture:linkableNetworkAddress
   ).toBeVisible();
   await library.getByLabel("Book Turtle").fill(shapes);
   await library.getByRole("button", { name: "Add book" }).click();
+  const canonicalShapesBook = library
+    .locator(".library-book", { hasText: "Cardano RDF SHACL shapes" })
+    .filter({
+      has: page.locator(".library-book-meta", { hasText: "local" }),
+    });
+  await expect(canonicalShapesBook).toHaveCount(1);
   await expect(
-    library.getByRole("heading", { name: "Pasted SHACL shapes" }),
+    canonicalShapesBook.getByRole("heading", { name: "Cardano RDF SHACL shapes" }),
   ).toBeVisible();
 
   await openInspectViaShell(page);

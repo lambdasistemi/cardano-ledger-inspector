@@ -6,7 +6,7 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
-import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, trim) as String
+import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, split, trim) as String
 import Data.String.CodeUnits as StringCodeUnits
 import Effect (Effect)
 import Effect.Aff (attempt)
@@ -2429,7 +2429,7 @@ inspectorComponent initial =
         else "Validation needs attention"
       detail =
         if conforms then validationTallyText counts
-        else show (shaclViolationCount state.shaclConformance) <> " violations / " <> validationTallyText counts
+        else validationTallyText counts
     in
       HH.div
         [ classNames
@@ -2802,7 +2802,7 @@ inspectorComponent initial =
     in
       { tone
       , node:
-          renderValidationCheckRow state tone "SHACL violation" violation.sourceShape violation.message context severity false "" ""
+          renderValidationCheckRow state tone (shaclViolationTitle violation) violation.sourceShape violation.message context severity false "" ""
             [ HH.div
                 [ classNames [ "validation-row-meta", "sparql-lens-row" ] ]
                 [ renderShaclViolationCell "Severity" severity
@@ -2816,6 +2816,31 @@ inspectorComponent initial =
             ]
             [ "shacl-violation-row", "shacl-" <> severity ]
       }
+
+  shaclViolationTitle violation =
+    let
+      messagePrefix =
+        case Array.head (String.split (String.Pattern ":") violation.message) of
+          Just value -> String.trim value
+          Nothing    -> ""
+    in
+      if messagePrefix /= "" && not (StringCodeUnits.contains (String.Pattern " ") messagePrefix) then
+        messagePrefix
+      else
+        shaclSourceShapeLabel violation.sourceShape
+
+  shaclSourceShapeLabel sourceShape =
+    let
+      hashPart =
+        case Array.last (String.split (String.Pattern "#") sourceShape) of
+          Just value -> value
+          Nothing    -> sourceShape
+      slashPart =
+        case Array.last (String.split (String.Pattern "/") hashPart) of
+          Just value -> value
+          Nothing    -> hashPart
+    in
+      if slashPart == "" then sourceShape else slashPart
 
   shaclViolationContext state violation =
     case shaclFocusRow state violation.focusNode of
@@ -3175,14 +3200,6 @@ inspectorComponent initial =
       <> " warnings / "
       <> show counts.violations
       <> " violations"
-
-  shaclViolationCount conformance =
-    case conformance of
-      Just value ->
-        case value.report of
-          Just report -> Array.length report.violations
-          Nothing     -> 0
-      Nothing -> 0
 
   validationMetricTone metric =
     if validationTextIsFailure metric.value then ValidationFail
