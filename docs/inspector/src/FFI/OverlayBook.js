@@ -51,6 +51,7 @@ cardano:TransactionShape
   sh:property cardano:ClassAInputSetNotEmptyShape ;
   sh:sparql cardano:ClassAReferenceInputOverlapConstraint ;
   sh:sparql cardano:ClassAZeroTreasuryWithdrawalConstraint ;
+  sh:sparql cardano:ClassANetworkConsistencyConstraint ;
   sh:sparql cardano:ClassACommitteeUpdateConflictConstraint ;
   sh:sparql cardano:ClassAAuxiliaryDataHashMissingConstraint ;
   sh:sparql cardano:ClassAAuxiliaryDataHashUnexpectedConstraint ;
@@ -99,6 +100,86 @@ cardano:ClassAZeroTreasuryWithdrawalConstraint
               cardano:hasWithdrawal ?value .
       ?value cardano:hasLovelace ?lovelace .
       FILTER(xsd:integer(?lovelace) = 0)
+    }
+  """ .
+
+cardano:ClassANetworkConsistencyConstraint
+  a sh:SPARQLConstraint ;
+  sh:severity sh:Violation ;
+  sh:message "NetworkConsistency: cardano:network literals must agree with each other and the transaction body network id." ;
+  sh:select """
+    PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    SELECT ?focusNode ?value
+    WHERE {
+      {
+        $this cardano:networkId ?bodyNetwork .
+        {
+          $this cardano:hasOutput ?output .
+          ?output cardano:atAddress ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasWithdrawal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasProposal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasProposal ?proposal .
+          ?proposal cardano:hasWithdrawal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasProposal ?proposal .
+          ?proposal cardano:hasGovAction ?action .
+          ?action cardano:hasWithdrawal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        }
+        FILTER(xsd:integer(?entityNetwork) != xsd:integer(?bodyNetwork))
+        BIND(?entityNetwork AS ?value)
+      } UNION {
+        {
+          $this cardano:hasOutput ?output .
+          ?output cardano:atAddress ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasWithdrawal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasProposal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasProposal ?proposal .
+          ?proposal cardano:hasWithdrawal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        } UNION {
+          $this cardano:hasProposal ?proposal .
+          ?proposal cardano:hasGovAction ?action .
+          ?action cardano:hasWithdrawal ?focusNode .
+          ?focusNode cardano:network ?entityNetwork .
+        }
+        {
+          $this cardano:hasOutput ?otherOutput .
+          ?otherOutput cardano:atAddress ?otherNode .
+          ?otherNode cardano:network ?otherNetwork .
+        } UNION {
+          $this cardano:hasWithdrawal ?otherNode .
+          ?otherNode cardano:network ?otherNetwork .
+        } UNION {
+          $this cardano:hasProposal ?otherNode .
+          ?otherNode cardano:network ?otherNetwork .
+        } UNION {
+          $this cardano:hasProposal ?otherProposal .
+          ?otherProposal cardano:hasWithdrawal ?otherNode .
+          ?otherNode cardano:network ?otherNetwork .
+        } UNION {
+          $this cardano:hasProposal ?otherProposal .
+          ?otherProposal cardano:hasGovAction ?otherAction .
+          ?otherAction cardano:hasWithdrawal ?otherNode .
+          ?otherNode cardano:network ?otherNetwork .
+        }
+        FILTER(xsd:integer(?entityNetwork) != xsd:integer(?otherNetwork))
+        BIND(?entityNetwork AS ?value)
+      }
     }
   """ .
 

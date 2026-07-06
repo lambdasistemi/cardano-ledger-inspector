@@ -124,6 +124,13 @@ WHERE {
     BIND("output" AS ?kind)
     BIND(STR(?entity) AS ?value)
     BIND("70" AS ?sort)
+  } UNION {
+    ?transaction cardano:networkId ?value .
+    BIND(cardano:networkId AS ?resolveEntity)
+    BIND(cardano:networkId AS ?resolvedType)
+    BIND("Network id" AS ?label)
+    BIND("network" AS ?kind)
+    BIND("80" AS ?sort)
   }
   OPTIONAL {
     FILTER(BOUND(?resolveEntity))
@@ -704,9 +711,13 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     collateral: inputs.filter((input) => bindingValue(input.section) === "Collateral inputs"),
     reference_inputs: inputs.filter((input) => bindingValue(input.section) === "Reference inputs"),
   };
-  const addInputGroup = (label, order, rowsForSection, childLabel) => {
+  const addInputGroup = (label, order, rowsForSection, childLabel, options = {}) => {
     const parentId = `decoded-body-${slug(label)}`;
     if (rowsForSection.length === 0) {
+      if (options.presentWhenEmpty) {
+        addContainerField("decoded-body", 3, order, label, countText(0, "input"));
+        return;
+      }
       addNullField("decoded-body", 3, order, label);
       return;
     }
@@ -799,7 +810,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
   );
 
   const bodyFieldOrder = [
-    ["inputs", 10, () => addInputGroup("inputs", 10, groupedInputs.inputs, "Input")],
+    ["inputs", 10, () => addInputGroup("inputs", 10, groupedInputs.inputs, "Input", { presentWhenEmpty: true })],
     ["outputs", 20, () => {
       const outputParentId = "decoded-body-outputs";
       if (outputs.length === 0) {
@@ -894,7 +905,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     ["script_data_hash", 110, () => addBodyScalar("decoded-body", 3, 110, "script_data_hash", "Script data hash")],
     ["collateral", 120, () => addInputGroup("collateral", 120, groupedInputs.collateral, "Collateral")],
     ["required_signers", 130, () => addNullField("decoded-body", 3, 130, "required_signers")],
-    ["network_id", 140, () => addNullField("decoded-body", 3, 140, "network_id")],
+    ["network_id", 140, () => addBodyScalar("decoded-body", 3, 140, "network_id", "Network id")],
     ["collateral_return", 150, () => addBodyScalar("decoded-body", 3, 150, "collateral_return", "Collateral return")],
     ["total_collateral", 160, () => addBodyScalar("decoded-body", 3, 160, "total_collateral", "Total collateral")],
     ["reference_inputs", 170, () => addInputGroup("reference_inputs", 170, groupedInputs.reference_inputs, "Reference input")],
