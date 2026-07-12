@@ -14,14 +14,14 @@ suffix, while retaining prior label resolutions.
 owner labels and concrete matched identifiers for the scoped real transaction,
 continues to show a pre-existing resolution, and passes the ticket gate.
 
-- [ ] T001-S1 [US1] Add a failing `generic hex-suffix credential resolution`
+- [X] T001-S1 [US1] Add a failing `generic hex-suffix credential resolution`
   regression to `docs/inspector/tests/tx-identify.spec.mjs` for both scoped
   owner hashes and one existing resolution.
-- [ ] T002-S1 [US1] Extend the resolved-label query and result normalisation in
+- [X] T002-S1 [US1] Extend the resolved-label query and result normalisation in
   `docs/inspector/src/FFI/RdfShapes.js` to return the transaction credential
   matched by the shared hex suffix; document the accepted same-bytes,
   cross-type collision limitation beside that query.
-- [ ] T003-S1 [US1] Run `./gate.sh`, inspect its successful output, and commit
+- [X] T003-S1 [US1] Run `./gate.sh`, inspect its successful output, and commit
   `feat(inspector): resolve credentials by generic hex suffix` with
   `Tasks: T001, T002, T003`.
 
