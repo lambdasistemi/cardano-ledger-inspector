@@ -2,8 +2,6 @@
 set -euo pipefail
 
 git diff --check
-nix build .#packages.x86_64-linux.tx-inspector-ui
-nix develop --quiet -c sh -c 'cd docs/inspector && TX_AMARU_TREASURY_TX_ROOT=/code/amaru-treasury-tx TX_INSPECTOR_SITE_DIR=../../result playwright test tests/tx-identify.spec.mjs --grep "faithful CQuisitor parity" --reporter=list'
-just test-playwright
-just format-check
-just hlint
+just ui-check
+just build-ui
+nix develop --quiet -c sh -c 'cd docs/inspector && ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules && TX_INSPECTOR_SITE_DIR=../../result playwright test tests/tx-identify.spec.mjs --grep "generic hex-suffix credential resolution" --reporter=list'
