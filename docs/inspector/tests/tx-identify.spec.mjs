@@ -2551,6 +2551,44 @@ test("selected library overlay book parts produce deterministic Turtle", async (
   ).toBeVisible();
 });
 
+test("generic hex-suffix credential resolution", async ({ page }) => {
+  const owners = [
+    {
+      label: "Amaru Network Compliance owner key",
+      hash: "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+    },
+    {
+      label: "Amaru Ops And Use Cases owner key",
+      hash: "f3ab64b0f97dcf0f91232754603283df5d75a1201337432c04d23e2e",
+    },
+  ];
+
+  await decodeFixtureAt(page, "/", signingIntentFixturePath);
+  await selectResultTab(page, "Graph / RDF");
+
+  const resolvedLabelsPanel = page.locator(".resolved-labels-panel");
+  for (const owner of owners) {
+    const row = resolvedLabelsPanel
+      .locator(".resolved-labels-row")
+      .filter({ hasText: owner.label });
+    await expect(row).toHaveCount(1);
+    await expect(row.getByText(owner.label, { exact: true })).toBeVisible();
+    await expect(row.locator(".sparql-lens-cell").last().locator("code")).toHaveText(
+      `urn:cardano:id:PaymentKey:${owner.hash}`,
+    );
+  }
+
+  const existingResolution = resolvedLabelsPanel
+    .locator(".resolved-labels-row")
+    .filter({
+      has: page.getByText("Amaru Core Development treasury", { exact: true }),
+    });
+  await expect(existingResolution).toHaveCount(1);
+  await expect(existingResolution.locator(".sparql-lens-cell").last().locator("code")).toHaveText(
+    "core_development",
+  );
+});
+
 test("resolves decoded-tree address rows from selected Turtle overlay books", async ({
   page,
 }) => {

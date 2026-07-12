@@ -39,6 +39,23 @@ WHERE {
 ORDER BY ?label ?entity
 `;
 
+const resolvedLabelMatchesQuery = `
+PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?entity ?matched
+WHERE {
+  ?entity rdfs:label ?label .
+  FILTER(STRSTARTS(STR(?entity), "urn:cardano:id:"))
+  ?matched cardano:bytesHex ?matchedBytesHex .
+  FILTER(STRSTARTS(STR(?matched), "urn:cardano:id:"))
+  # Equal hash bytes across credential types are intentionally ambiguous; type-aware disambiguation is out of scope.
+  BIND(REPLACE(STR(?entity), "^.*:", "") AS ?entityHash)
+  BIND(REPLACE(STR(?matched), "^.*:", "") AS ?matchedHash)
+  FILTER(?entityHash = ?matchedHash)
+}
+ORDER BY ?entity ?matched
+`;
+
 const typedFieldsQuery = `
 SELECT ?subject ?field ?value
 WHERE {
@@ -352,7 +369,7 @@ const normalizeTransactionOutputRows = (result) => {
   }));
 };
 
-const normalizeResolvedLabelRows = (result) => {
+const normalizeResolvedLabelRows = (result, matchesResult) => {
   if (!result || result.kind !== "solutions") {
     throw new Error("query did not return solution rows");
   }
@@ -362,18 +379,39 @@ const normalizeResolvedLabelRows = (result) => {
     throw new Error("query result missing bindings");
   }
 
-  return bindings.map((binding) => ({
-    label: bindingValue(binding.label),
-    role: humanToken(firstBindingValue(binding.scriptRole, binding.type)),
-    entity: bindingValue(binding.entity),
-    matched: firstBindingValue(
-      binding.txOutRef,
-      binding.fromTxOutRef,
-      binding.bech32,
-      binding.slug,
-      binding.entity,
-    ),
-  }));
+  if (!matchesResult || matchesResult.kind !== "solutions") {
+    throw new Error("match query did not return solution rows");
+  }
+
+  const matchBindings = matchesResult.json?.results?.bindings;
+  if (!Array.isArray(matchBindings)) {
+    throw new Error("match query result missing bindings");
+  }
+
+  const explicitMatches = new Map(
+    matchBindings.map((binding) => [
+      bindingValue(binding.entity),
+      bindingValue(binding.matched),
+    ]),
+  );
+
+  return bindings.map((binding) => {
+    const entity = bindingValue(binding.entity);
+    return {
+      label: bindingValue(binding.label),
+      role: humanToken(firstBindingValue(binding.scriptRole, binding.type)),
+      entity,
+      matched:
+        explicitMatches.get(entity) ||
+        firstBindingValue(
+          binding.txOutRef,
+          binding.fromTxOutRef,
+          binding.bech32,
+          binding.slug,
+          binding.entity,
+        ),
+    };
+  });
 };
 
 const normalizeTypedFieldRows = (result) => {
@@ -1360,7 +1398,8 @@ export const queryImpl = (left) => (right) => (graphTtl) => (sparql) => () => {
 export const queryResolvedLabelsImpl = (left) => (right) => (graphTtl) => () => {
   try {
     const result = globalThis.rdfShapes.query(graphTtl, resolvedLabelsQuery);
-    return right(normalizeResolvedLabelRows(result));
+    const matchesResult = globalThis.rdfShapes.query(graphTtl, resolvedLabelMatchesQuery);
+    return right(normalizeResolvedLabelRows(result, matchesResult));
   } catch (err) {
     return left(errText(err));
   }
