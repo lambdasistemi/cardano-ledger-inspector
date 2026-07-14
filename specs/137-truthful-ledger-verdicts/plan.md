@@ -55,12 +55,17 @@ Implementation shape:
 Owned files:
 
 - `docs/inspector/src/Main.purs`
+- `docs/inspector/src/FFI/Json.js`
+- `docs/inspector/src/FFI/Json.purs`
 - `docs/inspector/tests/tx-identify.spec.mjs`
 
 Implementation shape:
 
 - Render ledger and SHACL verdict banners independently, using their structured
   verdict/severity values. Keep `invalid` and `rejected` visibly distinct.
+- Add validation-specific structured metric tones at the FFI boundary and make
+  `Main.purs` consume them, removing the remaining validation metric/row tone
+  inference from rendered text.
 - Make the ledger filter tally ledger-only; retain SHACL findings in the SHACL
   panel without allowing them to determine ledger success.
 - Exercise the rendered status × SHACL matrix through hermetic operation/SHACL
