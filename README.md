@@ -173,6 +173,7 @@ For AI agents, start at [AGENTS.md](AGENTS.md).
 
 ```bash
 just --list
+nix develop --quiet -c just ci
 just build-wasm
 just build-ui
 just check-openapi
@@ -187,6 +188,9 @@ just check-evaluate-scripts
 just test-playwright
 just test
 ```
+
+Run `nix develop --quiet -c just ci` before pushing. It mirrors the GitHub
+Actions build gate and its required follow-on checks.
 
 The first full WASI ledger build can take a long time because Cabal populates a
 fresh dependency cache. Haskell-only edits inside the tx inspector use the

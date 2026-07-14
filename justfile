@@ -49,6 +49,41 @@ build-extism-host:
 check-extism-spike:
     nix build .#checks.x86_64-linux.tx-extism-spike-smoke -o result-extism-spike-smoke
 
+check-ci-drift:
+    scripts/check-ci-entry-point.sh
+
+ci:
+    just check-ci-drift
+    nix build --quiet \
+      .#packages.x86_64-linux.wasm-tx-inspector \
+      .#packages.x86_64-linux.tx-inspector-ui \
+      .#packages.x86_64-linux.ledger-functional-openapi \
+      .#packages.x86_64-linux.wasm-extism-spike \
+      .#packages.x86_64-linux.extism-spike-host \
+      .#packages.x86_64-linux.tx-deep-diagnosis \
+      .#checks.x86_64-linux.ledger-functional-openapi-check \
+      .#checks.x86_64-linux.ledger-functional-swagger-check \
+      .#checks.x86_64-linux.tx-identify-smoke \
+      .#checks.x86_64-linux.tx-witness-plan-smoke \
+      .#checks.x86_64-linux.tx-intent-smoke \
+      .#checks.x86_64-linux.tx-validate-smoke \
+      .#checks.x86_64-linux.tx-evaluate-scripts-smoke \
+      .#checks.x86_64-linux.tx-input-context-smoke \
+      .#checks.x86_64-linux.tx-extism-spike-smoke \
+      -o result-gate
+    nix run --quiet .#ledger-functional-openapi-check
+    nix run --quiet .#ledger-functional-swagger-check
+    nix run --quiet .#tx-identify-smoke
+    nix run --quiet .#tx-witness-plan-smoke
+    nix run --quiet .#tx-intent-smoke
+    nix run --quiet .#tx-validate-smoke
+    nix run --quiet .#tx-evaluate-scripts-smoke
+    nix run --quiet .#tx-input-context-smoke
+    nix run --quiet .#tx-extism-spike-smoke
+    nix run --quiet .#format-check
+    nix run --quiet .#hlint
+    nix run --quiet .#test-playwright
+
 test-playwright: build-ui
     nix develop --quiet -c sh -c 'cd docs/inspector && ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules && TX_INSPECTOR_SITE_DIR=../../result playwright test --reporter=list'
 
