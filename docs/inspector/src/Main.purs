@@ -111,7 +111,7 @@ data ValidationFilter = ValidationAll | ValidationPassed | ValidationWarnings | 
 
 derive instance eqValidationFilter :: Eq ValidationFilter
 
-data ValidationTone = ValidationPass | ValidationWarn | ValidationFail
+data ValidationTone = ValidationPass | ValidationWarn | ValidationFail | ValidationNeutral
 
 derive instance eqValidationTone :: Eq ValidationTone
 
@@ -2409,8 +2409,8 @@ inspectorComponent initial =
               , HH.p_ [ HH.text validation.subtitle ]
               ]
           ]
-      , renderValidationVerdictBanner state validation
-      , renderValidationFilters state.validationFilter (validationSurfaceCounts validation state.shaclConformance)
+      , renderValidationVerdictBanner validation
+      , renderValidationFilters state.validationFilter (validationSurfaceCounts validation)
       , renderValidationRowGroup state.validationFilter "Validation summary"
           (map (renderValidationMetricRow state) validation.metrics)
       , renderValidationRowGroup state.validationFilter "Warnings"
@@ -2419,17 +2419,10 @@ inspectorComponent initial =
           (map (renderValidationSection state state.validationFilter) validation.sections)
       ]
 
-  renderValidationVerdictBanner state validation =
+  renderValidationVerdictBanner validation =
     let
-      counts = validationSurfaceCounts validation state.shaclConformance
-      conforms = validation.valid && shaclConformancePasses state.shaclConformance
-      tone = if conforms then ValidationPass else ValidationFail
-      title =
-        if conforms then "Validation passed"
-        else "Validation needs attention"
-      detail =
-        if conforms then validationTallyText counts
-        else validationTallyText counts
+      counts = validationSurfaceCounts validation
+      tone = structuredValidationTone validation.verdict.tone
     in
       HH.div
         [ classNames
@@ -2439,23 +2432,13 @@ inspectorComponent initial =
         ]
         [ HH.element (HH.ElemName "md-icon")
             [ classNames [ "validation-verdict-icon" ] ]
-            [ HH.text (if conforms then "verified" else "error") ]
+            [ HH.text (validationToneIcon tone) ]
         , HH.div_
-            [ HH.strong_ [ HH.text title ]
-            , HH.p_ [ HH.text detail ]
+            [ HH.strong_ [ HH.text validation.verdict.title ]
+            , HH.p_ [ HH.text validation.verdict.detail ]
+            , HH.p_ [ HH.text (validationTallyText counts) ]
             ]
         ]
-
-  shaclConformancePasses conformance =
-    case conformance of
-      Just value ->
-        case value.error of
-          Just _ -> false
-          Nothing ->
-            case value.report of
-              Just report -> report.conforms
-              Nothing     -> true
-      Nothing -> true
 
   renderValidationFilters selected counts =
     HH.div
@@ -2488,7 +2471,7 @@ inspectorComponent initial =
 
   renderValidationMetricRow state metric =
     let
-      tone = validationMetricTone metric
+      tone = structuredValidationTone metric.tone
     in
       { tone
       , node:
@@ -2731,6 +2714,7 @@ inspectorComponent initial =
               , HH.p_ [ HH.text "Selected SHACL shapes validate the composed RDF graph." ]
               ]
           ]
+      , renderShaclVerdictBanner conformance
       , renderValidationRowGroup state.validationFilter "Selected shapes"
           (map (renderSelectedShape state) conformance.shapeLabels)
       , case conformance.error of
@@ -2747,17 +2731,13 @@ inspectorComponent initial =
                 HH.div_
                   [ renderValidationRowGroup state.validationFilter "SHACL verdict"
                       [ renderShaclMetricRow state
-                          { label: "Author gate"
-                          , value: if report.conforms then "pass" else "fail"
-                          }
+                          (if report.conforms then ValidationPass else ValidationFail)
+                          "Author gate"
+                          (if report.conforms then "pass" else "fail")
                       , renderShaclMetricRow state
-                          { label: "Auditor classifier"
-                          , value:
-                              if report.conforms then
-                                "canonical-pipeline match"
-                              else
-                                "foreign/off-spec"
-                          }
+                          (if report.conforms then ValidationPass else ValidationFail)
+                          "Auditor classifier"
+                          (if report.conforms then "canonical-pipeline match" else "foreign/off-spec")
                       ]
                   , renderShaclViolations state report
                   ]
@@ -2773,14 +2753,56 @@ inspectorComponent initial =
         renderValidationCheckRow state ValidationPass "Shape book" "sh:NodeShape" label "" "selected" false "" "" [] []
     }
 
-  renderShaclMetricRow state metric =
+  renderShaclMetricRow state tone label value =
+    { tone
+    , node:
+        renderValidationCheckRow state tone label "sh:ValidationReport" value "" value false "" "" [] []
+    }
+
+  renderShaclVerdictBanner conformance =
     let
-      tone = validationMetricTone metric
+      verdict = shaclConformanceVerdict conformance
     in
-      { tone
-      , node:
-          renderValidationCheckRow state tone metric.label "sh:ValidationReport" metric.value "" metric.value false "" "" [] []
-      }
+      HH.div
+        [ classNames
+            [ "shacl-verdict-banner"
+            , "shacl-verdict-banner--" <> validationToneClass verdict.tone
+            ]
+        ]
+        [ HH.element (HH.ElemName "md-icon")
+            [ classNames [ "validation-verdict-icon" ] ]
+            [ HH.text (validationToneIcon verdict.tone) ]
+        , HH.div_
+            [ HH.strong_ [ HH.text verdict.title ]
+            , HH.p_ [ HH.text verdict.detail ]
+            ]
+        ]
+
+  shaclConformanceVerdict conformance =
+    case conformance.error of
+      Just _ ->
+        { tone: ValidationFail
+        , title: "SHACL conformance could not be evaluated"
+        , detail: "SHACL evaluation returned an error."
+        }
+      Nothing ->
+        case conformance.report of
+          Just report ->
+            if report.conforms then
+              { tone: ValidationPass
+              , title: "SHACL conformance passed"
+              , detail: "The RDF graph conforms to the selected SHACL shapes."
+              }
+            else
+              { tone: ValidationFail
+              , title: "SHACL conformance failed"
+              , detail: "The RDF graph has SHACL conformance findings."
+              }
+          Nothing ->
+            { tone: ValidationFail
+            , title: "SHACL conformance could not be evaluated"
+            , detail: "SHACL evaluation returned an error."
+            }
 
   renderShaclViolations state report =
     if Array.null report.violations then
@@ -3105,7 +3127,7 @@ inspectorComponent initial =
   renderValidationRow state sectionTitle row =
     let
       presented = presentValidationRow sectionTitle row
-      tone = validationSectionRowTone sectionTitle presented
+      tone = structuredValidationTone row.tone
       message =
         if presented.detail == "" then presented.value
         else presented.detail
@@ -3128,56 +3150,18 @@ inspectorComponent initial =
       "Missing context" -> StringCodeUnits.length row.copyValue == 64
       _ -> true
 
-  validationSurfaceCounts validation conformance =
-    let
-      validationCounts = validationToneCounts (validationPanelTones validation)
-      shaclCounts = validationToneCounts (shaclConformanceTones conformance)
-    in
-      { passed: validationCounts.passed + shaclCounts.passed
-      , warnings: validationCounts.warnings + shaclCounts.warnings
-      , violations: validationCounts.violations + shaclCounts.violations
-      }
+  validationSurfaceCounts validation =
+    validationToneCounts (validationPanelTones validation)
 
   validationPanelTones validation =
-    map validationMetricTone validation.metrics
+    map (structuredValidationTone <<< _.tone) validation.metrics
       <> map (\_ -> ValidationWarn) validation.warnings
       <> Array.concat (map validationSectionTones validation.sections)
 
   validationSectionTones section =
     map
-      (\row -> validationSectionRowTone section.title (presentValidationRow section.title row))
+      (structuredValidationTone <<< _.tone)
       section.rows
-
-  shaclConformanceTones conformance =
-    case conformance of
-      Nothing -> []
-      Just value ->
-        map (\_ -> ValidationPass) value.shapeLabels
-          <> case value.error of
-            Just _ -> [ ValidationFail ]
-            Nothing ->
-              case value.report of
-                Just report -> shaclReportTones report
-                Nothing     -> []
-
-  shaclReportTones report =
-    [ validationMetricTone
-        { label: "Author gate"
-        , value: if report.conforms then "pass" else "fail"
-        }
-    , validationMetricTone
-        { label: "Auditor classifier"
-        , value:
-            if report.conforms then
-              "canonical-pipeline match"
-            else
-              "foreign/off-spec"
-        }
-    ]
-      <> if Array.null report.violations then
-        [ ValidationPass ]
-      else
-        map (\violation -> validationSeverityTone (normalizedShaclSeverity violation.severity)) report.violations
 
   validationToneCounts tones =
     { passed: validationToneCount ValidationPass tones
@@ -3201,36 +3185,17 @@ inspectorComponent initial =
       <> show counts.violations
       <> " violations"
 
-  validationMetricTone metric =
-    if validationTextIsFailure metric.value then ValidationFail
-    else if validationTextIsWarning metric.value then ValidationWarn
-    else ValidationPass
-
-  validationSectionRowTone sectionTitle row =
-    if sectionTitle == "Missing context" then ValidationWarn
-    else if validationTextIsFailure row.value then ValidationFail
-    else if validationTextIsWarning row.value then ValidationWarn
-    else ValidationPass
+  structuredValidationTone tone =
+    case tone of
+      "green"   -> ValidationPass
+      "amber"   -> ValidationWarn
+      "neutral" -> ValidationNeutral
+      "red"     -> ValidationFail
+      _         -> ValidationFail
 
   validationSeverityTone severity =
     if severity == "warning" || severity == "info" then ValidationWarn
     else ValidationFail
-
-  validationTextIsFailure value =
-    value == "fail"
-      || value == "failed"
-      || value == "invalid"
-      || value == "foreign/off-spec"
-      || value == "provider error"
-      || value == "error"
-
-  validationTextIsWarning value =
-    value == "incomplete"
-      || value == "not evaluated"
-      || value == "not_evaluated"
-      || value == "needs context"
-      || value == "warning"
-      || value == "warn"
 
   validationFilterAllows selected tone =
     case selected of
@@ -3244,24 +3209,28 @@ inspectorComponent initial =
       ValidationPass -> "success"
       ValidationWarn -> "warning"
       ValidationFail -> "error"
+      ValidationNeutral -> "neutral"
 
   validationToneChipClass tone =
     case tone of
       ValidationPass -> "li-chip--success"
       ValidationWarn -> "li-chip--warning"
       ValidationFail -> "li-chip--error"
+      ValidationNeutral -> "li-chip--neutral"
 
   validationToneIcon tone =
     case tone of
       ValidationPass -> "check_circle"
       ValidationWarn -> "warning"
       ValidationFail -> "error"
+      ValidationNeutral -> "info"
 
   validationToneBadge tone =
     case tone of
       ValidationPass -> "pass"
       ValidationWarn -> "warning"
       ValidationFail -> "error"
+      ValidationNeutral -> "info"
 
   presentValidationRow sectionTitle row =
     case sectionTitle of

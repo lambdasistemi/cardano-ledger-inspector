@@ -106,6 +106,155 @@ test("truthful ledger verdict mapping preserves nullable context validity", asyn
   expect(validation.verdict.validForSuppliedContext).toBeNull();
   expect(validation.verdict.tone).toBe("amber");
 });
+
+test("renders independent ledger and SHACL verdict banners for every status combination", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const ledgerCases = [
+    {
+      status: "valid",
+      complete: true,
+      validForSuppliedContext: true,
+      tone: "success",
+      title: "Ledger validation passed",
+      detail: "Complete validation accepted the transaction for the supplied context.",
+    },
+    {
+      status: "incomplete",
+      complete: false,
+      validForSuppliedContext: null,
+      tone: "warning",
+      title: "Ledger validation is incomplete",
+      detail: "More context is required before a final ledger verdict is available.",
+    },
+    {
+      status: "invalid",
+      complete: true,
+      validForSuppliedContext: false,
+      tone: "error",
+      title: "Ledger validation failed",
+      detail: "The ledger rejected the transaction as invalid for the supplied context.",
+    },
+    {
+      status: "rejected",
+      complete: false,
+      validForSuppliedContext: false,
+      tone: "error",
+      title: "Ledger validation was rejected",
+      detail: "The supplied validation context could not be evaluated.",
+    },
+  ];
+  const shaclCases = [
+    {
+      state: "pass",
+      tone: "success",
+      title: "SHACL conformance passed",
+      detail: "The RDF graph conforms to the selected SHACL shapes.",
+    },
+    {
+      state: "fail",
+      tone: "error",
+      title: "SHACL conformance failed",
+      detail: "The RDF graph has SHACL conformance findings.",
+    },
+    {
+      state: "error",
+      tone: "error",
+      title: "SHACL conformance could not be evaluated",
+      detail: "SHACL evaluation returned an error.",
+    },
+  ];
+  const allCountsByLedgerState = new Map();
+
+  for (const ledger of ledgerCases) {
+    for (const shacl of shaclCases) {
+      await page.goto("/");
+      await page.waitForFunction(() => typeof globalThis.runInspector === "function");
+      await page.evaluate(({ ledgerFixture, shaclFixture }) => {
+        const runInspector = globalThis.runInspector;
+        globalThis.runInspector = async (stdin) => {
+          const request = JSON.parse(stdin);
+          if (request.op === "tx.validate") {
+            return {
+              stdout: JSON.stringify({
+                validation: {
+                  status: ledgerFixture.status,
+                  complete: ledgerFixture.complete,
+                  valid_for_supplied_context: ledgerFixture.validForSuppliedContext,
+                  missing_context:
+                    ledgerFixture.status === "incomplete"
+                      ? [{ kind: "source_output", message: "fixture missing context" }]
+                      : [],
+                  failures:
+                    ledgerFixture.status === "invalid"
+                      ? [{ rule: "fixture ledger failure", message: "fixture invalid" }]
+                      : [],
+                  errors:
+                    ledgerFixture.status === "rejected"
+                      ? [{ kind: "fixture context error", message: "fixture rejected" }]
+                      : [],
+                },
+              }),
+              stderr: "",
+              exitOk: true,
+            };
+          }
+          return runInspector(stdin);
+        };
+        globalThis.txInspectorValidateShacl = () => {
+          if (shaclFixture.state === "error") {
+            throw new Error("fixture SHACL execution error");
+          }
+          return {
+            conforms: shaclFixture.state === "pass",
+            violations:
+              shaclFixture.state === "fail"
+                ? [
+                    {
+                      focusNode: "urn:fixture:transaction",
+                      path: "cardano:fixture",
+                      value: "",
+                      sourceShape: "FixtureShape",
+                      sourceConstraintComponent: "minCount",
+                      message: "fixture SHACL violation",
+                      severity: "error",
+                    },
+                  ]
+                : [],
+          };
+        };
+      }, { ledgerFixture: ledger, shaclFixture: shacl });
+
+      await submitTxCbor(page, txCbor);
+      await selectResultTab(page, "Validation");
+
+      const ledgerBanner = page.locator(".validation-verdict-banner");
+      await expect(ledgerBanner).toHaveClass(
+        new RegExp(`validation-verdict-banner--${ledger.tone}`),
+      );
+      await expect(ledgerBanner).toContainText(ledger.title);
+      await expect(ledgerBanner).toContainText(ledger.detail);
+
+      const shaclBanner = page.locator(".shacl-verdict-banner");
+      await expect(shaclBanner).toHaveClass(
+        new RegExp(`shacl-verdict-banner--${shacl.tone}`),
+      );
+      await expect(shaclBanner).toContainText(shacl.title);
+      await expect(shaclBanner).toContainText(shacl.detail);
+
+      const allCount = await page
+        .getByRole("button", { name: /^All / })
+        .innerText();
+      const previousCount = allCountsByLedgerState.get(ledger.status);
+      if (previousCount === undefined) {
+        allCountsByLedgerState.set(ledger.status, allCount);
+      } else {
+        expect(allCount).toBe(previousCount);
+      }
+    }
+  }
+});
 const pastedTurtleBook = `
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
 @prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-rdf/overlay/local#> .
