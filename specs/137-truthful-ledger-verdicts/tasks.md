@@ -2,12 +2,12 @@
 
 ## Slice 1: Formal, normalized verdict contract
 
-- [ ] T1370 Define total, structured ledger and SHACL verdict mappings that
+- [X] T1370 Define total, structured ledger and SHACL verdict mappings that
   cannot emit green without the complete valid ledger triple.
-- [ ] T1371 Preserve canonical ledger verdict fields and structured tones in
+- [X] T1371 Preserve canonical ledger verdict fields and structured tones in
   browser normalization; stop deriving validation-row tone from rendered
   metric/label text.
-- [ ] T1372 Add the hermetic 4 ledger-status × 3 SHACL-state pure matrix and
+- [X] T1372 Add the hermetic 4 ledger-status × 3 SHACL-state pure matrix and
   a no-`sorry`, no-custom-axiom Lean model proving the green invariant and
   SHACL independence.
 

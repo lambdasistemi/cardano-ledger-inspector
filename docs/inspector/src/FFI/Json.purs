@@ -12,6 +12,9 @@ module FFI.Json
   , OutputRow
   , RdfGraph
   , Validation
+  , ValidationRow
+  , ValidationSection
+  , ValidationVerdict
   , WitnessPlan
   , WitnessPlanRow
   , WitnessPlanSection
@@ -34,6 +37,7 @@ import Prelude
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Nullable (Nullable)
 import Foreign (Foreign, isNull, isUndefined, readArray, readString)
 import Foreign.Index (readProp)
 
@@ -160,13 +164,41 @@ type WitnessPlan =
   , sections :: Array WitnessPlanSection
   }
 
+type ValidationVerdict =
+  { status :: String
+  , complete :: Boolean
+  , validForSuppliedContext :: Nullable Boolean
+  , tone :: String
+  , title :: String
+  , detail :: String
+  }
+
+type ValidationRow =
+  { label :: String
+  , value :: String
+  , copyValue :: String
+  , path :: String
+  , detail :: String
+  , tone :: String
+  }
+
+type ValidationSection =
+  { title :: String
+  , empty :: String
+  , rows :: Array ValidationRow
+  }
+
 type Validation =
   { valid :: Boolean
   , title :: String
   , subtitle :: String
+  , ledgerStatus :: String
+  , complete :: Boolean
+  , validForSuppliedContext :: Nullable Boolean
+  , verdict :: ValidationVerdict
   , metrics :: Array Metric
   , warnings :: Array String
-  , sections :: Array WitnessPlanSection
+  , sections :: Array ValidationSection
   }
 
 type RdfGraph =

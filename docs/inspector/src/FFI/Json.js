@@ -1,5 +1,7 @@
 // Pretty-print a JSON string by parsing + re-stringifying with 2-space indent.
 // If the input isn't valid JSON, return it unchanged.
+import { ledgerVerdict } from "../../src/FFI/ValidationVerdict.mjs";
+
 export const prettyImpl = (text) => {
   try {
     return JSON.stringify(JSON.parse(text), null, 2);
@@ -249,14 +251,25 @@ const invalidWitnessPlan = (title, subtitle) => ({
   sections: [],
 });
 
-const invalidValidation = (title, subtitle) => ({
-  valid: false,
-  title,
-  subtitle,
-  metrics: [],
-  warnings: [],
-  sections: [],
-});
+const invalidValidation = (title, subtitle) => {
+  const verdict = ledgerVerdict({
+    status: "rejected",
+    complete: false,
+    validForSuppliedContext: false,
+  });
+  return {
+    valid: false,
+    title,
+    subtitle,
+    ledgerStatus: verdict.status,
+    complete: verdict.complete,
+    validForSuppliedContext: verdict.validForSuppliedContext,
+    verdict,
+    metrics: [],
+    warnings: [],
+    sections: [],
+  };
+};
 
 const witnessRow = (label, value, path, copyValue = value, detail = "") => ({
   label,
@@ -268,6 +281,26 @@ const witnessRow = (label, value, path, copyValue = value, detail = "") => ({
 
 const sourceDetail = (item) => text(item && item.source ? item.source : "");
 const validationPath = (...segments) => JSON.stringify(["validation", ...segments]);
+
+const validationRow = (tone, label, value, path, copyValue = value, detail = "") => ({
+  ...witnessRow(label, value, path, copyValue, detail),
+  tone,
+});
+
+const validationCheckTone = (status) => {
+  switch (status) {
+    case "pass":
+    case "valid":
+    case "accepted":
+      return "green";
+    case "not_evaluated":
+    case "incomplete":
+    case "warning":
+      return "amber";
+    default:
+      return "red";
+  }
+};
 
 const signerRows = (items, pathRoot) =>
   (Array.isArray(items) ? items : []).map((item, index) =>
@@ -309,7 +342,8 @@ const validationResolvedTxInRows = (items, pathRoot) =>
     const lovelace = txOut.coin_lovelace ? formatLovelace(txOut.coin_lovelace) : "";
     const reason = item?.reason ? text(item.reason) : "";
     const detailParts = [status, lovelace, address, reason].filter((part) => part !== "");
-    return witnessRow(
+    return validationRow(
+      item?.resolved === true ? "green" : "amber",
       status,
       key,
       validationPath(pathRoot, `#${index}`, "key"),
@@ -585,7 +619,8 @@ const validationCheckRows = (checks, missingContext) =>
           ? text(item.message)
           : "";
     const detail = [scope, message].filter((part) => part !== "").join(" / ");
-    return witnessRow(
+    return validationRow(
+      validationCheckTone(status),
       title,
       status,
       validationPath("checks", `#${index}`),
@@ -600,7 +635,8 @@ const validationMissingContextRows = (items) =>
       item?.tx_id && item?.index !== undefined
         ? `${item.tx_id}#${text(item.index)}`
         : item?.tx_id || item?.kind || `#${index}`;
-    return witnessRow(
+    return validationRow(
+      "amber",
       item?.kind || `#${index}`,
       key,
       validationPath("missing_context", `#${index}`),
@@ -611,7 +647,8 @@ const validationMissingContextRows = (items) =>
 
 const validationFailureRows = (items) =>
   (Array.isArray(items) ? items : []).map((item, index) =>
-    witnessRow(
+    validationRow(
+      "red",
       item?.rule || item?.code || item?.kind || `#${index}`,
       item?.predicate || item?.message || item?.code || "",
       validationPath("failures", `#${index}`),
@@ -622,7 +659,8 @@ const validationFailureRows = (items) =>
 
 const validationErrorRows = (items) =>
   (Array.isArray(items) ? items : []).map((item, index) =>
-    witnessRow(
+    validationRow(
+      "red",
       item?.kind || item?.code || `#${index}`,
       item?.message || jsonCopy(item),
       validationPath("errors", `#${index}`),
@@ -636,7 +674,8 @@ const validationResolutionRows = (resolution) => {
   const rows = [];
   if (resolution.provider) {
     rows.push(
-      witnessRow(
+      validationRow(
+        "amber",
         "provider",
         resolution.provider,
         validationPath("context", "resolution", "provider"),
@@ -647,7 +686,8 @@ const validationResolutionRows = (resolution) => {
   }
   if (resolution.validation_context_source) {
     rows.push(
-      witnessRow(
+      validationRow(
+        "amber",
         "validation context",
         resolution.validation_context_source,
         validationPath("context", "resolution", "validation_context_source"),
@@ -659,7 +699,8 @@ const validationResolutionRows = (resolution) => {
   const errors = Array.isArray(resolution.errors) ? resolution.errors : [];
   errors.forEach((error, index) =>
     rows.push(
-      witnessRow(
+      validationRow(
+        "red",
         "provider error",
         error,
         validationPath("context", "resolution", "errors", `#${index}`),
@@ -679,7 +720,14 @@ const normalizeValidation = (validation) => {
     );
   }
 
-  const status = text(validation.status || "unknown");
+  const ledgerStatus = text(validation.status || "rejected");
+  const complete = validation.complete === true;
+  const verdict = ledgerVerdict({
+    status: ledgerStatus,
+    complete,
+    validForSuppliedContext: validation.valid_for_supplied_context,
+  });
+  const validForSuppliedContext = verdict.validForSuppliedContext;
   const checks = Array.isArray(validation.checks) ? validation.checks : [];
   const failures = Array.isArray(validation.failures) ? validation.failures : [];
   const missingContext = Array.isArray(validation.missing_context)
@@ -701,14 +749,18 @@ const normalizeValidation = (validation) => {
   return {
     valid: true,
     title: "Ledger validation",
-    subtitle: validationStatusSubtitle(status, failures, missingContext, errors),
+    subtitle: validationStatusSubtitle(ledgerStatus, failures, missingContext, errors),
+    ledgerStatus,
+    complete,
+    validForSuppliedContext,
+    verdict,
     metrics: [
-      metric("Status", status),
+      metric("Status", ledgerStatus),
       metric("Network", context.network ?? "n/a"),
       metric("Slot", context.slot ?? "n/a"),
       metric("Epoch", context.epoch ?? "n/a"),
-      metric("Complete", yesNo(validation.complete)),
-      metric("Valid for context", yesNo(validation.valid_for_supplied_context)),
+      metric("Complete", yesNo(complete)),
+      metric("Valid for context", yesNo(validForSuppliedContext)),
       metric("Checks", checks.length),
       metric("Failures", failures.length),
       metric("Missing context", missingContext.length),

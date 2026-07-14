@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ledgerVerdict, shaclVerdict } from "../src/FFI/ValidationVerdict.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
@@ -39,6 +40,72 @@ const contingencyTxId =
   "18d57a4f104df4cc776104ce626958e2110122392e4c4c7671edc8861b48452e";
 const previewPrefix = "/lambdasistemi/cardano-ledger-inspector/pr-99/";
 const localBookStoreKey = "cardano-ledger-inspector.books.v1";
+
+test("truthful ledger verdict mapping", () => {
+  const cases = [
+    { status: "valid", complete: true, validForSuppliedContext: true, tone: "green" },
+    { status: "invalid", complete: true, validForSuppliedContext: false, tone: "red" },
+    { status: "incomplete", complete: false, validForSuppliedContext: false, tone: "amber" },
+    { status: "rejected", complete: false, validForSuppliedContext: false, tone: "red" },
+  ];
+  const shaclCases = [
+    { state: "pass", tone: "green" },
+    { state: "fail", tone: "red" },
+    { state: "error", tone: "red" },
+  ];
+
+  for (const ledger of cases) {
+    const expectedLedger = ledgerVerdict(ledger);
+    for (const shacl of shaclCases) {
+      expect(ledgerVerdict(ledger)).toEqual(expectedLedger);
+      expect(expectedLedger.tone).toBe(ledger.tone);
+      expect(shaclVerdict(shacl.state).tone).toBe(shacl.tone);
+    }
+  }
+
+  for (const complete of [false, true]) {
+    for (const validForSuppliedContext of [false, true]) {
+      const verdict = ledgerVerdict({
+        status: "valid",
+        complete,
+        validForSuppliedContext,
+      });
+      expect(verdict.tone === "green").toBe(complete && validForSuppliedContext);
+    }
+  }
+});
+
+test("truthful ledger verdict mapping preserves nullable context validity", async () => {
+  const jsonFfiSource = await readFile(
+    path.join(here, "../src/FFI/Json.js"),
+    "utf8",
+  );
+  const validationVerdictUrl = new URL(
+    "../src/FFI/ValidationVerdict.mjs",
+    import.meta.url,
+  ).href;
+  const jsonFfiModule = await import(
+    `data:text/javascript;base64,${Buffer.from(
+      jsonFfiSource.replace(
+        '"../../src/FFI/ValidationVerdict.mjs"',
+        `"${validationVerdictUrl}"`,
+      ),
+    ).toString("base64")}`,
+  );
+  const validation = jsonFfiModule.operationValidationImpl(
+    JSON.stringify({
+      validation: {
+        status: "valid",
+        complete: true,
+        valid_for_supplied_context: null,
+      },
+    }),
+  );
+
+  expect(validation.validForSuppliedContext).toBeNull();
+  expect(validation.verdict.validForSuppliedContext).toBeNull();
+  expect(validation.verdict.tone).toBe("amber");
+});
 const pastedTurtleBook = `
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
 @prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-rdf/overlay/local#> .
