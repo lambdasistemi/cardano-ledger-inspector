@@ -7,6 +7,10 @@
 - [X] T003 Update `README.md` to name `nix develop --quiet -c just ci` as the contributor pre-push command.
 - [X] T004 Run the focused success and temporary-drift checks, then `nix develop --quiet -c just ci` and `./gate.sh`; record RED-skip rationale and GREEN evidence in `WIP.md`.
 
+## Scope correction
+
+- [X] T005 Restore the pre-existing `gate.sh` after parent answer A-001, keeping the final PR's net diff within the brief's owned surface. Verify the standalone `just ci` entry point directly.
+
 ## Commit Contract
 
 One reviewed, bisect-safe commit:
@@ -19,3 +23,12 @@ Tasks: T001, T002, T003, T004
 
 The ticket orchestrator will mark all four tasks complete by amending that
 reviewed commit before pushing it.
+
+The parent-approved scope correction is a separate, bisect-safe orchestrator
+commit:
+
+```text
+chore: restore inherited gate
+
+Tasks: T005
+```
