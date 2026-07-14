@@ -1061,91 +1061,125 @@ async function expectTabbedInspectResult(page) {
   await expect(graphPanel.getByText("Raw JSON", { exact: true })).toBeVisible();
 }
 
-async function expectCQuisitorInspectSurface(page, route) {
-  await decodeFixtureAt(page, route, conwayMainnetFixturePath);
+async function expectCQuisitorInspectSurface(page, route, testInfo, captureEvidence = false) {
+  const viewports = [
+    { width: 1024, height: 768 },
+    { width: 390, height: 844 },
+  ];
 
-  const topbar = page.getByRole("banner");
-  await expect(topbar.getByText("Ledger Inspector", { exact: true })).toBeVisible();
-  await expect(topbar.getByRole("navigation").getByRole("link", { name: "Inspect" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await decodeFixtureAt(page, route, conwayMainnetFixturePath);
 
-  const workspace = page.locator(".workspace");
-  const loadedHeader = page.locator(".loaded-inspector-header");
-  const booksPanel = workspace.locator(".books-panel");
-  const resultPanel = workspace.locator(".result-panel");
-  await expect(loadedHeader).toBeVisible();
-  await expect(loadedHeader).toContainText("CBOR hex");
-  await expect(loadedHeader).toContainText(/Blockfrost|Koios/);
-  await expect(loadedHeader).toContainText("mainnet");
-  await expect(loadedHeader).toContainText(/Tx (id|hash)/i);
-  await expect(loadedHeader).toContainText(/[0-9a-f]{16}/i);
-  await expect(loadedHeader.getByRole("button", { name: "Change input" })).toBeVisible();
-  await expect(loadedHeader.getByRole("link", { name: "Library" })).toBeVisible();
-  await expect(loadedHeader.getByRole("button", { name: "Apply selected books" })).toBeVisible();
-  await expect(loadedHeader).toContainText(/selected|parts/);
+    const topbar = page.getByRole("banner");
+    await expect(topbar.getByText("Ledger Inspector", { exact: true })).toBeVisible();
+    await expect(topbar.getByRole("navigation").getByRole("link", { name: "Inspect" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
-  await expect(page.locator(".workspace-left")).toHaveCount(0);
-  await expect(page.locator(".workspace-right")).toHaveCount(0);
-  await expect(booksPanel.getByRole("heading", { name: "Resolution books" })).toBeVisible();
-  const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
-  await expect(tabs.getByRole("tab", { name: "Structure" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  const decodedTreePanel = decodedPanel(resultPanel);
-  await expect(decodedTreePanel).toBeVisible();
-  await expect(decodedTreePanel.getByRole("heading", { name: "Decoded transaction" })).toBeVisible();
-  const transactionRow = decodedTreePanel.locator(".decoded-tree-row", {
-    hasText: "Transaction",
-  }).first();
-  await expect(transactionRow).toBeVisible();
-  await expect(resultPanel.getByRole("heading", { name: "Conway transaction identity" })).toHaveCount(0);
-  await expect(resultPanel.locator(".summary-identity-grid")).toHaveCount(0);
+    const workspace = page.locator(".workspace");
+    const loadedHeader = page.locator(".loaded-inspector-header");
+    const booksPanel = workspace.locator(".books-panel");
+    const resultPanel = workspace.locator(".result-panel");
+    await expect(loadedHeader).toBeVisible();
+    await expect(loadedHeader).toContainText("CBOR hex");
+    await expect(loadedHeader).toContainText(/Blockfrost|Koios/);
+    await expect(loadedHeader).toContainText("mainnet");
+    await expect(loadedHeader).toContainText(/Tx (id|hash)/i);
+    await expect(loadedHeader).toContainText(/[0-9a-f]{16}/i);
+    await expect(loadedHeader.getByRole("button", { name: "Change input" })).toBeVisible();
+    await expect(loadedHeader.getByRole("link", { name: "Library" })).toBeVisible();
+    await expect(loadedHeader.getByRole("button", { name: "Apply selected books" })).toBeVisible();
+    await expect(loadedHeader).toContainText(/selected|parts/);
 
-  const loadedStack = await workspace.evaluate((root) => {
-    const rectForElement = (element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        top: rect.top,
-        bottom: rect.bottom,
-        left: rect.left,
-        width: rect.width,
+    await expect(page.locator(".workspace-left")).toHaveCount(0);
+    await expect(page.locator(".workspace-right")).toHaveCount(0);
+    await expect(booksPanel).toHaveCount(0);
+    await expect(page.locator(".resolution-books-panel")).toHaveCount(0);
+    const tabs = resultPanel.getByRole("tablist", { name: "Inspect result views" });
+    await expect(tabs.getByRole("tab", { name: "Structure" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const decodedTreePanel = decodedPanel(resultPanel);
+    await expect(decodedTreePanel).toBeVisible();
+    const decodedHeading = decodedTreePanel.getByRole("heading", { name: "Decoded transaction" });
+    await expect(decodedHeading).toBeVisible();
+    const transactionRow = decodedTreePanel.locator(".decoded-tree-row", {
+      hasText: "Transaction",
+    }).first();
+    await expect(transactionRow).toBeVisible();
+    await expect(resultPanel.getByRole("heading", { name: "Conway transaction identity" })).toHaveCount(0);
+    await expect(resultPanel.locator(".summary-identity-grid")).toHaveCount(0);
+
+    const loadedStack = await workspace.evaluate((root) => {
+      const rectForElement = (element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+        };
       };
-    };
-    const rectFor = (selector) => {
-      const element = root.querySelector(selector);
-      return element ? rectForElement(element) : null;
-    };
-    return {
-      workspace: rectForElement(root),
-      header: rectFor(".loaded-inspector-header"),
-      books: rectFor(".books-panel"),
-      result: rectFor(".result-panel"),
-    };
-  });
-  expect(loadedStack.workspace).not.toBeNull();
-  expect(loadedStack.header).not.toBeNull();
-  expect(loadedStack.books).not.toBeNull();
-  expect(loadedStack.result).not.toBeNull();
-  expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.books.top + 1);
-  expect(loadedStack.books.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
-  expect(loadedStack.result.width).toBeGreaterThan(loadedStack.workspace.width * 0.92);
-  expect(Math.abs(loadedStack.header.left - loadedStack.result.left)).toBeLessThanOrEqual(4);
+      const rectFor = (selector) => {
+        const element = root.querySelector(selector);
+        return element ? rectForElement(element) : null;
+      };
+      return {
+        workspace: rectForElement(root),
+        header: rectFor(".loaded-inspector-header"),
+        result: rectFor(".result-panel"),
+      };
+    });
+    expect(loadedStack.workspace).not.toBeNull();
+    expect(loadedStack.header).not.toBeNull();
+    expect(loadedStack.result).not.toBeNull();
+    expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
+    expect(loadedStack.result.width).toBeGreaterThan(loadedStack.workspace.width * 0.92);
+    expect(Math.abs(loadedStack.header.left - loadedStack.result.left)).toBeLessThanOrEqual(4);
 
-  const positions = await resultPanel.evaluate((panel) => {
-    const tree = panel.querySelector(".decoded-screen .decoded-tree-row");
-    const identity = panel.querySelector(".identity-panel, .summary-identity-grid");
-    return {
-      treeTop: tree?.getBoundingClientRect().top ?? null,
-      identityTop: identity?.getBoundingClientRect().top ?? null,
-    };
-  });
-  expect(positions.treeTop).not.toBeNull();
-  if (positions.identityTop !== null) {
-    expect(positions.treeTop).toBeLessThan(positions.identityTop);
+    const firstViewport = await resultPanel.evaluate((panel) => {
+      const tabBar = panel.querySelector(".result-tab-bar");
+      const decodedHeading = Array.from(panel.querySelectorAll("h1, h2, h3")).find(
+        (heading) => heading.textContent?.trim() === "Decoded transaction",
+      );
+      return {
+        tabsBottom: tabBar?.getBoundingClientRect().bottom ?? null,
+        headingBottom: decodedHeading?.getBoundingClientRect().bottom ?? null,
+        viewportHeight: window.innerHeight,
+      };
+    });
+    expect(firstViewport.tabsBottom).not.toBeNull();
+    expect(firstViewport.headingBottom).not.toBeNull();
+    expect(firstViewport.tabsBottom).toBeLessThanOrEqual(firstViewport.viewportHeight);
+    expect(firstViewport.headingBottom).toBeLessThanOrEqual(firstViewport.viewportHeight);
+
+    if (captureEvidence) {
+      const screenshotPath = testInfo.outputPath(
+        `cquisitor-loaded-${viewport.width}x${viewport.height}.png`,
+      );
+      await page.screenshot({
+        path: screenshotPath,
+      });
+      await testInfo.attach(`loaded hierarchy ${viewport.width}x${viewport.height}`, {
+        path: screenshotPath,
+        contentType: "image/png",
+      });
+    }
   }
+
+  const loadedHeader = page.locator(".loaded-inspector-header");
+  const resultPanel = page.locator(".result-panel");
+  await loadedHeader.getByRole("button", { name: "Apply selected books" }).click();
+  await expect(decodedPanel(resultPanel)).toBeVisible();
+  await loadedHeader.getByRole("button", { name: "Change input" }).click();
+  await expect(page.getByPlaceholder("Paste Conway transaction CBOR hex")).toBeVisible();
+  await page.getByRole("button", { name: "Decode" }).click();
+  await expect(loadedHeader).toBeVisible();
+  await loadedHeader.getByRole("link", { name: "Library" }).click();
+  await expect(page).toHaveURL(/\/library\/?$/);
 }
 
 async function selectResultTab(page, name) {
@@ -1967,7 +2001,7 @@ test("inspect lays out input, support panels, and decoded result", async ({
   const loadedHeader = page.locator(".loaded-inspector-header");
   await expect(loadedHeader).toBeVisible();
   await expect(inputPanel).toHaveCount(0);
-  await expect(booksPanel).toBeVisible();
+  await expect(booksPanel).toHaveCount(0);
   await expect(resultPanel.getByRole("tab", { name: "Structure" })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -1991,26 +2025,25 @@ test("inspect lays out input, support panels, and decoded result", async ({
     return {
       workspace: rectForElement(root),
       header: rectFor(".loaded-inspector-header"),
-      books: rectFor(".books-panel"),
       result: rectFor(".result-panel"),
     };
   });
   expect(loadedStack.header).not.toBeNull();
-  expect(loadedStack.books).not.toBeNull();
   expect(loadedStack.result).not.toBeNull();
-  expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.books.top + 1);
-  expect(loadedStack.books.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
+  expect(loadedStack.header.bottom).toBeLessThanOrEqual(loadedStack.result.top + 1);
   expect(loadedStack.result.width).toBeGreaterThan(loadedStack.workspace.width * 0.92);
   expect(Math.abs(loadedStack.header.left - loadedStack.result.left)).toBeLessThanOrEqual(4);
 
   await loadedHeader.getByRole("button", { name: "Change input" }).click();
   await expect(inputPanel).toBeVisible();
+  await expect(booksPanel).toBeVisible();
   await expect(decodedPanel(resultPanel)).toBeVisible();
   await expect(page.getByPlaceholder("Paste Conway transaction CBOR hex")).toHaveValue(txCbor);
 
   await page.getByRole("button", { name: "Decode" }).click();
   await expect(loadedHeader).toBeVisible();
   await expect(inputPanel).toHaveCount(0);
+  await expect(booksPanel).toHaveCount(0);
   await expect(decodedPanel(resultPanel)).toBeVisible();
 });
 
@@ -2485,11 +2518,11 @@ test("inspect result is tree-primary tabs after genuine decode", async ({ page }
 
 test("CQuisitor inspect layout keeps decoded tree primary after genuine decode and subpath", async ({
   page,
-}) => {
-  await expectCQuisitorInspectSurface(page, "/inspect");
+}, testInfo) => {
+  await expectCQuisitorInspectSurface(page, "/inspect", testInfo, true);
 
   await withPrefixedInspectorSite(async (baseUrl) => {
-    await expectCQuisitorInspectSurface(page, `${baseUrl}inspect/`);
+    await expectCQuisitorInspectSurface(page, `${baseUrl}inspect/`, testInfo);
   });
 });
 

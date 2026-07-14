@@ -372,7 +372,7 @@ inspectorComponent initial =
               else
                 renderLoadForm state
             , if showLoadedHeader then
-                renderBooksPanel state false
+                renderBooksPanel state true
               else
                 HH.text ""
             , HH.div
