@@ -112,6 +112,17 @@
 
           hostTargets = import ./nix/host { inherit pkgs CHaP; };
 
+          # The protocol registry (docs/inspector/protocols) is the same
+          # tree cabal's `data-dir: ../../docs/inspector/protocols` bundles
+          # into tx-deep-diagnosis. Package it standalone so an external
+          # consumer (e.g. the csk workbench) can `nix build
+          # .#protocol-registry` without vendoring the CLI or the repo.
+          protocolRegistry = pkgs.runCommand "protocol-registry" { } ''
+            mkdir -p "$out"
+            cp -rL ${./docs/inspector/protocols}/. "$out/"
+            chmod -R u+w "$out"
+          '';
+
           txRdfCoreSrc = pkgs.fetchgit {
             url = expectedTxRdfCore.location;
             rev = expectedTxRdfCore.rev;
@@ -1066,6 +1077,68 @@
                 $out/explain/explain.md
               cp response.md $out/
             '';
+
+          # Fails closed if tx-deep-diagnosis's bundled data (populated at
+          # build time from cabal's `data-dir: ../../docs/inspector/protocols`
+          # + `data-files`) ever drifts from packages.protocol-registry.
+          #
+          # tx-deep-diagnosis's `data-files` is a DELIBERATE, curated subset
+          # of the full registry tree -- registry.json plus the per-instance
+          # pin/plutus/journal files `TxDeepDiagnosisHost.Registry` actually
+          # parses at runtime. Prose docs (README.md, WORKED-EXAMPLE.md) and
+          # RDF/SHACL artifacts (cardano-rdf/shapes.ttl,
+          # amaru-treasury/overlay.ttl) are intentionally excluded -- they
+          # have no CLI consumer today. Do NOT turn this into a bidirectional
+          # `diff -r` between the CLI's data dir and packages.protocol-registry;
+          # that would fail permanently on files that were never meant to
+          # ship in the CLI. See specs/149-protocol-registry-flake-output/
+          # for the acceptance-criteria tension this resolves.
+          #
+          # Two directions are checked instead:
+          #   1. every file the CLI actually bundles must be byte-identical
+          #      to the same relative path in packages.protocol-registry;
+          #   2. every file registry.json's own manifest declares as CLI
+          #      lookup data (blueprint/pin/deployment-registry paths) must
+          #      actually be present in the CLI's installed data dir --
+          #      catches a future registry.json entry whose data-files
+          #      entry was forgotten in tx-deep-diagnosis.cabal.
+          protocol-registry-drift-check =
+            pkgs.runCommand "protocol-registry-drift-check"
+              { nativeBuildInputs = [ pkgs.diffutils pkgs.findutils pkgs.jq ]; } ''
+                set -euo pipefail
+                cli_data_dir=$(find ${hostTargets.tx-deep-diagnosis.data} \
+                  -type f -name registry.json -exec dirname {} \; | head -n1)
+                if [ -z "$cli_data_dir" ]; then
+                  echo "could not locate tx-deep-diagnosis's bundled registry.json" >&2
+                  exit 1
+                fi
+                fail=0
+                while IFS= read -r -d "" f; do
+                  rel=''${f#"$cli_data_dir"/}
+                  expected=${protocolRegistry}/"$rel"
+                  if [ ! -f "$expected" ]; then
+                    echo "drift: $rel is bundled by tx-deep-diagnosis but missing from packages.protocol-registry" >&2
+                    fail=1
+                    continue
+                  fi
+                  if ! cmp -s "$f" "$expected"; then
+                    echo "drift: $rel differs between tx-deep-diagnosis's bundled data and packages.protocol-registry" >&2
+                    fail=1
+                  fi
+                done < <(find "$cli_data_dir" -type f -print0)
+
+                while IFS= read -r rel; do
+                  if [ ! -f "$cli_data_dir/$rel" ]; then
+                    echo "drift: registry.json declares $rel but tx-deep-diagnosis does not bundle it (add it to apps/tx-deep-diagnosis/tx-deep-diagnosis.cabal data-files)" >&2
+                    fail=1
+                  fi
+                done < <(${pkgs.jq}/bin/jq -r '
+                  ((.blueprints // [])[] | .path, .pin),
+                  ((.deployment_registries // [])[] | .path, .pin)
+                ' "$cli_data_dir/registry.json")
+                [ "$fail" -eq 0 ] || exit 1
+                touch $out
+              '';
         in
         {
           packages = {
@@ -1079,6 +1152,7 @@
               tx-inspector-ui
               ;
             ledger-functional-swagger = ledger-functional-openapi;
+            protocol-registry = protocolRegistry;
             default = tx-inspector-ui;
           };
 
@@ -1096,7 +1170,8 @@
               tx-extism-spike-smoke
               tx-explain-render-smoke
               tx-deep-diagnosis-emit-explain-smoke
-              cardano-ledger-wasm-pin-check;
+              cardano-ledger-wasm-pin-check
+              protocol-registry-drift-check;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
