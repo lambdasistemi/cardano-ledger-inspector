@@ -12,6 +12,7 @@ module FFI.Json
   , OutputRow
   , RdfGraph
   , Validation
+  , ValidationMetric
   , ValidationRow
   , ValidationSection
   , ValidationVerdict
@@ -173,6 +174,12 @@ type ValidationVerdict =
   , detail :: String
   }
 
+type ValidationMetric =
+  { tone :: String
+  , label :: String
+  , value :: String
+  }
+
 type ValidationRow =
   { label :: String
   , value :: String
@@ -196,7 +203,7 @@ type Validation =
   , complete :: Boolean
   , validForSuppliedContext :: Nullable Boolean
   , verdict :: ValidationVerdict
-  , metrics :: Array Metric
+  , metrics :: Array ValidationMetric
   , warnings :: Array String
   , sections :: Array ValidationSection
   }

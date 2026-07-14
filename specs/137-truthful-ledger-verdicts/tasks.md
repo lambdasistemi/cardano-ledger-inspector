@@ -13,13 +13,13 @@
 
 ## Slice 2: Independent browser presentation and journeys
 
-- [ ] T1373 Render a ledger-specific structured verdict and a separate SHACL
+- [X] T1373 Render a ledger-specific structured verdict and a separate SHACL
   verdict, with distinct red invalid/rejected outcomes and actionable detail.
-- [ ] T1374 Add structured validation metric tones at the normalization
+- [X] T1374 Add structured validation metric tones at the normalization
   boundary, then restrict ledger tally/filter evidence to ledger findings while
   retaining missing context as a warning and provider/context errors as
   failures.
-- [ ] T1375 Add hermetic Playwright coverage for every ledger-status × SHACL
+- [X] T1375 Add hermetic Playwright coverage for every ledger-status × SHACL
   pass/fail/error combination plus valid and broken example journeys.
 
 ## Commit Contracts

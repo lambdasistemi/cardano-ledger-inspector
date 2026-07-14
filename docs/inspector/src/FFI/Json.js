@@ -563,6 +563,18 @@ const validityLabel = (slot) => (slot === null || slot === undefined ? "open" : 
 
 const metric = (label, value) => ({ label, value: text(value) });
 
+const validationMetric = (tone, label, value) => ({
+  tone,
+  label,
+  value: text(value),
+});
+
+const validationCountTone = (count, nonzeroTone) =>
+  Number(count) > 0 ? nonzeroTone : "green";
+
+const validationContextTone = (value) =>
+  value === true ? "green" : value === false ? "red" : "amber";
+
 const yesNo = (value) => (value === true ? "yes" : value === false ? "no" : "n/a");
 
 const jsonCopy = (value) => {
@@ -755,18 +767,31 @@ const normalizeValidation = (validation) => {
     validForSuppliedContext,
     verdict,
     metrics: [
-      metric("Status", ledgerStatus),
-      metric("Network", context.network ?? "n/a"),
-      metric("Slot", context.slot ?? "n/a"),
-      metric("Epoch", context.epoch ?? "n/a"),
-      metric("Complete", yesNo(complete)),
-      metric("Valid for context", yesNo(validForSuppliedContext)),
-      metric("Checks", checks.length),
-      metric("Failures", failures.length),
-      metric("Missing context", missingContext.length),
-      metric("Context errors", errors.length),
-      metric("Resolved inputs", context.resolved_input_count ?? resolvedInputs.length),
-      metric(
+      validationMetric(verdict.tone, "Status", ledgerStatus),
+      validationMetric("neutral", "Network", context.network ?? "n/a"),
+      validationMetric("neutral", "Slot", context.slot ?? "n/a"),
+      validationMetric("neutral", "Epoch", context.epoch ?? "n/a"),
+      validationMetric(complete ? "green" : "amber", "Complete", yesNo(complete)),
+      validationMetric(
+        validationContextTone(validForSuppliedContext),
+        "Valid for context",
+        yesNo(validForSuppliedContext)
+      ),
+      validationMetric("neutral", "Checks", checks.length),
+      validationMetric(validationCountTone(failures.length, "red"), "Failures", failures.length),
+      validationMetric(
+        validationCountTone(missingContext.length, "amber"),
+        "Missing context",
+        missingContext.length
+      ),
+      validationMetric(validationCountTone(errors.length, "red"), "Context errors", errors.length),
+      validationMetric(
+        "neutral",
+        "Resolved inputs",
+        context.resolved_input_count ?? resolvedInputs.length
+      ),
+      validationMetric(
+        "neutral",
         "Resolved ref inputs",
         context.resolved_reference_input_count ?? resolvedReferenceInputs.length
       ),
