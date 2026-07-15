@@ -148,3 +148,26 @@ against an existing fixture. A passing executed check proves feasibility and
 releases full implementation planning. A compiler/runtime/assertion failure
 caused by Haskell or the pinned library, rather than another tooling gap, is the
 first acceptable feasibility stop.
+
+## Slice 0N result and parent decision on Q-003
+
+Slice 0N reached the native Cabal planner but never reached a behavior-specific
+RED. Adding `cardano-ledger-inspector` to the GHC 9.8.4 plan also enabled its
+shipping `wasm-tx-inspector` component. Reusing the existing pinned
+`tx-rdf-core` source stanza then exposed a real constraint conflict:
+
+```text
+ghc-heap => containers==0.6.8/installed-0.6.8
+tx-rdf-core => containers>=0.7 && <0.8
+```
+
+The driver stopped after that single reasoned correction, and the navigator
+verified the conflict. No CBOR offset assertion executed.
+
+The epic owner ruled that this is a component-coupling failure, not evidence
+against `decodeWithByteSpan` or `peekByteOffset`, and authorized one final
+three-hour retry. Slice 0I must isolate the probe in a separate non-shipping
+Cabal package whose solve excludes `wasm-tx-inspector` and `tx-rdf-core`; their
+pins and bounds are immutable. This is the final retry regardless of outcome.
+A failure to reach behavior-specific RED is the accepted final stop. A passing
+GREEN releases full acceptance-criteria implementation planning.
