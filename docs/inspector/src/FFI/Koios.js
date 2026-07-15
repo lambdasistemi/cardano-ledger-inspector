@@ -1,7 +1,7 @@
 // Koios CBOR fetch. Returns a Promise<string> of the hex, or throws.
 //
-// Koios is free and keyless for basic use (rate-limited). A bearer token
-// can be supplied for higher limits; passed as empty string means no auth.
+// Koios itself offers keyless access, but this browser workflow requires a
+// bearer token as an explicit readiness gate before calling the adapter.
 // Docs: https://api.koios.rest/
 
 const BASES = {
@@ -20,10 +20,46 @@ const koiosHeaders = (bearer) => {
 
 const ledgerNetwork = (network) => (network === "mainnet" ? "mainnet" : "testnet");
 
+const failureCategory = (status) => {
+  if (status === 401) return "authentication";
+  if (status === 403) return "permission";
+  if (status === 429) return "rate-limit";
+  if (status >= 500) return "provider";
+  return "response";
+};
+
+const providerFailure = (category, status, detail) =>
+  new Error(`provider-boundary|Koios|${category}|${status || ""}|${detail || ""}`);
+
+const errorMessage = (err) => (err instanceof Error ? err.message : String(err));
+
+const fetchWithBoundary = async (base, url, options) => {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    let providerReachable = false;
+    try {
+      await fetch(base, { method: "GET", mode: "no-cors" });
+      providerReachable = true;
+    } catch (_) {
+      // A failed same-provider probe is the observable network signal.
+    }
+    throw providerFailure(
+      providerReachable ? "cors" : "network",
+      "",
+      errorMessage(err),
+    );
+  }
+};
+
 const readJson = async (resp, label) => {
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    throw new Error(`Koios ${label} ${resp.status}: ${body.slice(0, 200)}`);
+    throw providerFailure(
+      failureCategory(resp.status),
+      String(resp.status),
+      `${label}: ${body.slice(0, 200)}`,
+    );
   }
   return resp.json();
 };
@@ -39,7 +75,7 @@ const firstObject = (json, label) => {
 export const fetchTxCborImpl = (network) => (bearer) => (txHash) => async () => {
   const base = BASES[network] || BASES.mainnet;
   const headers = koiosHeaders(bearer);
-  const resp = await fetch(`${base}/tx_cbor`, {
+  const resp = await fetchWithBoundary(base, `${base}/tx_cbor`, {
     method: "POST",
     headers,
     body: JSON.stringify({ _tx_hashes: [txHash] }),
@@ -64,9 +100,11 @@ export const fetchValidationContextImpl = (network) => (bearer) => async () => {
   const base = BASES[network] || BASES.mainnet;
   const headers = koiosHeaders(bearer);
   const [tipResponse, pparamsResponse] = await Promise.all([
-    fetch(`${base}/tip`, { headers }).then((resp) => readJson(resp, "tip")),
-    fetch(`${base}/cli_protocol_params`, { headers }).then((resp) =>
-      readJson(resp, "protocol parameters")
+    fetchWithBoundary(base, `${base}/tip`, { headers }).then((resp) =>
+      readJson(resp, "tip")
+    ),
+    fetchWithBoundary(base, `${base}/cli_protocol_params`, { headers }).then(
+      (resp) => readJson(resp, "protocol parameters"),
     ),
   ]);
   const tip = firstObject(tipResponse, "tip");

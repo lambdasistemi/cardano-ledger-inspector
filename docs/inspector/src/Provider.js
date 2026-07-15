@@ -39,6 +39,52 @@ const extractInspectionInputs = (inspectionResponse) => {
 
 const errorMessage = (err) => (err instanceof Error ? err.message : String(err));
 
+const PROVIDER_FAILURE_PREFIX = "provider-boundary|";
+
+const isProviderBoundaryError = (err) =>
+  errorMessage(err).startsWith(PROVIDER_FAILURE_PREFIX);
+
+export const providerFailureGuidanceImpl = (selectedProvider) => (raw) => {
+  const parts = String(raw).split("|");
+  if (parts[0] !== "provider-boundary") {
+    return `${selectedProvider} provider request failed: ${raw}`;
+  }
+
+  const provider = parts[1] || selectedProvider;
+  const category = parts[2] || "response";
+  const status = parts[3] || "";
+  switch (category) {
+    case "authentication":
+      return `${provider} authentication failed (${status || "401"}). Check the project ID or bearer token in Settings and retry.`;
+    case "permission":
+      return `${provider} request was denied (${status || "403"}). Check credential permissions, the selected network, and Settings.`;
+    case "rate-limit":
+      return `${provider} rate limit reached (${status || "429"}). Wait and retry.`;
+    case "provider":
+      return `${provider} is unavailable (${status || "5xx"}). Retry later; the credential may still be valid.`;
+    case "network":
+      return `${provider} network request failed. Check connectivity and retry.`;
+    case "cors":
+      return provider === "Koios"
+        ? "Koios request was blocked by CORS. A bearer token permits an attempt but does not guarantee browser access."
+        : `${provider} request was blocked by CORS. A configured project ID permits an attempt but does not guarantee browser access.`;
+    default:
+      return `${provider} request failed${status ? ` (${status})` : ""}. Check Settings and retry.`;
+  }
+};
+
+export const focusProviderErrorImpl = () => {
+  const focus = () => {
+    const alert = document.querySelector("[data-provider-error]");
+    if (!(alert instanceof HTMLElement)) return false;
+    alert.focus({ preventScroll: true });
+    alert.scrollIntoView({ block: "center", inline: "nearest" });
+    return true;
+  };
+
+  if (!focus()) requestAnimationFrame(focus);
+};
+
 const providerValidationContext = async (fetchValidationContext, errors) => {
   try {
     const raw = await fetchValidationContext();
@@ -50,6 +96,7 @@ const providerValidationContext = async (fetchValidationContext, errors) => {
     const { source, ...fields } = parsed;
     return { fields, source: typeof source === "string" ? source : "" };
   } catch (err) {
+    if (isProviderBoundaryError(err)) throw err;
     errors.push(`validation_context: ${errorMessage(err)}`);
     return { fields: {}, source: "" };
   }
@@ -78,6 +125,7 @@ export const resolveProducerTxContextImpl =
             source,
           };
         } catch (err) {
+          if (isProviderBoundaryError(err)) throw err;
           missing.push(txId);
           errors.push(`${txId}: ${errorMessage(err)}`);
         }

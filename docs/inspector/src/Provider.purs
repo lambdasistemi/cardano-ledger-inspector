@@ -2,6 +2,10 @@ module Provider
   ( Provider(..)
   , providerName
   , needsKey
+  , credentialReady
+  , readinessGuidance
+  , providerFailureGuidance
+  , focusProviderError
   , fetchTxCbor
   , resolveProducerTxContext
   ) where
@@ -9,6 +13,7 @@ module Provider
 import Prelude
 
 import Control.Promise (Promise, toAffE)
+import Data.String as String
 import Effect (Effect)
 import Effect.Aff (Aff)
 import FFI.Blockfrost (Network)
@@ -24,16 +29,34 @@ providerName = case _ of
   Blockfrost -> "Blockfrost"
   Koios      -> "Koios"
 
--- | Blockfrost requires a project ID. Koios accepts an optional bearer
--- token for higher rate limits; it works without one, so the key field
--- is optional.
+-- | The browser workflow requires the selected provider's credential before
+-- any provider request. A Koios token permits an attempt but does not imply
+-- that the deployed browser origin will pass Koios' CORS policy.
 needsKey :: Provider -> Boolean
 needsKey = case _ of
   Blockfrost -> true
-  Koios      -> false
+  Koios      -> true
 
--- | Unified fetch. `key` is the project ID for Blockfrost or an optional
--- bearer token for Koios (empty string = no auth).
+credentialReady :: Provider -> String -> Boolean
+credentialReady provider credential =
+  not (needsKey provider) || String.trim credential /= ""
+
+readinessGuidance :: Provider -> String
+readinessGuidance = case _ of
+  Blockfrost ->
+    "Blockfrost credential required: the provider is not ready. Add a project ID in Settings."
+  Koios ->
+    "Koios credential required: the provider is not ready. Add a bearer token in Settings. A token permits an attempt but does not guarantee browser access."
+
+providerFailureGuidance :: Provider -> String -> String
+providerFailureGuidance provider =
+  providerFailureGuidanceImpl (providerName provider)
+
+focusProviderError :: Effect Unit
+focusProviderError = focusProviderErrorImpl
+
+-- | Unified fetch. `key` is the required project ID for Blockfrost or bearer
+-- token for Koios; readiness is enforced before this boundary is called.
 fetchTxCbor :: Provider -> Network -> String -> String -> Aff String
 fetchTxCbor provider network key txId =
   toAffE (fetchTxCborEffect provider network key txId)
@@ -58,9 +81,7 @@ fetchTxCborEffect = case _ of
 fetchValidationContextEffect :: Provider -> Network -> String -> Effect (Promise String)
 fetchValidationContextEffect provider network key =
   case provider of
-    Blockfrost ->
-      if key == "" then Koios.fetchValidationContextEffect network ""
-      else Blockfrost.fetchValidationContextEffect network key
+    Blockfrost -> Blockfrost.fetchValidationContextEffect network key
     Koios -> Koios.fetchValidationContextEffect network key
 
 resolutionProvider :: Provider -> String
@@ -81,3 +102,7 @@ foreign import resolveProducerTxContextImpl
   -> Effect (Promise String) -- fetch current validation context
   -> Boolean -- fetch producer tx CBOR
   -> Effect (Promise String)
+
+foreign import providerFailureGuidanceImpl :: String -> String -> String
+
+foreign import focusProviderErrorImpl :: Effect Unit

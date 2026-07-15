@@ -1077,6 +1077,115 @@ async function installProviderRequestRecorder(page) {
   return requests;
 }
 
+function providerNameForUrl(url) {
+  const { hostname } = new URL(url);
+  if (hostname === "blockfrost.io" || hostname.endsWith(".blockfrost.io")) {
+    return "Blockfrost";
+  }
+  if (hostname === "koios.rest" || hostname.endsWith(".koios.rest")) {
+    return "Koios";
+  }
+  return null;
+}
+
+async function installProviderBoundary(page, respond) {
+  const requests = [];
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    const provider = providerNameForUrl(request.url());
+    if (provider === null) {
+      await route.continue();
+      return;
+    }
+
+    requests.push({
+      provider,
+      method: request.method(),
+      url: request.url(),
+      headers: request.headers(),
+    });
+    await respond(route, provider);
+  });
+  return requests;
+}
+
+async function fulfillSuccessfulProviderRequest(route, txCbor, validationContext) {
+  const request = route.request();
+  const url = new URL(request.url());
+
+  if (url.hostname.endsWith(".blockfrost.io")) {
+    if (/\/txs\/[0-9a-f]+\/cbor$/.test(url.pathname)) {
+      const txHash = url.pathname.match(/\/txs\/([0-9a-f]+)\/cbor$/)?.[1];
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ cbor: producerCbor(validationContext, txHash, txCbor) }),
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/blocks/latest")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          slot: Number(validationContext.slot),
+          epoch: Number(validationContext.epoch),
+        }),
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/epochs/latest/parameters")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          blockfrostParamsFromLedger(validationContext.protocol_parameters),
+        ),
+      });
+      return;
+    }
+  }
+
+  if (url.hostname.endsWith(".koios.rest")) {
+    if (url.pathname.endsWith("/tx_cbor")) {
+      const hashes = request.postDataJSON()._tx_hashes;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          hashes.map((txHash) => ({
+            cbor: producerCbor(validationContext, txHash, txCbor),
+          })),
+        ),
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/tip")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            abs_slot: Number(validationContext.slot),
+            epoch_no: Number(validationContext.epoch),
+          },
+        ]),
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/cli_protocol_params")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(validationContext.protocol_parameters),
+      });
+      return;
+    }
+  }
+
+  await route.fulfill({ status: 500, body: "unexpected provider request" });
+}
+
 async function withPrefixedInspectorSite(callback) {
   const server = createServer(async (request, response) => {
     try {
@@ -2156,6 +2265,285 @@ test("bundled examples stay provider-silent without external context", async ({
     expect.soft(loadedContext).toContain("Offline/no external provider");
   }
   expect(providerRequests, "bundled example provider request ledger").toEqual([]);
+});
+
+for (const provider of ["Blockfrost", "Koios"]) {
+  for (const action of ["hash fetch", "external context"]) {
+    test(`provider readiness blocks missing ${provider} credential for ${action}`, async ({
+      page,
+    }) => {
+      const txCbor = (await readFile(fixturePath, "utf8")).trim();
+      const providerRequests = await installProviderRequestRecorder(page);
+
+      await configureChainData(page, {
+        provider,
+        blockfrostKey: "",
+        koiosBearer: "",
+      });
+      await openInspectViaShell(page);
+
+      if (action === "hash fetch") {
+        await page.getByRole("tab", { name: "Fetch by hash" }).click();
+        await page
+          .getByPlaceholder("Transaction hash (64 hex chars)")
+          .fill("0".repeat(64));
+      } else {
+        await enableExternalContext(page);
+        await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
+      }
+
+      await page.getByRole("button", { name: "Decode" }).click();
+      await page.waitForFunction(() =>
+        !Array.from(document.querySelectorAll('[role="button"]')).some((button) =>
+          /^(Fetching|Decoding)\.\.\.$/.test(button.textContent?.trim() || ""),
+        ),
+      );
+
+      const inlineAlert = page.locator(".decode-form").getByRole("alert");
+      expect(
+        providerRequests,
+        `${provider} ${action} missing-credential request ledger`,
+      ).toEqual([]);
+      await expect(inlineAlert).toBeVisible({ timeout: 5_000 });
+      await expect(inlineAlert).toContainText(provider);
+      await expect(inlineAlert).toContainText(/credential|required|not ready/i);
+      await expect(inlineAlert.getByRole("link", { name: "Settings" })).toBeVisible();
+    });
+  }
+}
+
+test("provider readiness contract removes Blockfrost-to-Koios fallback", async () => {
+  const providerSource = await readFile(
+    path.join(repoRoot, "docs/inspector/src/Provider.purs"),
+    "utf8",
+  );
+
+  expect(providerSource).not.toMatch(
+    /Blockfrost\s*->\s*\n\s*if key == "" then Koios\.fetchValidationContextEffect/,
+  );
+});
+
+test("exact provider dispatch calls only the selected provider and labels its context", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
+  const providerRequests = await installProviderBoundary(page, (route) =>
+    fulfillSuccessfulProviderRequest(route, txCbor, validationContext),
+  );
+
+  for (const provider of ["Blockfrost", "Koios"]) {
+    const start = providerRequests.length;
+    const credential =
+      provider === "Blockfrost"
+        ? { blockfrostKey: "mainnet-explicit-project" }
+        : { koiosBearer: "koios-explicit-token" };
+
+    await configureChainData(page, { provider, network: "mainnet", ...credential });
+    await openInspectViaShell(page);
+    await page.getByRole("tab", { name: "Fetch by hash" }).click();
+    await enableExternalContext(page);
+    const onlineTrustCopy = page.locator(".input-panel-title p");
+    await expect(onlineTrustCopy).toContainText(
+      new RegExp(`${provider}.*contacted.*ledger decode.*local`, "i"),
+    );
+    await expect(onlineTrustCopy).not.toContainText(/nothing is sent/i);
+    await page
+      .getByPlaceholder("Transaction hash (64 hex chars)")
+      .fill("0".repeat(64));
+    await page.getByRole("button", { name: "Decode" }).click();
+
+    const loadedHeader = page.locator(".loaded-inspector-header");
+    await expect(loadedHeader).toBeVisible();
+    await expect(loadedHeader).toContainText(provider);
+
+    const dispatched = providerRequests.slice(start);
+    expect(dispatched.length, `${provider} request ledger should be non-empty`).toBeGreaterThan(0);
+    expect(
+      [...new Set(dispatched.map((request) => request.provider))],
+      `${provider} exact-dispatch request ledger`,
+    ).toEqual([provider]);
+    if (provider === "Blockfrost") {
+      expect(dispatched.every((request) => request.headers.project_id === "mainnet-explicit-project"))
+        .toBe(true);
+      expect(dispatched.some((request) => request.url.endsWith("/blocks/latest"))).toBe(true);
+      expect(
+        dispatched.some((request) => request.url.endsWith("/epochs/latest/parameters")),
+      ).toBe(true);
+      expect(dispatched.some((request) => /\/txs\/[0-9a-f]+\/cbor$/.test(request.url)))
+        .toBe(true);
+    } else {
+      expect(dispatched.every((request) => request.headers.authorization === "Bearer koios-explicit-token"))
+        .toBe(true);
+      expect(dispatched.some((request) => request.url.endsWith("/tip"))).toBe(true);
+      expect(dispatched.some((request) => request.url.endsWith("/cli_protocol_params")))
+        .toBe(true);
+      expect(dispatched.some((request) => request.url.endsWith("/tx_cbor"))).toBe(true);
+    }
+  }
+});
+
+const providerFailureCases = [
+  {
+    category: "401 authentication",
+    provider: "Blockfrost",
+    response: { status: 401, body: "invalid project id" },
+    guidance: /authentication failed.*401.*project ID.*Settings/i,
+  },
+  {
+    category: "403 permission",
+    provider: "Blockfrost",
+    response: { status: 403, body: "forbidden" },
+    guidance: /denied.*403.*permissions.*network.*Settings/i,
+  },
+  {
+    category: "429 rate limit",
+    provider: "Blockfrost",
+    response: { status: 429, body: "too many requests" },
+    guidance: /rate limit.*429.*wait.*retry/i,
+  },
+  {
+    category: "5xx provider",
+    provider: "Blockfrost",
+    response: { status: 503, body: "unavailable" },
+    guidance: /unavailable.*503.*retry later.*credential.*valid/i,
+  },
+  {
+    category: "network transport",
+    provider: "Blockfrost",
+    abort: "connectionrefused",
+    transportProbe: "fails",
+    guidance: /network request failed.*connectivity.*retry/i,
+  },
+  {
+    category: "CORS",
+    provider: "Koios",
+    abort: "accessdenied",
+    transportProbe: "succeeds",
+    guidance: /Koios.*blocked by CORS.*bearer token.*does not guarantee.*browser/i,
+  },
+  {
+    category: "Blockfrost CORS",
+    provider: "Blockfrost",
+    abort: "accessdenied",
+    transportProbe: "succeeds",
+    guidance: /Blockfrost.*blocked by CORS.*project ID.*does not guarantee.*browser/i,
+  },
+];
+
+for (const failure of providerFailureCases) {
+  test(`provider failure categories render ${failure.category} guidance inline`, async ({
+    page,
+  }) => {
+    const providerRequests = await installProviderBoundary(page, async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const isTransportProbe =
+        request.method() === "GET" &&
+        (url.pathname === "/api/v0" || url.pathname === "/api/v1");
+      if (isTransportProbe && failure.transportProbe === "succeeds") {
+        await route.fulfill({ status: 204 });
+        return;
+      }
+      if (failure.abort !== undefined) {
+        await route.abort(failure.abort);
+      } else {
+        await route.fulfill(failure.response);
+      }
+    });
+    const credential =
+      failure.provider === "Blockfrost"
+        ? { blockfrostKey: "mainnet-failure-project" }
+        : { koiosBearer: "koios-failure-token" };
+
+    await configureChainData(page, {
+      provider: failure.provider,
+      network: "mainnet",
+      ...credential,
+    });
+    await openInspectViaShell(page);
+    await page.getByRole("tab", { name: "Fetch by hash" }).click();
+    await page
+      .getByPlaceholder("Transaction hash (64 hex chars)")
+      .fill("0".repeat(64));
+    await page.getByRole("button", { name: "Decode" }).click();
+
+    const inlineAlert = page.locator(".decode-form").getByRole("alert");
+    await expect(inlineAlert).toBeVisible({ timeout: 5_000 });
+    const expectedRequestCount = failure.transportProbe === undefined ? 1 : 2;
+    expect(providerRequests).toHaveLength(expectedRequestCount);
+    expect(providerRequests.every((request) => request.provider === failure.provider)).toBe(true);
+    if (failure.transportProbe !== undefined) {
+      expect(providerRequests[1].method).toBe("GET");
+      expect(new URL(providerRequests[1].url).pathname).toMatch(/^\/api\/v[01]$/);
+      expect(providerRequests[1].headers["sec-fetch-mode"]).toBe("no-cors");
+    }
+    await expect(inlineAlert).toContainText(failure.guidance);
+  });
+}
+
+test("provider error focus moves to the inline hash failure", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 320 });
+  const providerRequests = await installProviderBoundary(page, (route) =>
+    route.fulfill({ status: 429, body: "too many requests" }),
+  );
+
+  await configureChainData(page, {
+    provider: "Blockfrost",
+    network: "mainnet",
+    blockfrostKey: "mainnet-focus-project",
+  });
+  await openInspectViaShell(page);
+  await page.getByRole("tab", { name: "Fetch by hash" }).click();
+  await page
+    .getByPlaceholder("Transaction hash (64 hex chars)")
+    .fill("0".repeat(64));
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const inlineAlert = page.locator(".decode-form").getByRole("alert");
+  await expect(inlineAlert).toBeVisible({ timeout: 5_000 });
+  expect(providerRequests).toHaveLength(1);
+  expect(await inlineAlert.evaluate((element) => document.activeElement === element)).toBe(true);
+});
+
+test("provider error focus scrolls an external-context failure into the first viewport", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
+  await page.setViewportSize({ width: 900, height: 320 });
+  const providerRequests = await installProviderBoundary(page, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/blocks/latest")) {
+      await route.fulfill({ status: 503, body: "provider unavailable" });
+      return;
+    }
+    await fulfillSuccessfulProviderRequest(route, txCbor, validationContext);
+  });
+
+  await configureChainData(page, {
+    provider: "Blockfrost",
+    network: "mainnet",
+    blockfrostKey: "mainnet-scroll-project",
+  });
+  await openInspectViaShell(page);
+  await page.addStyleTag({ content: ".input-panel { margin-top: 720px; }" });
+  await enableExternalContext(page);
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
+  const decodeButton = page.getByRole("button", { name: "Decode" });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const before = await decodeButton.boundingBox();
+  expect(before.y).toBeGreaterThan(320);
+  await decodeButton.click();
+
+  const inlineAlert = page.locator(".decode-form").getByRole("alert");
+  await expect(inlineAlert).toBeVisible({ timeout: 10_000 });
+  await expect(inlineAlert).toContainText(/Blockfrost.*unavailable.*503/i);
+  await expectInFirstViewport(inlineAlert);
+  expect(providerRequests.length).toBeGreaterThan(0);
+  expect([...new Set(providerRequests.map((request) => request.provider))]).toEqual([
+    "Blockfrost",
+  ]);
 });
 
 test("inspect lays out input, support panels, and decoded result", async ({
@@ -3793,7 +4181,30 @@ test("shows transaction-derived witness plan values", async ({ page }) => {
 });
 
 test("surfaces ledger validation diagnostics", async ({ page }) => {
-  await decodeFixture(page);
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
+  await installClipboardMock(page);
+  const providerRequests = await installProviderBoundary(page, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/tx_cbor")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "[]",
+      });
+      return;
+    }
+    await fulfillSuccessfulProviderRequest(route, txCbor, validationContext);
+  });
+
+  await configureChainData(page, {
+    provider: "Koios",
+    network: "mainnet",
+    koiosBearer: "koios-validation-diagnostics-token",
+  });
+  await openInspectViaShell(page);
+  await enableExternalContext(page);
+  await submitTxCbor(page, txCbor);
 
   await selectResultTab(page, "Validation");
   const validationPanel = page.locator(".validation-panel");
@@ -3842,6 +4253,16 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
 
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^[0-9a-f]{64}$/);
+  expect(providerRequests.length).toBeGreaterThan(0);
+  expect([...new Set(providerRequests.map((request) => request.provider))]).toEqual([
+    "Koios",
+  ]);
+  expect(
+    providerRequests.every(
+      (request) =>
+        request.headers.authorization === "Bearer koios-validation-diagnostics-token",
+    ),
+  ).toBe(true);
 });
 
 test("keeps copy controls off non-value missing context rows", async ({ page }) => {
