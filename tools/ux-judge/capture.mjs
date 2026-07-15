@@ -32,7 +32,7 @@ async function ready(page) {
         undefined,
         { timeout: 90_000 },
       );
-      await page.getByText("Paste here").first().waitFor({ state: "visible", timeout: 30_000 });
+      await page.locator(".example-chip").first().waitFor({ state: "visible", timeout: 30_000 });
       return;
     } catch (err) {
       lastErr = err;
@@ -67,7 +67,7 @@ const scenarios = [
     name: "02-decoded-valid",
     async run(page, tag) {
       await ready(page);
-      await page.locator("md-outlined-button.example-valid").click();
+      await page.locator(".example-chip", { hasText: "Valid Conway transaction" }).click();
       await page.locator(".result-panel .decoded-tree-row").first().waitFor({ timeout: 60_000 });
       await shot(page, `02-decoded-valid@${tag}`);
     },
@@ -76,10 +76,53 @@ const scenarios = [
     name: "03-validation-broken",
     async run(page, tag) {
       await ready(page);
-      await page.locator("md-outlined-button.example-violation").first().click();
+      await page.locator(".example-chip", { hasText: "Empty input set" }).click();
       await page.locator(".result-panel").getByRole("tab", { name: "Validation" }).click();
       await page.locator(".shacl-conformance-panel").first().waitFor({ timeout: 60_000 });
       await shot(page, `03-validation-broken@${tag}`);
+    },
+  },
+  {
+    name: "04-resolution",
+    async run(page, tag) {
+      await ready(page);
+      await page.locator(".example-chip", { hasText: "Amaru owner-key resolution" }).click();
+
+      const loadedHeader = page.locator(".loaded-inspector-header");
+      await loadedHeader.waitFor({ state: "visible", timeout: 60_000 });
+      await loadedHeader.getByRole("button", { name: "Apply selected books" }).click();
+
+      const resultPanel = page.locator(".result-panel");
+      await resultPanel.getByRole("tab", { name: "Structure" }).click();
+      const structurePanel = resultPanel.getByRole("tabpanel", { name: "Structure" });
+      await structurePanel
+        .locator(".decoded-toolbar")
+        .getByRole("button", { name: "Expand" })
+        .click();
+
+      const ownerLabel = "Amaru Network Compliance owner key";
+      const resolvedSigner = structurePanel
+        .locator(".decoded-tree-row--resolved")
+        .filter({
+          has: page.locator(".decoded-tree-key", { hasText: "Required signer" }),
+        })
+        .filter({
+          has: page.locator(".decoded-tree-resolved-name", { hasText: ownerLabel }),
+        })
+        .first();
+      await resolvedSigner.waitFor({ state: "visible", timeout: 60_000 });
+      const resolvedLabel = await resolvedSigner.locator(".decoded-tree-resolved-name").evaluate(
+        (node) =>
+          Array.from(node.childNodes)
+            .filter((child) => child.nodeType === Node.TEXT_NODE)
+            .map((child) => child.textContent || "")
+            .join("")
+            .trim(),
+      );
+      if (resolvedLabel !== ownerLabel) {
+        throw new Error(`expected exact resolved label ${ownerLabel}, got ${resolvedLabel}`);
+      }
+      await shot(page, `04-resolution@${tag}`);
     },
   },
 ];
