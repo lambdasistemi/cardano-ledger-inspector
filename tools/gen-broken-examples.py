@@ -7,6 +7,7 @@ import sys, json, copy, cbor2, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1] / "specs/001-ledger-functional-layer/fixtures"
 BASE = (ROOT / "conway-mainnet-tx.hex").read_text().strip()
+AMARU_OWNER_KEY = (ROOT / "sundae-swap-usdm-disbursement.hex").read_text().strip()
 OUT = ROOT / "broken"
 base_tx = cbor2.loads(bytes.fromhex(BASE))
 
@@ -49,6 +50,10 @@ ps_rows = [{
     "slug": "valid-conway-mainnet", "label": "Valid Conway transaction", "severity": "valid",
     "shape": "", "description": "A real mainnet transaction that conforms to every phase-1 shape.",
     "hex": BASE,
+}, {
+    "slug": "amaru-owner-key-resolution", "label": "Amaru owner-key resolution", "severity": "valid",
+    "shape": "", "description": "A real transaction whose required signer credentials resolve from a selected book.",
+    "hex": AMARU_OWNER_KEY,
 }]
 for e in examples:
     ps_rows.append({**e, "hex": (OUT / f"{e['slug']}.hex").read_text().strip()})

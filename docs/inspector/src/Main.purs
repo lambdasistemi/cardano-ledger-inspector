@@ -1232,6 +1232,11 @@ inspectorComponent initial =
         , HP.id row.id
         , HH.attr (HH.AttrName "style") ("--depth: " <> show row.depth <> ";")
         ]
+          <> ( if row.entityIri == "" then
+                []
+              else
+                [ HH.attr (HH.AttrName "data-entity-iri") row.entityIri ]
+            )
           <> ( if hasChildren then
                 [ HH.attr (HH.AttrName "role") "button"
                 , HH.attr (HH.AttrName "aria-expanded") (if expanded then "true" else "false")
@@ -1294,12 +1299,21 @@ inspectorComponent initial =
                                     [ HH.text (decodedTreeKindIcon row) ]
                                 , HH.text row.resolvedLabel
                                 ]
-                            , HH.span
+                            ]
+                              <> ( if row.resolvedType == "" then
+                                    []
+                                  else
+                                    [ HH.span
+                                        [ classNames [ "li-chip", "decoded-tree-rdf-type" ] ]
+                                        [ HH.text (decodedResolvedTypeLabel row.resolvedType) ]
+                                    ]
+                                )
+                              <> [ HH.span
                                 [ classNames [ "li-chip", "decoded-tree-book-chip" ] ]
                                 [ HH.element (HH.ElemName "md-icon") [] [ HH.text "menu_book" ]
                                 , HH.text (decodedResolutionSourceLabel state)
                                 ]
-                            ]
+                                 ]
                           else
                             [ HH.span
                                 [ classNames
@@ -1464,13 +1478,32 @@ inspectorComponent initial =
     else "label"
 
   decodedResolutionSourceLabel state =
-    case selectedBooks state of
-      [] -> "books"
+    case selectedOverlayBooks state of
+      [] -> "overlay books"
       [ book ] -> book.name
-      books -> show (Array.length books) <> " books"
+      books -> show (Array.length books) <> " overlay books"
+
+  decodedResolvedTypeLabel value =
+    let
+      hashPart =
+        case Array.last (String.split (String.Pattern "#") value) of
+          Just part -> part
+          Nothing   -> value
+      slashPart =
+        case Array.last (String.split (String.Pattern "/") hashPart) of
+          Just part -> part
+          Nothing   -> hashPart
+    in
+      case Array.last (String.split (String.Pattern ":") slashPart) of
+        Just part -> part
+        Nothing   -> slashPart
 
   decodedResolvedCount rows =
-    Array.length (Array.filter (\row -> row.resolvedLabel /= "") rows)
+    rows
+      # Array.filter (\row -> row.resolvedLabel /= "" && row.entityIri /= "")
+      # map _.entityIri
+      # Array.nub
+      # Array.length
 
   decodedEmptyGroupIds rows =
     rows
@@ -2744,6 +2777,11 @@ inspectorComponent initial =
   selectedBooks state =
     BookStore.selectedBooks { kind: BookStore.envelopeKind, books: state.books }
 
+  selectedOverlayBooks state =
+    Array.filter
+      (\book -> Array.any (\part -> part.kind == "overlay") book.parts)
+      (selectedBooks state)
+
   selectedLocalBooks state =
     Array.filter (\book -> book.selected && not book.seed) state.books
 
@@ -3051,6 +3089,15 @@ inspectorComponent initial =
               [ classNames [ "identity-section-title" ] ]
               [ HH.text "Role" ]
           , HH.code_ [ HH.text row.role ]
+          ]
+      , HH.div
+          [ classNames [ "sparql-lens-cell" ] ]
+          [ HH.span
+              [ classNames [ "identity-section-title" ] ]
+              [ HH.text "Scope" ]
+          , HH.span
+              [ classNames [ "li-chip", "resolved-label-scope" ] ]
+              [ HH.text (if row.transactionMatch then "Transaction match" else "Book vocabulary") ]
           ]
       , HH.div
           [ classNames [ "sparql-lens-cell" ] ]

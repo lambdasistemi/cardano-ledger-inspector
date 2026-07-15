@@ -2618,7 +2618,7 @@ test("inspect lays out input, support panels, and decoded result", async ({
   await expect(inputPanel).toContainText("Decodes locally in browser");
   await expect(inputPanel.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
   await expect(inputPanel.getByRole("tab", { name: "Fetch by hash" })).toBeVisible();
-  await expect(inputPanel.locator(".example-valid")).toBeVisible();
+  await expect(inputPanel.locator(".example-valid").first()).toBeVisible();
   await expect(inputPanel.locator(".example-violation").first()).toBeVisible();
   await expect(supportGrid).toBeVisible();
   await expect(booksPanel.getByRole("heading", { name: "Resolution books" })).toBeVisible();
@@ -3322,6 +3322,126 @@ test("generic hex-suffix credential resolution", async ({ page }) => {
   await expect(existingResolution.locator(".sparql-lens-cell").last().locator("code")).toHaveText(
     "core_development",
   );
+});
+
+test("transaction-scoped owner-key resolution", async ({ page }) => {
+  const ownerHash = "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1";
+  const ownerLabel = "Amaru Network Compliance owner key";
+  const overlayName = "Amaru treasury 2026 overlay";
+
+  await installClipboardMock(page);
+  const providerRequests = await installProviderRequestRecorder(page);
+  await page.addInitScript((storeKey) => {
+    localStorage.removeItem(storeKey);
+    globalThis.inspectorOperationCalls = [];
+    Object.defineProperty(globalThis, "runInspector", {
+      configurable: true,
+      set(originalRunInspector) {
+        Object.defineProperty(globalThis, "runInspector", {
+          configurable: true,
+          writable: true,
+          value: async (stdinText) => {
+            const request = JSON.parse(stdinText);
+            globalThis.inspectorOperationCalls.push(request.op);
+            return originalRunInspector(stdinText);
+          },
+        });
+      },
+    });
+  }, localBookStoreKey);
+
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  const amaruBook = library.locator(".library-book", { hasText: overlayName });
+  await expect(amaruBook).toBeVisible();
+  await amaruBook
+    .getByRole("checkbox", { name: `Select ${overlayName}` })
+    .uncheck();
+
+  await openInspectViaShell(page);
+  await page.locator(".example-chip", { hasText: "Amaru owner-key resolution" }).click();
+  await expect(page.locator(".loaded-inspector-header")).toBeVisible();
+
+  const structurePanel = await selectResultTab(page, "Structure");
+  await expandDecodedStructure(structurePanel);
+  const rawOwnerRow = structurePanel
+    .locator(".decoded-tree-row")
+    .filter({ has: page.locator(".decoded-tree-key", { hasText: "Required signer" }) })
+    .filter({ has: page.getByText(ownerHash, { exact: true }) })
+    .first();
+  await expect(rawOwnerRow).toBeVisible();
+  await expect(rawOwnerRow).not.toContainText(ownerLabel);
+  await rawOwnerRow.getByRole("button", { name: "Copy value" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(ownerHash);
+
+  const inspectCallsAfterDecode = await page.evaluate(
+    () => globalThis.inspectorOperationCalls.filter((op) => op === "tx.inspect").length,
+  );
+  expect(inspectCallsAfterDecode).toBe(1);
+
+  await page.getByRole("banner").getByRole("link", { name: "Library" }).click();
+  await amaruBook
+    .getByRole("checkbox", { name: `Select ${overlayName}` })
+    .check();
+  await openInspectViaShell(page);
+  await page
+    .locator(".loaded-inspector-header")
+    .getByRole("button", { name: "Apply selected books" })
+    .click();
+
+  await selectResultTab(page, "Structure");
+  await expandDecodedStructure(structurePanel);
+  const resolvedOwnerRow = structurePanel
+    .locator(".decoded-tree-row--resolved")
+    .filter({ has: page.locator(".decoded-tree-key", { hasText: "Required signer" }) })
+    .filter({ has: page.getByText(ownerHash, { exact: true }) })
+    .filter({ hasText: ownerLabel })
+    .first();
+  await expect(resolvedOwnerRow).toBeVisible();
+  await expect(resolvedOwnerRow).toContainText("Owner");
+  await expect(resolvedOwnerRow).toContainText(overlayName);
+  await resolvedOwnerRow.getByRole("button", { name: "Copy raw value" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(ownerHash);
+
+  const resolvedEntityIds = await structurePanel
+    .locator(".decoded-tree-row--resolved")
+    .evaluateAll((rows) =>
+      rows.map((row) => row.getAttribute("data-entity-iri")).filter(Boolean),
+    );
+  expect(resolvedEntityIds.length).toBeGreaterThan(0);
+  const distinctResolvedCount = new Set(resolvedEntityIds).size;
+  const resolvedReadout = structurePanel.locator(".decoded-resolved-readout");
+  await expect(resolvedReadout).toContainText(
+    `${distinctResolvedCount} identifiers resolved to names`,
+  );
+
+  const graphPanel = await selectResultTab(page, "Graph / RDF");
+  const resolvedLabelsPanel = graphPanel.locator(".resolved-labels-panel");
+  const ownerLensRow = resolvedLabelsPanel
+    .locator(".resolved-labels-row")
+    .filter({ has: page.getByText(ownerLabel, { exact: true }) });
+  await expect(ownerLensRow).toContainText("Transaction match");
+  const vocabularyLensRow = resolvedLabelsPanel
+    .locator(".resolved-labels-row")
+    .filter({
+      has: page.getByText("Amaru Core Development treasury", { exact: true }),
+    });
+  await expect(vocabularyLensRow).toContainText("Book vocabulary");
+
+  await graphPanel
+    .locator(".overlay-book-panel")
+    .getByRole("button", { name: "Apply selected books" })
+    .click();
+  await expect(ownerLensRow).toContainText("Transaction match");
+  const inspectCallsAfterReapply = await page.evaluate(
+    () => globalThis.inspectorOperationCalls.filter((op) => op === "tx.inspect").length,
+  );
+  expect(inspectCallsAfterReapply).toBe(inspectCallsAfterDecode);
+  expect(providerRequests, "owner-key example provider request ledger").toEqual([]);
 });
 
 test("resolves decoded-tree address rows from selected Turtle overlay books", async ({
