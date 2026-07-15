@@ -161,6 +161,18 @@ WHERE {
 ORDER BY ?sort ?label ?value ?entity
 `;
 
+const decodedRequiredSignersQuery = `
+PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+SELECT ?entity ?bytesHex ?type
+WHERE {
+  ?transaction a cardano:Transaction ;
+    cardano:hasRequiredSigner ?entity .
+  OPTIONAL { ?entity cardano:bytesHex ?bytesHex . }
+  OPTIONAL { ?entity a ?type . }
+}
+ORDER BY ?bytesHex ?entity ?type
+`;
+
 const decodedInputsQuery = `
 PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -316,6 +328,15 @@ WHERE {
 ORDER BY ?label ?entity
 `;
 
+const decodedExplicitMatchValuesQuery = `
+PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+SELECT ?entity ?bytesHex
+WHERE {
+  ?entity cardano:bytesHex ?bytesHex .
+}
+ORDER BY ?entity ?bytesHex
+`;
+
 const bindingValue = (binding) =>
   binding && binding.value !== undefined && binding.value !== null
     ? String(binding.value)
@@ -401,6 +422,7 @@ const normalizeResolvedLabelRows = (result, matchesResult) => {
       label: bindingValue(binding.label),
       role: humanToken(firstBindingValue(binding.scriptRole, binding.type)),
       entity,
+      transactionMatch: explicitMatches.has(entity),
       matched:
         explicitMatches.get(entity) ||
         firstBindingValue(
@@ -557,11 +579,13 @@ const decodedLabelMatches = (graphTtl) => {
     return matches;
   }
 
+  const labelsByEntity = new Map();
   for (const row of rows) {
     const match = {
       resolvedLabel: bindingValue(row.label),
       resolvedType: bindingValue(row.type),
     };
+    labelsByEntity.set(bindingValue(row.entity), match);
     addMatchValue(matches, bindingValue(row.entity), match);
     addMatchValue(matches, bindingValue(row.bech32), match);
     addMatchValue(matches, bindingValue(row.bytesHex), match);
@@ -569,6 +593,24 @@ const decodedLabelMatches = (graphTtl) => {
     addMatchValue(matches, bindingValue(row.fromTxOutRef), match);
     addMatchValue(matches, bindingValue(row.rawBytes), match);
     addMatchValue(matches, bindingValue(row.datumHashHex), match);
+  }
+
+  try {
+    const rawValues = new Map(
+      queryBindings(graphTtl, decodedExplicitMatchValuesQuery).map((row) => [
+        bindingValue(row.entity),
+        bindingValue(row.bytesHex),
+      ]),
+    );
+    for (const row of queryBindings(graphTtl, resolvedLabelMatchesQuery)) {
+      const match = labelsByEntity.get(bindingValue(row.entity));
+      const matchedEntity = bindingValue(row.matched);
+      if (!match || matchedEntity === "") continue;
+      addMatchValue(matches, matchedEntity, match);
+      addMatchValue(matches, rawValues.get(matchedEntity), match);
+    }
+  } catch (_) {
+    // Direct identifier values above remain available when the explicit lens cannot run.
   }
 
   return matches;
@@ -625,6 +667,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
   ];
 
   const bodyFields = queryBindings(graphTtl, decodedBodyFieldsQuery);
+  const requiredSigners = queryBindings(graphTtl, decodedRequiredSignersQuery);
   const inputs = queryBindings(graphTtl, decodedInputsQuery);
   const outputs = queryBindings(graphTtl, decodedOutputsQuery);
   const witnesses = queryBindings(graphTtl, decodedWitnessesQuery);
@@ -799,6 +842,43 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       );
     });
   };
+  const addRequiredSigners = () => {
+    const parentId = "decoded-body-required-signers";
+    if (requiredSigners.length === 0) {
+      addNullField("decoded-body", 3, 130, "required_signers");
+      return;
+    }
+    addContainerField(
+      "decoded-body",
+      3,
+      130,
+      "required_signers",
+      countText(requiredSigners.length, "required signer"),
+      { id: parentId },
+    );
+    requiredSigners.forEach((signer, index) => {
+      const entity = bindingValue(signer.entity);
+      const raw = firstBindingValue(signer.bytesHex, signer.entity);
+      const resolved = resolvedFrom(labelMatches, "", "", entity, raw);
+      appendLeaf(
+        rows,
+        parentId,
+        4,
+        index,
+        `Required signer ${index}`,
+        "required-signer",
+        raw,
+        {
+          raw,
+          entityIri: entity,
+          resolvedLabel: resolved.resolvedLabel,
+          resolvedType: resolved.resolvedType,
+          annotationPredicate: bindingValue(signer.bytesHex) === "" ? "" : "cardano:bytesHex",
+          annotationValue: bindingValue(signer.bytesHex),
+        },
+      );
+    });
+  };
 
   addNode({
     id: "decoded-transaction-hash",
@@ -942,7 +1022,7 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     ["mint", 100, () => addBodyScalar("decoded-body", 3, 100, "mint", "Mint")],
     ["script_data_hash", 110, () => addBodyScalar("decoded-body", 3, 110, "script_data_hash", "Script data hash")],
     ["collateral", 120, () => addInputGroup("collateral", 120, groupedInputs.collateral, "Collateral")],
-    ["required_signers", 130, () => addNullField("decoded-body", 3, 130, "required_signers")],
+    ["required_signers", 130, addRequiredSigners],
     ["network_id", 140, () => addBodyScalar("decoded-body", 3, 140, "network_id", "Network id")],
     ["collateral_return", 150, () => addBodyScalar("decoded-body", 3, 150, "collateral_return", "Collateral return")],
     ["total_collateral", 160, () => addBodyScalar("decoded-body", 3, 160, "total_collateral", "Total collateral")],

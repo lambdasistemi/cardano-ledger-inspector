@@ -16,28 +16,28 @@ loads the bundled example, observes the raw signer, applies the book, and
 asserts the exact label/type/source/raw/copy/count and Graph / RDF distinction
 without a second full decode.
 
-- [ ] T001-S1 [US1] Add a failing `transaction-scoped owner-key resolution`
+- [X] T001-S1 [US1] Add a failing `transaction-scoped owner-key resolution`
   Playwright journey to `docs/inspector/tests/tx-identify.spec.mjs` covering the
   exact before/after Network Compliance signer, copyability, count, Graph / RDF
   match/vocabulary cues, provider silence, and no repeat `tx.inspect` call.
-- [ ] T002-S1 [US1] Extend `tools/gen-broken-examples.py` with the existing
+- [X] T002-S1 [US1] Extend `tools/gen-broken-examples.py` with the existing
   committed SundaeSwap disbursement fixture as the “Amaru owner-key
   resolution” example and regenerate `docs/inspector/src/Examples.purs`.
-- [ ] T003-S1 [US1] In `docs/inspector/src/FFI/RdfShapes.js`, project
+- [X] T003-S1 [US1] In `docs/inspector/src/FFI/RdfShapes.js`, project
   `cardano:hasRequiredSigner` entities into the decoded tree and map #144's
   existing explicit generic suffix matches onto their concrete transaction
   identities without changing the suffix-query semantics.
-- [ ] T004-S1 [US1] Extend
+- [X] T004-S1 [US1] Extend
   `docs/inspector/src/FFI/RdfShapes.purs` and
   `docs/inspector/src/Main.purs` so Structure renders RDF type and selected
   overlay source, counts distinct resolved transaction entities, preserves raw
   copy controls, and Graph / RDF distinguishes transaction matches from
   book-only vocabulary.
-- [ ] T005-S1 [US1] Run the focused journey on an isolated
+- [X] T005-S1 [US1] Run the focused journey on an isolated
   `PLAYWRIGHT_PORT`, the existing generic hex-suffix and address-resolution
   regressions, and `./gate.sh`; verify `gate.sh`, the transaction fixture, the
   Amaru journal, and overlay Turtle are unchanged from `origin/main`.
-- [ ] T006-S1 [US1] Commit one bisect-safe change as
+- [X] T006-S1 [US1] Commit one bisect-safe change as
   `feat(inspector): demonstrate credential resolution in Structure` with
   `Tasks: T001, T002, T003, T004, T005, T006`, then stop without pushing.
 

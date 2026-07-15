@@ -47,6 +47,7 @@ type ResolvedLabelRow =
   { label :: String
   , role :: String
   , entity :: String
+  , transactionMatch :: Boolean
   , matched :: String
   }
 
