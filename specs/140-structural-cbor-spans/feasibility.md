@@ -2,8 +2,12 @@
 
 Date: 2026-07-15
 
-Decision: **FAIL — the bounded spike did not execute, so feasibility remains
-unproved and implementation is stopped.**
+Interim decision: **the first bounded spike did not execute, so feasibility
+remained unproved and implementation stopped.** The epic owner subsequently
+rejected this environmental result as a genuine feasibility failure and
+authorized Slice 0R: one fresh 90-minute rerun of the same probe through the
+repository-standard `nix develop --quiet -c <command>` entry point. This record
+preserves the first attempt; it is not the final feasibility decision.
 
 ## What the spike established
 
@@ -71,7 +75,15 @@ plausibility cannot authorize the production contract.
 ## Stop outcome
 
 No schema, OpenAPI, production Haskell, dependency pin, generated artifact, or
-browser work follows this record unless the epic owner explicitly approves a
-new plan through `Q-001-feasibility-outcome`. The failed gate must not be
-relabelled as an architectural proof, and no approximate span map may be
-substituted.
+browser work follows this record unless Slice 0R executes successfully and is
+navigator-verified. The first environmental stop must not be relabelled as an
+architectural proof, and no approximate span map may be substituted.
+
+## Parent decision on Q-001
+
+The epic owner authorized only an environment-corrected rerun of the same
+probe. The fresh pair must use `nix develop --quiet -c <command>`, must not
+recreate the failing ad hoc `shellFor`, and must return the specific error if
+the proper dev shell still cannot compile or run it. A successful executed
+probe releases planning for the original acceptance-criteria implementation;
+it does not itself authorize unrelated scope.

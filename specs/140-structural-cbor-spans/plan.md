@@ -69,3 +69,26 @@ slice. The implementation plan must then cover, without weakening the issue:
 - the full `nix develop --quiet -c just ci` gate.
 
 Browser rendering and browser-side decoding remain forbidden throughout.
+
+## Slice 0R: Authorized environment-corrected rerun
+
+The epic owner rejected the first spike's environmental stop as a real
+feasibility result. One fresh 90-minute rerun of the same probe is authorized.
+It must use the repository-standard `nix develop --quiet -c <command>` entry
+point which prior epic tickets used for the full Haskell/crypto toolchain; it
+must not construct another ad hoc Haskell.nix `shellFor` environment.
+
+The pair starts from the archived probe and evidence but receives cleared
+contexts and fresh runtime roots. The only permitted changes are adjustments
+under the new runtime root needed to run that same probe through the approved
+entry point. The original pass criteria remain unchanged.
+
+- If the proper dev shell still cannot compile/run the probe, the pair records
+  the specific error and returns a navigator-verified feasibility failure to
+  the epic owner.
+- If the probe runs and demonstrates every pass criterion, the ticket owner
+  records and reports the successful decision, then amends this plan with
+  exact acceptance-criteria implementation slices.
+
+No production, schema, OpenAPI, dependency-pin, generated-artifact, gate, or
+browser edit is authorized in Slice 0R.
