@@ -9,7 +9,9 @@ tree. Reuse the committed real transaction whose two required signers match
 the bundled Amaru owner entries, add it to Examples through the existing
 generator, project `cardano:hasRequiredSigner` rows from the canonical RDF
 graph, and distinguish matched transaction labels from book-only vocabulary in
-Graph / RDF. One Playwright journey supplies the RED/GREEN proof.
+Graph / RDF. One Playwright journey supplies the RED/GREEN proof, followed by
+a second bisect-safe slice that adds the same resolved credential journey to
+the repository UX-judge capture harness at every supported viewport.
 
 ## Technical Context
 
@@ -59,6 +61,7 @@ docs/inspector/src/FFI/RdfShapes.js             # required-signer projection + m
 docs/inspector/src/FFI/RdfShapes.purs           # typed row extension
 docs/inspector/src/Main.purs                     # Structure/Graph rendering and count
 docs/inspector/tests/tx-identify.spec.mjs        # exact before/after proof
+tools/ux-judge/capture.mjs                       # resolution capture at three viewports
 ```
 
 The existing transaction fixture and Amaru journal/book remain byte-identical.
@@ -81,6 +84,27 @@ One vertical, bisect-safe implementation commit:
 - Commit as `feat(inspector): demonstrate credential resolution in Structure`
   with `Tasks: T001, T002, T003, T004, T005, T006`.
 
+### Slice 2 — UX-judge resolution capture
+
+One narrow, bisect-safe harness commit:
+
+- Observe RED by running the current capture against PR #156 and proving its
+  manifest contains no resolution scenario.
+- Add `04-resolution` to `tools/ux-judge/capture.mjs`. Load the exact “Amaru
+  owner-key resolution” example, apply the selected books, expand Structure,
+  wait for “Amaru Network Compliance owner key” on a resolved required-signer
+  row, and capture that state at desktop, laptop, and mobile widths.
+- Keep the three existing journeys green, updating their example selectors
+  only as needed for the current Material component and multiple-valid-example
+  markup.
+- Run capture, judge, and report against the PR preview. Require every capture
+  to succeed, every resolution judgment to parse with a non-null resolution
+  score, and the report to contain all three resolution viewports. A P1 on the
+  resolution scenario is a parent decision rather than permission to widen UI
+  implementation scope.
+- Commit as `test(ux): capture credential resolution scenario` with
+  `Tasks: T007, T008, T009`.
+
 ## Verification
 
 - **RED**: focused grep `transaction-scoped owner-key resolution` fails before
@@ -92,7 +116,9 @@ One vertical, bisect-safe implementation commit:
 - **Slice gate**: `./gate.sh` passes without any edit to `gate.sh`.
 - **Final gate**: `nix develop --quiet -c just ci` passes at the accepted HEAD.
 - **UX evidence**: capture the resolved Structure state at the acceptance
-  scenario's desktop viewport for the parent/PR report.
+  scenario's desktop, laptop, and mobile viewports; run the judge/report loop
+  and retain the generated report as PR evidence without committing generated
+  `out/` or history artifacts.
 
 ## Risks and Controls
 

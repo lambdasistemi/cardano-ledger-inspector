@@ -2,8 +2,8 @@
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md)
 **Gate**: focused Firefox Playwright + `./gate.sh`; final `nix develop --quiet -c just ci`
-**Implementation strategy**: one vertical, independently testable,
-bisect-safe slice executed by a driver+navigator pair.
+**Implementation strategy**: two vertical, independently testable,
+bisect-safe slices executed by fresh driver+navigator pairs.
 
 ## Slice 1 — Bundled credential-resolution journey
 
@@ -41,11 +41,39 @@ without a second full decode.
   `feat(inspector): demonstrate credential resolution in Structure` with
   `Tasks: T001, T002, T003, T004, T005, T006`, then stop without pushing.
 
+## Slice 2 — UX-judge resolution capture
+
+**Goal**: Make the accepted credential-hash journey a repeatable UX-judge
+scenario at desktop, laptop, and mobile widths.
+
+**Independent proof**: Against PR #156's packaged preview, the capture manifest
+contains successful `04-resolution` entries for all three viewports; each
+image visibly contains the resolved required-signer label and the judge/report
+pipeline emits parsed resolution scores for those entries.
+
+- [ ] T007-S2 [US1] Run the existing UX capture against the PR preview and
+  record RED because no `04-resolution` scenario exists; add the scenario to
+  `tools/ux-judge/capture.mjs`, reusing the exact “Amaru owner-key resolution”
+  example and waiting for “Amaru Network Compliance owner key” on a resolved
+  required-signer Structure row before each screenshot.
+- [ ] T008-S2 [US1] Keep the three existing capture journeys green, run the
+  capture/judge/report pipeline at all configured viewports, verify every
+  capture succeeds, verify each resolution judgment parses with a non-null
+  resolution score, and verify the aggregate report lists all three resolution
+  screenshots. Remove generated untracked history after preserving evidence;
+  do not commit `out/` or generated report/history files.
+- [ ] T009-S2 [US1] Commit one bisect-safe change as
+  `test(ux): capture credential resolution scenario` with
+  `Tasks: T007, T008, T009`, then stop without pushing.
+
 ## Dependencies & Execution Order
 
-T001 is RED proof and must be observed failing before any implementation.
-Navigator approval of the RED handoff precedes T002–T004. Navigator approval
-of the complete GREEN diff precedes T005 and the single T006 commit.
+T001 is Slice 1 RED proof and must be observed failing before implementation.
+Navigator approval of that RED handoff precedes T002–T004; approval of the
+complete GREEN diff precedes T005 and T006. Slice 2 starts only after Slice 1
+and Q-001 approval. Navigator approval of the T007 missing-scenario RED
+precedes the capture edit; approval of the complete GREEN diff precedes T008
+and T009.
 
 ## Owned Files
 
@@ -55,6 +83,10 @@ of the complete GREEN diff precedes T005 and the single T006 commit.
 - `docs/inspector/src/FFI/RdfShapes.purs`
 - `docs/inspector/src/Main.purs`
 - `docs/inspector/tests/tx-identify.spec.mjs`
+
+Slice 2 owns exactly:
+
+- `tools/ux-judge/capture.mjs`
 
 ## Forbidden Scope
 
