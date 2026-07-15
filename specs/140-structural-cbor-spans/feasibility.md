@@ -2,12 +2,14 @@
 
 Date: 2026-07-15
 
-Interim decision: **the first bounded spike did not execute, so feasibility
-remained unproved and implementation stopped.** The epic owner subsequently
-rejected this environmental result as a genuine feasibility failure and
+Final gate decision: **FAIL — neither bounded attempt executed the probe, so
+exact original-byte offsets remain unproved and implementation is stopped.**
+The epic owner rejected the first environmental result as conclusive and
 authorized Slice 0R: one fresh 90-minute rerun of the same probe through the
-repository-standard `nix develop --quiet -c <command>` entry point. This record
-preserves the first attempt; it is not the final feasibility decision.
+literal repository-standard `nix develop --quiet -c <command>` entry point.
+That corrected rerun also stopped before compilation with the specific error
+authorized as the final stop condition. This is a feasibility-gate failure,
+not proof that the source-level architecture is impossible.
 
 ## What the spike established
 
@@ -87,3 +89,48 @@ recreate the failing ad hoc `shellFor`, and must return the specific error if
 the proper dev shell still cannot compile or run it. A successful executed
 probe releases planning for the original acceptance-criteria implementation;
 it does not itself authorize unrelated scope.
+
+## Slice 0R result
+
+The pair copied `Main.hs`, `cabal.project`, and
+`feasibility-probe.cabal` byte-for-byte from the first archive and received
+navigator approval for this single command:
+
+```sh
+nix develop --quiet -c bash \
+  /tmp/epic-97/cardano-ledger-inspector-140/feasibility-rerun-driver/handoffs/run-probe.sh
+```
+
+The command ran once and exited `127`. Discovery inside that exact dev shell
+reported:
+
+```text
+cabal=MISSING
+ghc=MISSING
+ghci=MISSING
+ghc-pkg=MISSING
+pkg-config=MISSING
+PKG_CONFIG_PATH=UNSET
+```
+
+The first compile command therefore failed with `cabal: command not found`.
+There was no `--expr`, `shellFor`, bare-host compile, custom shell, retry,
+fallback, assertion change, or repository edit. The navigator reproduced the
+same environment result and verified `feasibility-fail`; the ticket owner then
+independently reran read-only discovery through `nix develop --quiet -c` and
+confirmed the same missing toolchain.
+
+The copied probe hashes remained:
+
+- `Main.hs`:
+  `e4a1904a645cdc323c1d8407b6b98aae5d962867c585774769c6837259f5ece0`
+- `cabal.project`:
+  `b3a885143bbf5a4dfaf628847a1bbfec7d003fcec457de974989f8d635eecee2`
+- `feasibility-probe.cabal`:
+  `5db631f8f3231ec5b99400f6901306f91231c9ea336e0cd9a32afc272851b070`
+
+No spans or slices were produced. Ledger acceptance inside the combined probe,
+bounds, containment, exact original slicing, distinct repeated paths, and the
+malformed zero-span outcome remain unproved. Per Q-001's conditional answer,
+this specific proper-shell failure justifies the option-1 stop and is returned
+to the epic owner through Q-002 before finalization.
