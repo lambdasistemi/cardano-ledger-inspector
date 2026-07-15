@@ -28,9 +28,6 @@ jobs:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Build inspector UI
-        run: nix --quiet build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
-
       - name: Build OpenAPI artifact
         run: nix --quiet build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
 
@@ -39,17 +36,6 @@ jobs:
 
       - name: Prepare Pages artifact
         run: |
-          mkdir -p _site/inspector
-          cp -RL result-inspector/. _site/inspector/
-          test "$(find _site/inspector -maxdepth 1 -name 'inspector.*.wasm' | wc -l)" -eq 1
-          test "$(find _site/inspector -maxdepth 1 -name 'rdf_shapes_wasm_bg.*.wasm' | wc -l)" -eq 1
-          for wasm in _site/inspector/inspector.*.wasm _site/inspector/rdf_shapes_wasm_bg.*.wasm; do
-            test -f "$wasm"
-            test -f "$wasm.gz"
-            test -f "$wasm.br"
-          done
-          test -f _site/inspector/index.js.gz
-          test -f _site/inspector/index.js.br
           mkdir -p _site/openapi
           cp -L result-openapi/* _site/openapi/
           touch _site/.nojekyll
