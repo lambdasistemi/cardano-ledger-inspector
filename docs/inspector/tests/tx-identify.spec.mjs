@@ -1055,6 +1055,28 @@ function contentTypeFor(filePath) {
   return "application/octet-stream";
 }
 
+async function installProviderRequestRecorder(page) {
+  const requests = [];
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    const { hostname } = new URL(request.url());
+    const isProviderHost =
+      hostname === "blockfrost.io" ||
+      hostname.endsWith(".blockfrost.io") ||
+      hostname === "koios.rest" ||
+      hostname.endsWith(".koios.rest");
+
+    if (isProviderHost) {
+      requests.push({ method: request.method(), url: request.url() });
+      await route.abort("blockedbyclient");
+      return;
+    }
+
+    await route.continue();
+  });
+  return requests;
+}
+
 async function withPrefixedInspectorSite(callback) {
   const server = createServer(async (request, response) => {
     try {
@@ -1300,7 +1322,7 @@ async function expectCQuisitorInspectSurface(page, route, testInfo, captureEvide
     const resultPanel = workspace.locator(".result-panel");
     await expect(loadedHeader).toBeVisible();
     await expect(loadedHeader).toContainText("CBOR hex");
-    await expect(loadedHeader).toContainText(/Blockfrost|Koios/);
+    await expect(loadedHeader).toContainText("Offline/no external provider");
     await expect(loadedHeader).toContainText("mainnet");
     await expect(loadedHeader).toContainText(/Tx (id|hash)/i);
     await expect(loadedHeader).toContainText(/[0-9a-f]{16}/i);
@@ -1461,6 +1483,14 @@ async function configureChainData(page, options = {}) {
 async function openInspectViaShell(page) {
   await page.getByRole("banner").getByRole("link", { name: "Inspect" }).click();
   await expect(page).toHaveURL(/\/inspect$/);
+}
+
+async function enableExternalContext(page) {
+  const externalContext = page.getByRole("switch", {
+    name: "Use external provider context",
+  });
+  await externalContext.check();
+  await expect(externalContext).toBeChecked();
 }
 
 async function expectInFirstViewport(locator) {
@@ -2076,6 +2106,58 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   );
 });
 
+test("offline first-run paste makes zero provider requests", async ({ page }) => {
+  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const providerRequests = await installProviderRequestRecorder(page);
+
+  await page.goto("/inspect");
+  const pasteTab = page.getByRole("tab", { name: "Paste CBOR" });
+  const initialMode = await pasteTab.getAttribute("aria-selected");
+  const initialSettings = await page.locator(".settings-summary").innerText();
+  await pasteTab.click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const loadedHeader = page.locator(".loaded-inspector-header");
+  await expect(loadedHeader).toBeVisible();
+  const loadedContext = await loadedHeader.innerText();
+  expect.soft(initialMode).toBe("true");
+  expect.soft(initialSettings).toContain("Offline/no external provider");
+  expect.soft(loadedContext).toContain("Offline/no external provider");
+  expect(providerRequests, "offline paste provider request ledger").toEqual([]);
+});
+
+test("bundled examples stay provider-silent without external context", async ({
+  page,
+}) => {
+  const providerRequests = await installProviderRequestRecorder(page);
+
+  await page.goto("/inspect");
+  const examples = page.locator(".example-chip");
+  const exampleCount = await examples.count();
+  expect(exampleCount).toBeGreaterThan(0);
+  const examplesCopy = await page.locator(".examples-picker").innerText();
+  const loadedContexts = [];
+
+  for (let index = 0; index < exampleCount; index += 1) {
+    if (index > 0) {
+      await page.goto("/inspect");
+    }
+    await examples.nth(index).click();
+    const loadedHeader = page.locator(".loaded-inspector-header");
+    await expect(loadedHeader).toBeVisible();
+    loadedContexts.push(await loadedHeader.innerText());
+  }
+
+  expect.soft(examplesCopy).toContain(
+    "Offline examples prove structural conformance; ledger validation can be incomplete without external context.",
+  );
+  for (const loadedContext of loadedContexts) {
+    expect.soft(loadedContext).toContain("Offline/no external provider");
+  }
+  expect(providerRequests, "bundled example provider request ledger").toEqual([]);
+});
+
 test("inspect lays out input, support panels, and decoded result", async ({
   page,
 }) => {
@@ -2092,7 +2174,7 @@ test("inspect lays out input, support panels, and decoded result", async ({
   await expect(page.locator(".workspace-left")).toHaveCount(0);
   await expect(page.locator(".workspace-right")).toHaveCount(0);
   await expect(settingsSummary).toBeVisible();
-  await expect(settingsSummary).toContainText("Blockfrost");
+  await expect(settingsSummary).toContainText("Offline/no external provider");
   await expect(settingsSummary).toContainText("mainnet");
   await expect(settingsSummary.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(inputPanel).toBeVisible();
@@ -2319,6 +2401,8 @@ test("settings changes provider state used by inspect hash decode", async ({ pag
   });
 
   await openInspectViaShell(page);
+  await page.getByRole("tab", { name: "Fetch by hash" }).click();
+  await enableExternalContext(page);
   await expect(page.locator(".settings-summary")).toContainText("Koios");
   await expect(page.locator(".settings-summary")).toContainText("preview");
   await page
@@ -3849,6 +3933,7 @@ test("passes producer transaction CBOR into witness planning", async ({
     blockfrostKey: "mainnet-test-project",
   });
   await openInspectViaShell(page);
+  await enableExternalContext(page);
   await page.getByRole("tab", { name: "Paste CBOR" }).click();
   await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -3951,6 +4036,7 @@ test("passes producer transaction CBOR into RDF resolved value flow", async ({
     blockfrostKey: "mainnet-test-project",
   });
   await openInspectViaShell(page);
+  await enableExternalContext(page);
   await page.getByRole("tab", { name: "Paste CBOR" }).click();
   await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -3997,6 +4083,7 @@ test("surfaces hard provider context resolution failures", async ({
     blockfrostKey: "mainnet-test-project",
   });
   await openInspectViaShell(page);
+  await enableExternalContext(page);
   await page.getByRole("tab", { name: "Paste CBOR" }).click();
   await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();
@@ -4056,6 +4143,7 @@ test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
     koiosBearer: "koios-test-token",
   });
   await openInspectViaShell(page);
+  await enableExternalContext(page);
   await page.getByRole("tab", { name: "Paste CBOR" }).click();
   await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
   await page.getByRole("button", { name: "Decode" }).click();

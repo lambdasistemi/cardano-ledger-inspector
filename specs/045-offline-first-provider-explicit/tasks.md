@@ -2,12 +2,12 @@
 
 ## Slice 1: Network-silent offline path
 
-- [ ] T0450 Make Paste CBOR the first-run default and add an explicit external-
+- [X] T0450 Make Paste CBOR the first-run default and add an explicit external-
   context opt-in that defaults off.
-- [ ] T0451 Keep pasted CBOR and every bundled example entirely local while
+- [X] T0451 Keep pasted CBOR and every bundled example entirely local while
   external context is off; label offline example validation as structurally
   conformant and potentially ledger-incomplete.
-- [ ] T0452 Add hermetic Playwright request-ledger coverage proving zero
+- [X] T0452 Add hermetic Playwright request-ledger coverage proving zero
   Blockfrost/Koios requests for first-run paste and bundled examples, and adapt
   context-dependent journeys to opt in explicitly.
 

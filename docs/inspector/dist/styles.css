@@ -3118,6 +3118,11 @@ pre {
   padding: 16px 20px 20px;
 }
 
+.examples-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
 .examples-heading h3 {
   margin: 0;
   color: var(--on-surface-variant);
@@ -3126,6 +3131,28 @@ pre {
   letter-spacing: 0.08em;
   line-height: 1.2;
   text-transform: uppercase;
+}
+
+.examples-heading p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--on-surface-variant);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.external-context-toggle {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--divider);
+  padding: 14px 20px 16px;
+}
+
+.external-context-toggle p {
+  margin: 0 0 0 44px;
+  color: var(--on-surface-variant);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .example-chips {
