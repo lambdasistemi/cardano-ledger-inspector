@@ -66,7 +66,7 @@ export const providerFailureGuidanceImpl = (selectedProvider) => (raw) => {
       return `${provider} network request failed. Check connectivity and retry.`;
     case "cors":
       return provider === "Koios"
-        ? "Koios request was blocked by CORS. A bearer token permits an attempt but does not guarantee browser access."
+        ? "Koios deployed browser flow is CORS-blocked. A bearer token permits an attempt but a token does not remove this restriction."
         : `${provider} request was blocked by CORS. A configured project ID permits an attempt but does not guarantee browser access.`;
     default:
       return `${provider} request failed${status ? ` (${status})` : ""}. Check Settings and retry.`;

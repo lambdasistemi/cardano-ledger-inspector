@@ -2307,6 +2307,14 @@ for (const provider of ["Blockfrost", "Koios"]) {
       await expect(inlineAlert).toBeVisible({ timeout: 5_000 });
       await expect(inlineAlert).toContainText(provider);
       await expect(inlineAlert).toContainText(/credential|required|not ready/i);
+      if (provider === "Koios") {
+        await expect(inlineAlert).toContainText(
+          /deployed browser flow is CORS-blocked/i,
+        );
+        await expect(inlineAlert).toContainText(
+          /token does not (?:remove|fix) (?:this|the) restriction/i,
+        );
+      }
       await expect(inlineAlert.getByRole("link", { name: "Settings" })).toBeVisible();
     });
   }
@@ -2420,7 +2428,8 @@ const providerFailureCases = [
     provider: "Koios",
     abort: "accessdenied",
     transportProbe: "succeeds",
-    guidance: /Koios.*blocked by CORS.*bearer token.*does not guarantee.*browser/i,
+    guidance:
+      /Koios.*deployed browser flow is CORS-blocked.*token does not (?:remove|fix) (?:this|the) restriction/i,
   },
   {
     category: "Blockfrost CORS",

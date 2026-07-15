@@ -23,9 +23,17 @@
   exact provider dispatch, no fallback, every failure category, and error
   focus/visibility.
 
+## Follow-up: Empirical Koios browser boundary
+
+- [X] T0460 Keep the inline Koios token gate while stating honestly that the
+  deployed browser flow is CORS-blocked and a token does not remove the
+  restriction.
+- [X] T0461 Add focused readiness and CORS guidance assertions reflecting the
+  empirical token/no-token live-browser finding.
+
 ## Orchestrator Finalization
 
-- [ ] T0457 Run the inherited `./gate.sh` and full
+- [X] T0457 Run the inherited `./gate.sh` and full
   `nix develop --quiet -c just ci` at final HEAD.
 - [ ] T0458 Record a real preview-browser network transcript for authenticated
   Koios and explicit Blockfrost, proving no cross-provider request; escalate
