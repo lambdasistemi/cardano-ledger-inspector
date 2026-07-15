@@ -11,10 +11,46 @@ const blockfrostHeaders = (projectId) => ({ project_id: projectId });
 
 const ledgerNetwork = (network) => (network === "mainnet" ? "mainnet" : "testnet");
 
+const failureCategory = (status) => {
+  if (status === 401) return "authentication";
+  if (status === 403) return "permission";
+  if (status === 429) return "rate-limit";
+  if (status >= 500) return "provider";
+  return "response";
+};
+
+const providerFailure = (category, status, detail) =>
+  new Error(`provider-boundary|Blockfrost|${category}|${status || ""}|${detail || ""}`);
+
+const errorMessage = (err) => (err instanceof Error ? err.message : String(err));
+
+const fetchWithBoundary = async (base, url, options) => {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    let providerReachable = false;
+    try {
+      await fetch(base, { method: "GET", mode: "no-cors" });
+      providerReachable = true;
+    } catch (_) {
+      // A failed same-provider probe is the observable network signal.
+    }
+    throw providerFailure(
+      providerReachable ? "cors" : "network",
+      "",
+      errorMessage(err),
+    );
+  }
+};
+
 const readJson = async (resp, label) => {
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    throw new Error(`Blockfrost ${label} ${resp.status}: ${body.slice(0, 200)}`);
+    throw providerFailure(
+      failureCategory(resp.status),
+      String(resp.status),
+      `${label}: ${body.slice(0, 200)}`,
+    );
   }
   return resp.json();
 };
@@ -99,7 +135,7 @@ const blockfrostParamsToLedgerPParams = (params) => {
 
 export const fetchTxCborImpl = (network) => (projectId) => (txHash) => async () => {
   const base = BASES[network] || BASES.mainnet;
-  const resp = await fetch(`${base}/txs/${txHash}/cbor`, {
+  const resp = await fetchWithBoundary(base, `${base}/txs/${txHash}/cbor`, {
     headers: blockfrostHeaders(projectId),
   });
   const json = await readJson(resp, "tx cbor");
@@ -110,9 +146,11 @@ export const fetchValidationContextImpl = (network) => (projectId) => async () =
   const base = BASES[network] || BASES.mainnet;
   const headers = blockfrostHeaders(projectId);
   const [block, params] = await Promise.all([
-    fetch(`${base}/blocks/latest`, { headers }).then((resp) => readJson(resp, "latest block")),
-    fetch(`${base}/epochs/latest/parameters`, { headers }).then((resp) =>
-      readJson(resp, "latest protocol parameters")
+    fetchWithBoundary(base, `${base}/blocks/latest`, { headers }).then((resp) =>
+      readJson(resp, "latest block")
+    ),
+    fetchWithBoundary(base, `${base}/epochs/latest/parameters`, { headers }).then(
+      (resp) => readJson(resp, "latest protocol parameters"),
     ),
   ]);
 

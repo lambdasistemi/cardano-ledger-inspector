@@ -13,13 +13,13 @@
 
 ## Slice 2: Exact provider readiness and diagnostics
 
-- [ ] T0453 Remove Blockfrost-to-Koios fallback and require selected-provider
+- [X] T0453 Remove Blockfrost-to-Koios fallback and require selected-provider
   readiness before hash fetch or external-context resolution makes a request.
-- [ ] T0454 Render inline provider readiness with a direct Settings action and
+- [X] T0454 Render inline provider readiness with a direct Settings action and
   ensure offline/online context labels name the source actually used.
-- [ ] T0455 Distinguish 401/403, 429, 5xx, network, and CORS failures beside the
+- [X] T0455 Distinguish 401/403, 429, 5xx, network, and CORS failures beside the
   initiating action, then focus or scroll the error into view.
-- [ ] T0456 Add hermetic Playwright coverage for missing-credential silence,
+- [X] T0456 Add hermetic Playwright coverage for missing-credential silence,
   exact provider dispatch, no fallback, every failure category, and error
   focus/visibility.
 

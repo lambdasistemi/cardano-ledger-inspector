@@ -1333,6 +1333,31 @@ md-icon-button:focus-visible,
   gap: 10px;
 }
 
+.provider-inline-error {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--md-sys-color-error);
+  border-radius: 8px;
+  background: var(--error-container);
+  color: var(--on-error-container);
+  padding: 0.72rem 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.provider-inline-error:focus {
+  outline: 3px solid color-mix(in srgb, var(--md-sys-color-error) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.provider-inline-error a {
+  flex: 0 0 auto;
+  color: inherit;
+  font-weight: 750;
+}
+
 .hash-form {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;

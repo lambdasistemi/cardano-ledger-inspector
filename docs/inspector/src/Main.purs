@@ -159,6 +159,7 @@ type State =
   , copiedPath :: Maybe String
   , browserPath :: String
   , fetchError :: Maybe String
+  , providerError :: Maybe String
   , route :: Route
   , routeBase :: String
   , theme :: Theme.Theme
@@ -324,6 +325,7 @@ inspectorComponent initial =
         , copiedPath: Nothing
         , browserPath: "[]"
         , fetchError: Nothing
+        , providerError: Nothing
         , route: initial.route
         , routeBase: initial.routeBase
         , theme: initial.theme
@@ -1940,7 +1942,15 @@ inspectorComponent initial =
           [ HH.div
               [ classNames [ "input-panel-title" ] ]
               [ HH.h1_ [ HH.text "Inspect a Cardano transaction" ]
-              , HH.p_ [ HH.text "Decodes locally in browser; nothing is sent to a server." ]
+              , HH.p_
+                  [ HH.text
+                      ( if state.mode == ByHash || state.externalContext then
+                          Provider.providerName state.provider
+                            <> " is contacted for chain data; ledger decode remains local in your browser."
+                        else
+                          "Decodes locally in browser; nothing is sent to a server."
+                      )
+                  ]
               ]
           , HH.div
               [ classNames [ "input-trust-row" ] ]
@@ -2055,6 +2065,7 @@ inspectorComponent initial =
             , HE.onClick (\_ -> Decode)
             ]
             [ HH.text (if state.running then "Fetching..." else "Decode") ]
+        , renderInlineProviderError state
         ]
     ByHex ->
       HH.div
@@ -2074,7 +2085,26 @@ inspectorComponent initial =
             , HE.onClick (\_ -> Decode)
             ]
             [ HH.text (if state.running then "Decoding..." else "Decode") ]
+        , renderInlineProviderError state
         ]
+
+  renderInlineProviderError state =
+    case state.providerError of
+      Nothing -> HH.text ""
+      Just err ->
+        HH.div
+          [ classNames [ "provider-inline-error" ]
+          , HH.attr (HH.AttrName "role") "alert"
+          , HH.attr (HH.AttrName "tabindex") "-1"
+          , HH.attr (HH.AttrName "data-provider-error") "true"
+          ]
+          [ HH.span_ [ HH.text err ]
+          , HH.a
+              [ HP.href (state.routeBase <> Routing.routePath RouteSettings)
+              , HE.onClick (Navigate RouteSettings)
+              ]
+              [ HH.text "Settings" ]
+          ]
 
   renderResult state =
     case state.fetchError of
@@ -3744,21 +3774,21 @@ inspectorComponent initial =
       nextTheme <- liftEffect (Shell.toggleThemeEff theme)
       H.modify_ _ { theme = nextTheme }
     SetBlockfrostKey s -> do
-      H.modify_ _ { blockfrostKey = s }
+      H.modify_ _ { blockfrostKey = s, providerError = Nothing }
       persist <- H.gets _.persistKeys
       when persist (liftEffect (Storage.setItem blockfrostKey s))
     SetKoiosBearer s -> do
       if looksLikeBlockfrostProjectId s then do
-        H.modify_ _ { provider = Blockfrost, blockfrostKey = s, fetchError = Nothing }
+        H.modify_ _ { provider = Blockfrost, blockfrostKey = s, fetchError = Nothing, providerError = Nothing }
         liftEffect (Storage.setItem providerKey (Provider.providerName Blockfrost))
         persist <- H.gets _.persistKeys
         when persist (liftEffect (Storage.setItem blockfrostKey s))
       else do
-        H.modify_ _ { koiosBearer = s }
+        H.modify_ _ { koiosBearer = s, providerError = Nothing }
         persist <- H.gets _.persistKeys
         when persist (liftEffect (Storage.setItem koiosKey s))
     SelectProvider p -> do
-      H.modify_ _ { provider = p, fetchError = Nothing }
+      H.modify_ _ { provider = p, fetchError = Nothing, providerError = Nothing }
       liftEffect (Storage.setItem providerKey (Provider.providerName p))
     TogglePersist on -> do
       H.modify_ _ { persistKeys = on }
@@ -3773,15 +3803,15 @@ inspectorComponent initial =
             Storage.setItem blockfrostKey ""
             Storage.setItem koiosKey ""
     ToggleExternalContext on ->
-      H.modify_ _ { externalContext = on, fetchError = Nothing, copiedPath = Nothing }
-    SelectMode m -> H.modify_ _ { mode = m, fetchError = Nothing, copiedPath = Nothing }
+      H.modify_ _ { externalContext = on, fetchError = Nothing, providerError = Nothing, copiedPath = Nothing }
+    SelectMode m -> H.modify_ _ { mode = m, fetchError = Nothing, providerError = Nothing, copiedPath = Nothing }
     SelectNetwork n -> do
-      H.modify_ _ { network = n, fetchError = Nothing, copiedPath = Nothing }
+      H.modify_ _ { network = n, fetchError = Nothing, providerError = Nothing, copiedPath = Nothing }
       liftEffect (Storage.setItem networkKey (networkName n))
-    SetTxHash s -> H.modify_ _ { txHash = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
-    SetTxHex s -> H.modify_ _ { txHex = s, copied = false, copiedPath = Nothing, fetchError = Nothing }
+    SetTxHash s -> H.modify_ _ { txHash = s, copied = false, copiedPath = Nothing, fetchError = Nothing, providerError = Nothing }
+    SetTxHex s -> H.modify_ _ { txHex = s, copied = false, copiedPath = Nothing, fetchError = Nothing, providerError = Nothing }
     LoadExample hex -> do
-      H.modify_ _ { mode = ByHex, txHex = hex, copied = false, copiedPath = Nothing, fetchError = Nothing }
+      H.modify_ _ { mode = ByHex, txHex = hex, copied = false, copiedPath = Nothing, fetchError = Nothing, providerError = Nothing }
       handleAction Decode
     SetLibraryInput s -> H.modify_ _ { libraryInput = s, libraryError = Nothing }
     SetLibraryUrl s -> H.modify_ _ { libraryUrl = s, libraryError = Nothing }
@@ -4068,34 +4098,38 @@ inspectorComponent initial =
           , copiedPath = Nothing
           , browserPath = "[]"
           , fetchError = Nothing
+          , providerError = Nothing
           }
-      hexE <- case st.mode of
-        ByHex -> pure (Right (String.trim st.txHex))
-        ByHash ->
-          let key = case st.provider of
-                Blockfrost -> String.trim st.blockfrostKey
-                Koios      -> String.trim st.koiosBearer
+      let
+        selectedCredential = case st.provider of
+          Blockfrost -> st.blockfrostKey
+          Koios      -> st.koiosBearer
+        providerRequired = st.mode == ByHash || st.externalContext
+      hexE <-
+        if providerRequired && not (Provider.credentialReady st.provider selectedCredential) then
+          pure (Left (Provider.readinessGuidance st.provider))
+        else case st.mode of
+          ByHex -> pure (Right (String.trim st.txHex))
+          ByHash ->
+            let
+              key = String.trim selectedCredential
               trimmedHash = String.trim st.txHash
-          in
-            if Provider.needsKey st.provider && key == ""
-              then pure (Left (Provider.providerName st.provider <> " key not set."))
-              else if trimmedHash == ""
-                then pure (Left "Tx hash is empty.")
-                else do
-                  e <- H.liftAff (attempt (Provider.fetchTxCbor st.provider st.network key trimmedHash))
-                  case e of
-                    Left err ->
-                      let raw = message err
-                          diag = case st.provider of
-                            Koios | raw == "Failed to fetch" ->
-                              if String.trim st.koiosBearer == ""
-                                then "Koios blocks anonymous browser requests by design. Sign up (free) at koios.rest/auth, paste the bearer token above, and retry."
-                                else "Koios rejected the request. Check the bearer token is valid and the network matches (mainnet/preprod/preview)."
-                            _ -> raw
-                      in pure (Left diag)
-                    Right cbor -> pure (Right cbor)
+            in
+              if trimmedHash == "" then
+                pure (Left "Tx hash is empty.")
+              else do
+                e <- H.liftAff (attempt (Provider.fetchTxCbor st.provider st.network key trimmedHash))
+                case e of
+                  Left err ->
+                    pure (Left (Provider.providerFailureGuidance st.provider (message err)))
+                  Right cbor -> pure (Right cbor)
       case hexE of
-        Left err -> H.modify_ _ { running = false, loadFormExpanded = true, fetchError = Just err, browserPath = "[]" }
+        Left err ->
+          if err == "Tx hash is empty." then
+            H.modify_ _ { running = false, loadFormExpanded = true, fetchError = Just err, browserPath = "[]" }
+          else do
+            H.modify_ _ { running = false, loadFormExpanded = true, providerError = Just err, browserPath = "[]" }
+            liftEffect Provider.focusProviderError
         Right h -> do
           operationResult <- H.liftAff (runLedgerOperation h "tx.inspect" "{}")
           let
@@ -4105,19 +4139,30 @@ inspectorComponent initial =
             canFetchProducerTxs =
               operationResult.exitOk
                 && (not (Provider.needsKey st.provider) || providerKeyValue /= "")
-          inputContextArgs <-
+          contextResolution <-
             if operationResult.exitOk && st.externalContext then do
               ctx <- H.liftAff
                 (attempt (Provider.resolveProducerTxContext st.provider st.network providerKeyValue canFetchProducerTxs operationResult.stdout))
               case ctx of
-                Right args -> pure args
+                Right args -> pure { args, providerError: Nothing }
                 Left err ->
-                  pure
-                    ( Json.providerResolutionErrorArgs
-                        (Provider.providerName st.provider)
-                        (message err)
-                    )
-            else pure "{}"
+                  let raw = message err
+                  in
+                    pure
+                      { args:
+                          Json.providerResolutionErrorArgs
+                            (Provider.providerName st.provider)
+                            raw
+                      , providerError:
+                          Just (Provider.providerFailureGuidance st.provider raw)
+                      }
+            else pure { args: "{}", providerError: Nothing }
+          let inputContextArgs = contextResolution.args
+          case contextResolution.providerError of
+            Nothing -> pure unit
+            Just err -> do
+              H.modify_ _ { providerError = Just err, loadFormExpanded = true }
+              liftEffect Provider.focusProviderError
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
           intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
@@ -4147,7 +4192,9 @@ inspectorComponent initial =
             _
               { running = false
               , result = Just inspectionResult
-              , loadFormExpanded = not (isDecodedResult inspectionResult)
+              , loadFormExpanded =
+                  contextResolution.providerError /= Nothing
+                    || not (isDecodedResult inspectionResult)
               , txCbor = Just h
               , operationArgs = inputContextArgs
               , browser = if operationResult.exitOk && browser.valid then Just browser else Nothing
@@ -4177,7 +4224,11 @@ inspectorComponent initial =
               , expandedPaths = []
               , decodedTreeExpanded = defaultDecodedTreeExpanded lenses.decodedTreeLens
               , browserPath = browser.currentPath
+              , providerError = contextResolution.providerError
               }
+          case contextResolution.providerError of
+            Nothing -> pure unit
+            Just _  -> liftEffect Provider.focusProviderError
     Copy -> do
       mr <- H.gets _.result
       case mr of
