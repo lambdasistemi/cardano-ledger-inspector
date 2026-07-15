@@ -46,7 +46,7 @@ readinessGuidance = case _ of
   Blockfrost ->
     "Blockfrost credential required: the provider is not ready. Add a project ID in Settings."
   Koios ->
-    "Koios credential required: the provider is not ready. Add a bearer token in Settings. A token permits an attempt but does not guarantee browser access."
+    "Koios credential required: the provider is not ready. This deployed browser flow is CORS-blocked. Add a bearer token in Settings to satisfy the credential gate; a token does not remove this restriction."
 
 providerFailureGuidance :: Provider -> String -> String
 providerFailureGuidance provider =
