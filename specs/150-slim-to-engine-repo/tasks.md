@@ -9,13 +9,13 @@
 **Goal**: Make the former Pages workbench route hand off to the already-live
 csk workbench before deleting any UI source.
 
-- [ ] T001-S1 Verify the live csk Pages root returns the transaction workbench;
+- [X] T001-S1 Verify the live csk Pages root returns the transaction workbench;
   add `gh-docs/inspector/index.html` with automatic redirect, canonical URL,
   and clickable fallback all targeting the exact live root.
-- [ ] T002-S1 Change the Pages workflow and `just build-pages-site` to publish
+- [X] T002-S1 Change the Pages workflow and `just build-pages-site` to publish
   strict MkDocs + `/inspector/` redirect + OpenAPI without building/copying the
   UI, while retaining the old UI source and non-Pages checks until slice 2.
-- [ ] T003-S1 Build and inspect the Pages artifact, prove docs/redirect/OpenAPI,
+- [X] T003-S1 Build and inspect the Pages artifact, prove docs/redirect/OpenAPI,
   run the unchanged `./gate.sh`, and commit
   `docs(pages): redirect inspector to csk workbench` with
   `Tasks: T001, T002, T003`.

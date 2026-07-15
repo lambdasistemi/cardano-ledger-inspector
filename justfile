@@ -116,12 +116,9 @@ ui-check:
     nix develop --quiet -c sh -c 'cd docs/inspector && spago build'
 
 build-pages-site:
-    nix build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
     nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
     rm -rf _site
     nix develop --quiet -c mkdocs build --strict --site-dir _site
-    mkdir -p _site/inspector
-    cp -rL result-inspector/* _site/inspector/
     mkdir -p _site/openapi
     cp -rL result-openapi/* _site/openapi/
 
