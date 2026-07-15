@@ -44,19 +44,6 @@
       inputs.CHaP.follows = "CHaP";
       inputs.ghc-wasm-meta.follows = "ghc-wasm-meta";
     };
-    rdf-shapes-wasm = {
-      url = "github:lambdasistemi/rdf-shapes-wasm/1240e4e58061836264d955b70c49c7195480f3b4";
-      inputs.purescript-overlay.follows = "purescript-overlay";
-      inputs.mkSpagoDerivation.follows = "mkSpagoDerivation";
-    };
-    purescript-overlay = {
-      url = "github:paolino/purescript-overlay/fix/remove-nodePackages";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    mkSpagoDerivation = {
-      url = "github:jeslie0/mkSpagoDerivation";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -69,9 +56,6 @@
     , CHaP
     , ghc-wasm-meta
     , cardanoLedgerWasm
-    , rdf-shapes-wasm
-    , purescript-overlay
-    , mkSpagoDerivation
     , ...
     }:
     flake-parts.lib.mkFlake { inherit inputs; } {
@@ -91,14 +75,6 @@
               haskellNix.overlay
               iohkNix.overlays.haskell-nix-crypto
               iohkNix.overlays.cardano-lib
-            ];
-          };
-
-          psPkgs = import nixpkgs {
-            inherit system;
-            overlays = [
-              purescript-overlay.overlays.default
-              mkSpagoDerivation.overlays.default
             ];
           };
 
@@ -177,15 +153,6 @@
                     ' sh {} +
                   '';
                 });
-          };
-
-          tx-inspector-ui = import ./nix/wasm-ui.nix {
-            inherit system nixpkgs purescript-overlay mkSpagoDerivation;
-            wasmArtifact = wasmTargets.wasm-tx-inspector;
-            wasmArtifactName = "wasm-tx-inspector";
-            rdfShapesWasmPkg = rdf-shapes-wasm.packages.${system}.wasm-pkg;
-            editorPackageSrc = ./packages/purescript-rdf-editor;
-            src = ./docs/inspector;
           };
 
           ledgerFunctionalOpenapiSpec = import ./nix/ledger-functional-openapi.nix;
@@ -1149,11 +1116,10 @@
             inherit
               ledger-functional-openapi
               ledger-functional-openapi-generated
-              tx-inspector-ui
               ;
             ledger-functional-swagger = ledger-functional-openapi;
             protocol-registry = protocolRegistry;
-            default = tx-inspector-ui;
+            default = wasmTargets.wasm-tx-inspector;
           };
 
           checks = {
@@ -1227,36 +1193,11 @@
                   hlint libs apps nix/wasm
                 '';
               };
-              test-playwright = pkgs.writeShellApplication {
-                name = "test-playwright";
-                runtimeInputs = [
-                  pkgs.playwright-test
-                  pkgs.nodejs_20
-                  pkgs.python3
-                  pkgs.coreutils
-                ];
-                excludeShellChecks = [
-                  "SC2046"
-                  "SC2086"
-                ];
-                text = ''
-                  set -euo pipefail
-                  cd docs/inspector
-                  ln -sfn \
-                    $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules \
-                    node_modules
-                  TX_INSPECTOR_SITE_DIR=${tx-inspector-ui} \
-                    PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers} \
-                    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-                    playwright test --reporter=list
-                '';
-              };
             in
             {
               format = mkApp format;
               format-check = mkApp format-check;
               hlint = mkApp hlint;
-              test-playwright = mkApp test-playwright;
               tx-identify-smoke =
                 mkApp (mkSmokeApp "tx-identify-smoke" tx-identify-smoke);
               tx-witness-plan-smoke =
@@ -1293,18 +1234,11 @@
               pkgs.wasmtime
               pkgs.jq
               pkgs.curl
-              pkgs.playwright-test
               pkgs.nixfmt-rfc-style
               pkgs.haskellPackages.fourmolu
               pkgs.haskellPackages.hlint
               mkdocsEnv
-              psPkgs.purs
-              psPkgs.spago-unstable
-              psPkgs.esbuild
-              psPkgs.nodejs_20
             ];
-            PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
-            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
           };
         };
     };

@@ -26,21 +26,21 @@ csk workbench before deleting any UI source.
 surface while keeping the engine, registry, release contract, and downstream
 flake interface unchanged.
 
-- [ ] T004-S2 Delete every non-registry child of `docs/inspector/`, the UI-only
+- [X] T004-S2 Delete every non-registry child of `docs/inspector/`, the UI-only
   PureScript RDF editor package, `tools/ux-judge`, the UI fixture generator,
   and `nix/wasm-ui.nix`; prove `docs/inspector/protocols/` is byte-identical.
-- [ ] T005-S2 Remove UI-only flake inputs, lock nodes, derivation, package/app,
+- [X] T005-S2 Remove UI-only flake inputs, lock nodes, derivation, package/app,
   and dev-shell tools; make `wasm-tx-inspector` the default package without
   changing any preserved named engine output.
-- [ ] T006-S2 Remove UI build/artifact and Playwright from CI, delete the UI PR
+- [X] T006-S2 Remove UI build/artifact and Playwright from CI, delete the UI PR
   preview workflow, and keep the release-assets workflow byte-identical.
-- [ ] T007-S2 Prune UI-only Just recipes, align the CI entry point and gate to
+- [X] T007-S2 Prune UI-only Just recipes, align the CI entry point and gate to
   the complete engine check set, and keep strict docs/redirect/OpenAPI proof in
   the gate.
-- [ ] T008-S2 Rewrite README, architecture, build/installation/overview docs,
+- [X] T008-S2 Rewrite README, architecture, build/installation/overview docs,
   AGENTS, and the repository guide skill to describe the engine-only scope and
   direct browser users to the csk workbench.
-- [ ] T009-S2 Run the full engine gate; compare pre/post store paths for
+- [X] T009-S2 Run the full engine gate; compare pre/post store paths for
   `wasm-tx-inspector` and `protocol-registry`; verify registry drift, preserved
   flake names, redirect artifact, and unchanged release workflow; commit
   `refactor: slim inspector to engine surfaces` with

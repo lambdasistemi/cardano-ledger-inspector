@@ -1,8 +1,10 @@
 # Architecture
 
 The project packages Cardano ledger operations as reproducible Nix outputs.
-The browser, WASI module, Extism spike, OpenAPI bundle, and smoke checks are
-separate artifacts, but they share one ledger operation implementation.
+The WASI module, Extism spike, OpenAPI bundle, protocol registry, native CLI,
+and smoke checks are separate artifacts, but they share one ledger operation
+implementation. The cardano-swiss-knife browser workbench is an external
+consumer of the engine outputs.
 
 ```mermaid
 flowchart TB
@@ -13,14 +15,14 @@ flowchart TB
   WASI[wasm-tx-inspector.wasm]
   Extism[wasm-extism-spike.wasm]
   Native["apps/tx-deep-diagnosis<br/>(native binary linking the lib)"]
-  UI[PureScript inspector UI]
+  CSK["cardano-swiss-knife<br/>(external browser consumer)"]
   ExtHost[apps/extism-spike-host]
   Ledger[Cardano ledger packages]
   JSON[JSON result]
 
   Tx --> Envelope
   Context --> Envelope
-  UI --> Envelope
+  CSK --> Envelope
   ExtHost --> Envelope
   Native --> Envelope
   Envelope --> WASI
@@ -31,26 +33,25 @@ flowchart TB
   Inspector --> Ledger
   Ledger --> Inspector
   Inspector --> JSON
-  JSON --> UI
+  JSON --> CSK
   JSON --> ExtHost
   JSON --> Native
 ```
 
 The same `cardano-ledger-inspector` Haskell library is compiled three ways:
-to wasm32-wasi (loaded by the browser), to wasm32-wasi as an Extism plugin,
-and natively (linked into `apps/tx-deep-diagnosis`). Every consumer talks to
-the same dispatcher and gets the same JSON contract.
+to wasm32-wasi, to wasm32-wasi as an Extism plugin, and natively (linked into
+`apps/tx-deep-diagnosis`). Every consumer talks to the same dispatcher and
+gets the same JSON contract.
 
 ## Layers
 
-### Browser Layer
+### Consumer Boundary
 
-`docs/inspector/` contains the PureScript workbench. It is responsible for
-fetching or accepting transaction CBOR, managing local browser state, invoking
-the WASI module, and presenting operation results. The browser package emits
-the built `wasm-tx-inspector.wasm` and RDF shapes wasm as separate hashed
-assets, then loads them with WebAssembly streaming APIs and non-streaming
-fallbacks for hosts that do not serve `application/wasm`.
+The cardano-swiss-knife repository owns the browser product, local UI state,
+and provider adapters. It consumes the named `wasm-tx-inspector` and
+`protocol-registry` flake outputs from this repository. The engine receives
+transaction CBOR and explicit context through its versioned JSON envelope; it
+does not depend on hidden browser state or provider calls.
 
 ### Inspector library
 
@@ -66,7 +67,8 @@ different targets, all from the same source.
 The library's `app/Main.hs` is a 34-line WASI reactor that reads one JSON
 envelope (or raw transaction hex) from stdin and writes one JSON response. Its wasm build, configured
 by `libs/cardano-ledger-inspector/cabal-wasm.project`, produces
-`wasm-tx-inspector.wasm`. The browser loads it with `@bjorn3/browser_wasi_shim`.
+`wasm-tx-inspector.wasm`. WASI hosts provide the envelope on stdin and read
+the JSON response on stdout.
 
 ### Extism Layer
 
@@ -120,12 +122,12 @@ flowchart TB
   WasmTargets[WASM package targets]
   HostTargets[Native host targets]
   OpenAPI[OpenAPI artifacts]
-  UI[Inspector UI]
+  Registry[Protocol registry]
   Checks[Smoke and contract checks]
   DevShell[devShells.default]
 
   Lib --> WasmTargets
-  WasmTargets --> UI
+  Registry --> HostTargets
   WasmTargets --> Checks
   HostTargets --> Checks
   OpenAPI --> Checks
@@ -156,11 +158,11 @@ per-system `pkgs`, `ghc-wasm-meta`, CHaP source, and target source tree into
 | `packages.<system>.tx-deep-diagnosis` | Native executable `tx-deep-diagnosis` | Native CLI that links the inspector library, resolves inputs via Blockfrost, and labels script hashes against vendored blueprints + the Amaru journal. Produces a layered diagnosis report. |
 | `packages.<system>.tx-deep-diagnosis-render-snapshot` | Native executable `tx-deep-diagnosis-render-snapshot` | Golden-file snapshot harness for the explain-artifact renderers; `--write` regenerates the expected files under `apps/tx-deep-diagnosis/test/golden/`. |
 | `packages.<system>.libextism` | Native `libextism` library and headers | Prebuilt Extism runtime used by the native host package. |
-| `packages.<system>.tx-inspector-ui` | `index.html`, `index.js`, shared hashed wasm assets, precompressed `.gz`/`.br` copies | Browser workbench bundle. The WASI inspector and RDF shapes wasm files are emitted as cacheable assets during the PureScript/esbuild build. |
+| `packages.<system>.protocol-registry` | Registry manifest, blueprints, pins, deployment journal, and registry documentation | Standalone registry consumed by cardano-swiss-knife and checked against the native CLI's bundled data. |
 | `packages.<system>.ledger-functional-openapi-generated` | Generated `cardano-ledger-functional.openapi.json` | Deterministic OpenAPI JSON generated from the Nix source definition. |
 | `packages.<system>.ledger-functional-openapi` | OpenAPI JSON plus referenced schema JSON files | Publishable API bundle for docs and CI artifacts. |
 | `packages.<system>.ledger-functional-swagger` | Alias of `ledger-functional-openapi` | Compatibility output for consumers that still look for the Swagger name. |
-| `packages.<system>.default` | Alias of `tx-inspector-ui` | Default package for `nix build`. |
+| `packages.<system>.default` | Alias of `wasm-tx-inspector` | Default engine package for `nix build`. |
 
 The WASM package targets use fixed-output dependency derivations. When Cabal
 inputs, CHaP pins, source-repository-package forks, or package lists change,
@@ -174,6 +176,7 @@ implicit network access during the final build.
 | `checks.<system>.ledger-functional-openapi-check` | Regenerates OpenAPI JSON from `nix/ledger-functional-openapi.nix` and diffs it against the committed file under `specs/001-ledger-functional-layer/openapi/`. |
 | `checks.<system>.ledger-functional-swagger-check` | Alias of the OpenAPI check for the Swagger compatibility name. |
 | `checks.<system>.tx-identify-smoke` | Runs `tx.identify` through `wasm-tx-inspector.wasm` and asserts stable identity, size, fee, and witness-count fields. |
+| `checks.<system>.tx-rdf-smoke` | Runs deterministic RDF projection checks, including resolved inputs and blueprint-aware datum decoding. |
 | `checks.<system>.tx-witness-plan-smoke` | Runs `tx.witness.plan` without context and asserts witness, script, datum, redeemer, and warning shapes. |
 | `checks.<system>.tx-witness-attach-smoke` | Runs `tx.witness.attach`, asserts inserted vs replaced behavior, preserves transaction identity, and checks rejected missing-witness diagnostics. |
 | `checks.<system>.tx-intent-smoke` | Runs `tx.intent` against a complete producer-context fixture and verifies signer-perspective value accounting. |
@@ -183,6 +186,8 @@ implicit network access during the final build.
 | `checks.<system>.tx-extism-spike-smoke` | Calls the Extism plugin through `extism-spike-host` and checks that Extism responses for shared envelopes match the WASI reactor byte-for-byte. |
 | `checks.<system>.tx-explain-render-smoke` | Runs the render-snapshot harness in compare mode against the committed golden explain artifacts. |
 | `checks.<system>.tx-deep-diagnosis-emit-explain-smoke` | Runs the native CLI with `--emit-explain` end-to-end and verifies the emitted artifact set. |
+| `checks.<system>.cardano-ledger-wasm-pin-check` | Verifies the WASM source pins and fork metadata remain aligned. |
+| `checks.<system>.protocol-registry-drift-check` | Verifies the CLI's bundled registry data is byte-identical to the standalone registry package for every consumed file. |
 
 The smoke checks are intentionally fixture-driven. They do not fetch provider
 state or hide network lookups inside the ledger layer; all transaction CBOR and
@@ -200,27 +205,21 @@ CI recipes:
 | `wasmtime` | Runs WASI artifacts in smoke checks and manual tests. |
 | `jq` | Builds request fixtures and asserts JSON response contracts. |
 | `curl` | Manual API/provider probing when needed. |
-| `playwright-test` | Browser regression tests for the inspector UI. |
 | `nixfmt-rfc-style` | Nix formatting. |
 | `fourmolu` | Haskell formatting. |
 | `mkdocs`, `mkdocs-material`, `pymdown-extensions` | Documentation site build. |
-| `purs`, `spago-unstable`, `esbuild`, `nodejs_20` | PureScript UI build. |
-
-The shell also sets `PLAYWRIGHT_BROWSERS_PATH` and
-`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` so Playwright uses the Nix-provided browser
-bundle instead of downloading one.
 
 ## CI and Artifact Flow
 
 The flake outputs define the CI surface:
 
-1. Build the WASI module and browser package from pinned inputs.
+1. Build the WASI module, Extism/native packages, protocol registry, and
+   OpenAPI bundle from pinned inputs.
 2. Regenerate and compare the OpenAPI output against the committed spec.
 3. Run fixture-based WASI and Extism smoke checks.
-4. Upload downloadable artifacts for the WASI bundle, browser bundle, and API
-   bundle.
-5. Publish the MkDocs site, with the inspector UI mounted under `/inspector/`
-   and OpenAPI assets mounted under `/openapi/`.
+4. Upload downloadable artifacts for the WASI and OpenAPI bundles.
+5. Publish the MkDocs site and Swagger/OpenAPI assets; `/inspector/` is a
+   static redirect to cardano-swiss-knife.
 
-This keeps the repository docs, browser preview, downloadable artifacts, and
-contract checks tied to the same Nix output graph.
+This keeps the repository docs, downloadable engine artifacts, downstream
+registry package, and contract checks tied to the same Nix output graph.

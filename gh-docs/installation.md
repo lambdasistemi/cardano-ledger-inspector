@@ -9,7 +9,7 @@ conventional-commit history. Each release attaches:
 | Asset | Contents |
 | --- | --- |
 | `cardano-ledger-reference-<tag>.wasm` | Extism plugin exposing `tx_identify`, `tx_validate`, and `tx_evaluate_scripts`. The conformance reference for alternative node implementations: load it with any Wasmtime-backed [Extism host SDK](https://extism.org/docs/concepts/host-sdk). The Go SDK does not work yet because its bundled wazero predates wasm tail-call support. |
-| `wasm-tx-inspector-<tag>.wasm` | The same Conway ledger packaged as a WASI reactor (stdin/stdout JSON), for shell-driven debugging and the inspector UI. |
+| `wasm-tx-inspector-<tag>.wasm` | The same Conway ledger packaged as a WASI reactor (stdin/stdout JSON), for shell-driven debugging and external hosts such as cardano-swiss-knife. |
 | `ledger-functional-openapi-<tag>.tar.gz` | OpenAPI contract for the JSON envelope. |
 | `SHA256SUMS-<tag>.txt` | Checksums for the assets above. |
 
@@ -22,7 +22,7 @@ All artifacts are flake outputs and can be built without a checkout:
 
 ```bash
 nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.wasm-tx-inspector
-nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.tx-inspector-ui
+nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.protocol-registry
 nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.tx-deep-diagnosis
 ```
 
@@ -39,26 +39,18 @@ exercises the Linux outputs.
 
 ## CI artifacts (per-run, ephemeral)
 
-Every `CI` workflow run uploads `wasm-tx-inspector`, `tx-inspector-ui`, and
-`ledger-functional-openapi` artifacts (each with `SHA256SUMS`) retained for
-30 days. Use these for inspecting a specific PR; use a tagged release for
-anything you depend on. See
+Every `CI` workflow run uploads `wasm-tx-inspector` and
+`ledger-functional-openapi` artifacts (each with `SHA256SUMS`) retained
+for 30 days. Use these for inspecting a specific PR; use a tagged release
+for anything you depend on. See
 [CI workflow runs](https://github.com/lambdasistemi/cardano-ledger-inspector/actions/workflows/ci.yml).
 
 ## Browser workbench
 
-The transaction inspector needs no installation; it runs in the browser at
-<https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>.
+The browser product needs no installation and lives in cardano-swiss-knife:
 
-The browser package loads the large inspector and RDF shapes WebAssembly
-modules as separate hashed assets, so repeat visits can reuse the browser HTTP
-cache instead of downloading those bytes inside `index.js`. The Nix-built
-package also includes `.gz` and `.br` precompressed copies of HTML,
-JavaScript, CSS, and wasm files, including both hashed wasm assets.
+<https://lambdasistemi.github.io/cardano-swiss-knife/>
 
-GitHub Pages and the shared PR preview host may serve the uncompressed files
-and ordinary cache headers until their host configuration supports static
-brotli/gzip siblings and immutable cache policy for hashed assets. The
-repository package still contains the precompressed files, so hosts with
-`brotli_static`/`gzip_static`-style support can serve them without rebuilding
-the UI.
+It consumes this repository's `wasm-tx-inspector` and
+`protocol-registry` flake outputs. The former inspector URL in this
+repository redirects to that workbench.

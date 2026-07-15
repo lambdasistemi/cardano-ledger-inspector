@@ -1,6 +1,6 @@
 ---
 name: cardano-ledger-inspector-guide
-description: Working guide for the lambdasistemi/cardano-ledger-inspector repository — Conway ledger operations compiled to wasm32-wasi plus a native diagnosis CLI. Load when a task mentions wasm-tx-inspector, tx-deep-diagnosis, the ledger functional layer or its operations (tx.inspect, tx.browse, tx.identify, tx.intent, tx.witness.plan, tx.witness.attach, tx.validate, tx.evaluate.scripts), the Extism conformance plugin (tx_identify, tx_validate, tx_evaluate_scripts exports, extism-spike-host), the PureScript inspector workbench under docs/inspector, the protocol registry (registry.json, --registry, --no-bundled-registry, the Amaru journal), Conway.Inspector modules, the ledger-functional OpenAPI contract, error strings like malformed_cbor or unknown_ledger_operation, or just recipes such as build-wasm, check-identify, check-validate, test-playwright in this repo.
+description: Working guide for the lambdasistemi/cardano-ledger-inspector engine repository — Conway ledger operations compiled to wasm32-wasi, an Extism conformance plugin, OpenAPI, protocol registry, and a native diagnosis CLI. Load when a task mentions wasm-tx-inspector, tx-deep-diagnosis, the ledger functional layer or its operations (tx.inspect, tx.browse, tx.identify, tx.intent, tx.witness.plan, tx.witness.attach, tx.validate, tx.evaluate.scripts), Extism exports or extism-spike-host, the protocol registry (registry.json, --registry, --no-bundled-registry, the Amaru journal), Conway.Inspector modules, the ledger-functional OpenAPI contract, error strings like malformed_cbor or unknown_ledger_operation, or engine recipes such as build-wasm, check-identify, or check-validate.
 ---
 
 # cardano-ledger-inspector guide
@@ -13,23 +13,24 @@ description: Working guide for the lambdasistemi/cardano-ledger-inspector reposi
 | `apps/tx-deep-diagnosis/` | Native CLI linking the library. `app/Main.hs` parses flags and orchestrates the intent → Blockfrost resolution → validate pipeline; `src/TxDeepDiagnosisHost/` holds Blockfrost, Registry, and the markdown/diagram renderers; `snapshot/Main.hs` is the golden-file harness. |
 | `apps/wasm-extism-spike/` | Extism PDK plugin; `src/Extism/Spike.hs` exports `tx_identify`, `tx_validate`, `tx_evaluate_scripts`. |
 | `apps/extism-spike-host/` | Native host calling the plugin via libextism/Wasmtime. |
-| `docs/inspector/` | PureScript/Halogen browser workbench (`src/Main.purs`, `src/Provider.purs`, `src/FFI/`), Playwright tests (`tests/`), and the protocol registry (`protocols/`). |
+| `docs/inspector/protocols/` | Protocol registry source bundled into the native CLI and exposed as the `protocol-registry` flake package. Its path is a downstream contract. |
 | `specs/001-ledger-functional-layer/` | API contract, JSON schemas, OpenAPI document, and committed transaction fixtures. |
 | `gh-docs/` | MkDocs pages published to GitHub Pages. |
-| `nix/` | `wasm/` (mkCardanoLedgerWasm, forks, wasm C libs), `host/` (native builds, libextism), `ledger-functional-openapi.nix`, `wasm-targets.nix`, `wasm-ui.nix`. |
+| `nix/` | `wasm/` (mkCardanoLedgerWasm, forks, wasm C libs), `host/` (native builds, libextism), `ledger-functional-openapi.nix`, and `wasm-targets.nix`. |
 
 ## Build, test, run
 
 Use `just` recipes (they wrap `nix build`):
 
-- `just build-wasm` / `just build-ui` / `just build-openapi` — main artifacts.
+- `just build-wasm` / `just build-openapi` — main generated artifacts.
 - `just check-identify`, `check-witness-plan`, `check-witness-attach`,
   `check-intent`, `check-input-context`, `check-validate`,
   `check-evaluate-scripts` — fixture-driven smoke checks, one per operation.
 - `just check-extism-spike` — asserts Extism responses match the WASI
   reactor byte-for-byte.
-- `just hlint`, `just format` / `format-check`, `just ui-check`.
-- `just test-playwright` — browser E2E; `just test` — full local gate.
+- `just hlint`, `just format` / `format-check`, and
+  `just build-pages-site` — lint, formatting, and strict docs/redirect/OpenAPI.
+- `just test` — complete engine CI recipe.
 
 The first WASI build is slow (fresh Cabal dependency cache); subsequent
 Haskell-only edits rebuild fast. Flake outputs exist for `x86_64-linux` and
@@ -54,8 +55,9 @@ Haskell-only edits rebuild fast. Flake outputs exist for `x86_64-linux` and
 - Report section order and renderers:
   `apps/tx-deep-diagnosis/src/TxDeepDiagnosisHost/Render/Summary.hs` and
   golden files under `apps/tx-deep-diagnosis/test/golden/`.
-- UI operation calls and provider adapters: `docs/inspector/src/Main.purs`,
-  `src/Provider.purs`, `src/FFI/Blockfrost.purs`, `src/FFI/Koios.purs`.
+- Downstream browser product: cardano-swiss-knife consumes the
+  `wasm-tx-inspector` and `protocol-registry` flake outputs and owns UI and
+  provider adapters.
 
 ## Using the ledger operations
 
@@ -97,5 +99,7 @@ defaults to `tx_identify`).
   `docs/inspector/protocols/README.md` and `WORKED-EXAMPLE.md`.
 - "Why doesn't the Go Extism SDK work?" — `apps/wasm-extism-spike/README.md`
   (wazero predates wasm tail-call support; use Wasmtime-backed SDKs).
-- The hosted workbench, API page, and Swagger UI live under
-  <https://lambdasistemi.github.io/cardano-ledger-inspector/>.
+- The browser workbench lives at
+  <https://lambdasistemi.github.io/cardano-swiss-knife/>. This repository's
+  Pages site publishes engine documentation and Swagger/OpenAPI; its former
+  `/inspector/` route redirects to that workbench.

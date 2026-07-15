@@ -22,7 +22,7 @@ Operations use a JSON control envelope. Transaction bytes remain CBOR hex.
 
 ## Response Shape
 
-The response is JSON so browser tools, tests, and command-line users can
+The response is JSON so host tools, tests, and command-line users can
 inspect it directly.
 
 ```json
@@ -53,26 +53,19 @@ status is not stable and belongs to live-chain validation or submission checks.
 
 ## Provider Boundary
 
-Browser provider adapters expose byte-fetch and context-fetch capabilities for
-the current 0.1 inspection path:
+Provider adapters belong to hosts, outside the ledger engine. A host can expose
+byte-fetch and context-fetch capabilities such as:
 
 ```text
 fetchTxCbor(network, credentials, tx_id) -> tx_cbor
 fetchValidationContext(network, credentials) -> { network, slot, epoch, protocol_parameters }
 ```
 
-`fetchTxCbor` opens the user-selected transaction and fetches producer
-transactions needed for input context. Provider modules do not expose UTxO JSON
-projection or ledger reconstruction helpers; producer-context arguments are
-built by the host and interpreted by the Haskell ledger layer.
-
-The browser host resolves validation context from the selected provider instead
-of asking users to paste it. Koios uses `tip` plus `cli_protocol_params`;
-Blockfrost uses `blocks/latest` plus `epochs/latest/parameters`, translating
-the Blockfrost protocol-parameter response into the ledger-compatible shape.
-If Blockfrost is selected but no project ID is configured, the browser still
-fetches keyless Koios tip/protocol-parameter context and reports only the
-producer transaction CBOR that could not be fetched.
+`fetchTxCbor` can open a selected transaction and fetch producer
+transactions needed for input context. Provider modules must not reconstruct
+ledger state from lossy UTxO JSON; producer-context arguments are built by the
+host and interpreted by the Haskell ledger layer. The cardano-swiss-knife
+workbench owns the browser provider integrations that consume this boundary.
 
 ## Current Operations
 
@@ -81,7 +74,7 @@ producer transaction CBOR that could not be fetched.
 
 `tx.browse`
 : Return a navigable representation suitable for expanding transaction
-  structure in the UI.
+  structure in a host.
 
 `tx.identify`
 : Return stable transaction identifiers, byte-level metadata, and witness
@@ -125,20 +118,18 @@ producer transaction CBOR that could not be fetched.
   and evaluated execution units, and preserves missing-context diagnostics. It
   never mutates or returns transaction CBOR.
 
-The browser inspector now calls `tx.inspect`, `tx.browse`, `tx.identify`,
-`tx.intent`, `tx.witness.plan`, and `tx.validate` from the same selected
-transaction CBOR.
-When provider credentials are available, producer transaction CBOR fetched by
-transaction id is passed as explicit `args.context.producer_txs`, and provider
+Hosts call operations from the same selected transaction CBOR. When provider
+credentials are available, producer transaction CBOR fetched by transaction id
+is passed as explicit `args.context.producer_txs`, and provider
 tip/protocol-parameter data is passed as explicit validation context. Missing
-governance, certificate, or failed provider context remains visible as
-validation diagnostics rather than being guessed by the UI.
+governance, certificate, or provider context remains visible as validation
+diagnostics rather than being guessed by the engine.
 
-`tx.witness.attach` is available through the same WASI/API boundary for signing
-flows, so browser and CLI hosts can share the same witness-set patching logic.
+`tx.witness.attach` is available through the same WASI/API boundary for
+signing flows, so hosts can share the same witness-set patching logic.
 
-`tx.evaluate.scripts` is available through the WASI/API boundary; a dedicated
-browser panel can be added separately once its UI flow is selected.
+`tx.evaluate.scripts` is available through the same WASI/API boundary for
+hosts that need phase-2 evaluation.
 
 A complete positive request is committed at
 [`specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json`](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json).

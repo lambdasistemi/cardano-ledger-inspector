@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Configure branch protection on main:
-# - Require every per-concern CI job + the Build Gate populator + preview
+# - Require every per-concern CI job plus the Build Gate populator
 # - Require branch be up-to-date with base before merging
 # - Disallow force-pushes and deletions
 # - No required reviewers (single-maintainer repo); bump if collaborators join
 #
 # The required-contexts list mirrors the job 'name:' fields in
-# .github/workflows/ci.yml plus 'preview' from .github/workflows/pr-preview.yml.
-# When a new per-concern job is added, list it here too.
+# .github/workflows/ci.yml. When a new per-concern job is added, list it here
+# too.
 #
 # Idempotent. Re-run any time the required-checks list changes.
 #
@@ -35,9 +35,7 @@ gh api -X PUT "repos/$OWNER/$REPO/branches/$BRANCH/protection" \
       "Smoke explicit UTxO input context",
       "Smoke Extism conformance vs WASI",
       "Format (fourmolu)",
-      "Hlint",
-      "Playwright",
-      "preview"
+      "Hlint"
     ]
   },
   "enforce_admins": false,
