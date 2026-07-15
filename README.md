@@ -1,8 +1,9 @@
 # cardano-ledger-inspector
 
-Cardano ledger operations compiled to WASI, with a browser transaction
-workbench and a native diagnosis CLI that exercise the same Haskell ledger
-code.
+Cardano ledger operations packaged as a WASI reactor, an Extism conformance
+plugin, an OpenAPI contract, a protocol registry, and a native diagnosis CLI.
+The browser product that consumes this engine lives in
+[`cardano-swiss-knife`](https://lambdasistemi.github.io/cardano-swiss-knife/).
 
 ## What Is This
 
@@ -16,8 +17,8 @@ control envelope carrying the transaction as CBOR hex, run real
 evaluation), and return JSON results.
 
 The library is compiled three ways from the same source: to a `wasm32-wasi`
-reactor (`wasm-tx-inspector.wasm`) loaded by the browser workbench and
-runnable under `wasmtime`; to a wasm Extism plugin
+reactor (`wasm-tx-inspector.wasm`) consumed by the cardano-swiss-knife
+workbench and runnable under `wasmtime`; to a wasm Extism plugin
 (`wasm-extism-spike.wasm`) used as a conformance reference for alternative
 node implementations; and natively, linked into the `tx-deep-diagnosis`
 CLI, which adds Blockfrost producer-transaction resolution and protocol
@@ -32,7 +33,7 @@ node-client library.
 
 ```mermaid
 flowchart TB
-  UI["docs/inspector<br/>PureScript browser workbench"]
+  CSK["cardano-swiss-knife<br/>browser workbench (external consumer)"]
   CLI["apps/tx-deep-diagnosis<br/>native diagnosis CLI"]
   ExtHost["apps/extism-spike-host<br/>native Extism host"]
   WASI["wasm-tx-inspector.wasm<br/>WASI reactor"]
@@ -40,7 +41,7 @@ flowchart TB
   Lib["libs/cardano-ledger-inspector<br/>Conway inspector library"]
   Ledger["cardano-ledger-conway, cardano-ledger-api, plutus-ledger-api<br/>pinned via CHaP"]
 
-  UI -- "JSON envelope via browser_wasi_shim" --> WASI
+  CSK -- "JSON envelope" --> WASI
   ExtHost -- "JSON envelope via libextism" --> Plugin
   CLI -- "links the library natively" --> Lib
   Lib -- "wasm32-wasi build" --> WASI
@@ -63,8 +64,8 @@ flowchart TB
   operations as named exports for cross-implementation conformance testing.
 - `apps/extism-spike-host/` — native Extism host that loads the wasm spike
   via libextism for CI-side conformance checks.
-- `docs/inspector/` — PureScript/Halogen browser workbench embedding the WASI
-  artifact with `@bjorn3/browser_wasi_shim`.
+- `docs/inspector/protocols/` — protocol registry source consumed by the
+  native CLI and exposed as the `protocol-registry` flake package.
 - `nix/wasm/` — reusable Nix machinery for compiling selected Cardano ledger
   Haskell packages to `wasm32-wasi`.
 - `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md` —
@@ -86,7 +87,7 @@ conventional-commit history. Each release attaches:
   predates wasm tail-call support.
 - `wasm-tx-inspector-<tag>.wasm` — same Conway ledger, packaged as a
   WASI reactor (stdin/stdout JSON). Suitable for shell-driven debug
-  and the inspector UI.
+  and external hosts such as cardano-swiss-knife.
 - `ledger-functional-openapi-<tag>.tar.gz` — OpenAPI contract for the
   JSON envelope.
 - `SHA256SUMS-<tag>.txt` — checksums.
@@ -97,13 +98,13 @@ You can also build any artifact directly from GitHub:
 
 ```bash
 nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.wasm-tx-inspector
-nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.tx-inspector-ui
+nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.protocol-registry
 ```
 
-Every `CI` workflow run additionally uploads per-run artifacts
-(`wasm-tx-inspector`, `tx-inspector-ui`, `ledger-functional-openapi`, each
-with `SHA256SUMS`) retained for 30 days. Use these for inspecting a specific
-PR; use a tagged release for anything you depend on. Download them from the
+Every `CI` workflow run additionally uploads per-run
+`wasm-tx-inspector` and `ledger-functional-openapi` artifacts, each with
+`SHA256SUMS`, retained for 30 days. Use these for inspecting a specific PR;
+use a tagged release for anything you depend on. Download them from the
 **Artifacts** section of a run under
 <https://github.com/lambdasistemi/cardano-ledger-inspector/actions/workflows/ci.yml>.
 
@@ -134,7 +135,7 @@ nix develop --quiet -c sh -c '
 
 | Operation | Description |
 | --- | --- |
-| `tx.inspect` | Decode transaction CBOR and return a compact summary plus the root browser view. |
+| `tx.inspect` | Decode transaction CBOR and return a compact summary plus the root structured view. |
 | `tx.browse` | Return a navigable representation of the transaction at `args.path`. |
 | `tx.identify` | Return transaction id, body hash, era, byte size, fee, structural counts, and witness counts. |
 | `tx.intent` | Return a signer-focused summary: visible effects, self-declared metadata claims, required signers, scripts, withdrawals, mint/burn, collateral, and context coverage. |
@@ -146,9 +147,9 @@ nix develop --quiet -c sh -c '
 Hosts and entry points:
 
 - **Browser workbench** —
-  <https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>,
-  with Blockfrost and Koios provider adapters for fetching transaction and
-  validation context.
+  <https://lambdasistemi.github.io/cardano-swiss-knife/>. Its inspector
+  consumes this repository's `wasm-tx-inspector` and `protocol-registry`
+  outputs and owns browser state and provider integration.
 - **Native CLI** — `nix run .#tx-deep-diagnosis -- --cbor tx.hex --format explain`
   produces a layered markdown diagnosis;
   see the [CLI walkthrough](https://lambdasistemi.github.io/cardano-ledger-inspector/build/)
@@ -163,9 +164,9 @@ Hosts and entry points:
 - Repository docs: <https://lambdasistemi.github.io/cardano-ledger-inspector/>
 - Functional API definition: <https://lambdasistemi.github.io/cardano-ledger-inspector/api/>
 - Swagger UI: <https://lambdasistemi.github.io/cardano-ledger-inspector/swagger/>
-- Transaction inspector: <https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>
-
-Pull requests build the preview bundle and smoke-test it on localhost in CI.
+- Browser workbench: <https://lambdasistemi.github.io/cardano-swiss-knife/>
+- Former inspector route (redirect):
+  <https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>
 
 For AI agents, start at [AGENTS.md](AGENTS.md).
 
@@ -175,17 +176,18 @@ For AI agents, start at [AGENTS.md](AGENTS.md).
 just --list
 nix develop --quiet -c just ci
 just build-wasm
-just build-ui
 just check-openapi
 just check-swagger
 just check-identify
+just check-rdf
 just check-witness-plan
 just check-witness-attach
 just check-intent
 just check-input-context
 just check-validate
 just check-evaluate-scripts
-just test-playwright
+just check-extism-spike
+just build-pages-site
 just test
 ```
 
@@ -199,10 +201,8 @@ split `prebuiltDeps` path and rebuild much faster after the cache exists.
 through Nix and fail if it differs from the committed Swagger JSON.
 `just check-identify` runs the WASI executable against a committed Conway
 transaction fixture and verifies the `tx.identify` response shape.
-`tx.intent` is covered by the browser suite, including the
-`sundae-swap-usdm-disbursement.hex` fixture and a first-viewport signer summary
-regression. `just check-intent` verifies signer-perspective value accounting
-against a complete producer-context fixture.
+`just check-intent` verifies signer-perspective value accounting against a
+complete producer-context fixture.
 `just check-witness-plan` verifies the implemented `tx.witness.plan` response
 shape against the same fixture.
 `just check-witness-attach` verifies inserted vs replaced witness behavior and
@@ -217,8 +217,8 @@ The positive validation fixture is
 `just check-evaluate-scripts` verifies the implemented `tx.evaluate.scripts`
 response shape, including incomplete-context diagnostics, per-redeemer budget
 data, and complete-context execution-unit reporting.
-`just test-playwright` runs the Playwright E2E suite against the packaged inspector UI.
-`just test` runs the feature smoke checks plus lint and the browser suite.
+`just check-extism-spike` verifies Extism responses against the WASI reactor
+byte-for-byte. `just test` runs the complete engine CI recipe.
 
 ## License
 

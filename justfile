@@ -4,9 +4,6 @@ default:
 build-wasm:
     nix build .#packages.x86_64-linux.wasm-tx-inspector
 
-build-ui:
-    nix build .#packages.x86_64-linux.tx-inspector-ui
-
 build-openapi:
     nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
 
@@ -56,7 +53,7 @@ ci:
     just check-ci-drift
     nix build --quiet \
       .#packages.x86_64-linux.wasm-tx-inspector \
-      .#packages.x86_64-linux.tx-inspector-ui \
+      .#packages.x86_64-linux.protocol-registry \
       .#packages.x86_64-linux.ledger-functional-openapi \
       .#packages.x86_64-linux.wasm-extism-spike \
       .#packages.x86_64-linux.extism-spike-host \
@@ -64,12 +61,18 @@ ci:
       .#checks.x86_64-linux.ledger-functional-openapi-check \
       .#checks.x86_64-linux.ledger-functional-swagger-check \
       .#checks.x86_64-linux.tx-identify-smoke \
+      .#checks.x86_64-linux.tx-rdf-smoke \
       .#checks.x86_64-linux.tx-witness-plan-smoke \
+      .#checks.x86_64-linux.tx-witness-attach-smoke \
       .#checks.x86_64-linux.tx-intent-smoke \
       .#checks.x86_64-linux.tx-validate-smoke \
       .#checks.x86_64-linux.tx-evaluate-scripts-smoke \
       .#checks.x86_64-linux.tx-input-context-smoke \
       .#checks.x86_64-linux.tx-extism-spike-smoke \
+      .#checks.x86_64-linux.tx-explain-render-smoke \
+      .#checks.x86_64-linux.tx-deep-diagnosis-emit-explain-smoke \
+      .#checks.x86_64-linux.cardano-ledger-wasm-pin-check \
+      .#checks.x86_64-linux.protocol-registry-drift-check \
       -o result-gate
     nix run --quiet .#ledger-functional-openapi-check
     nix run --quiet .#ledger-functional-swagger-check
@@ -82,22 +85,8 @@ ci:
     nix run --quiet .#tx-extism-spike-smoke
     nix run --quiet .#format-check
     nix run --quiet .#hlint
-    nix run --quiet .#test-playwright
 
-test-playwright: build-ui
-    nix develop --quiet -c sh -c 'cd docs/inspector && ln -sfn $(dirname $(dirname $(readlink -f $(command -v playwright))))/lib/node_modules node_modules && TX_INSPECTOR_SITE_DIR=../../result playwright test --reporter=list'
-
-test:
-    just check-identify
-    just check-rdf
-    just check-witness-plan
-    just check-witness-attach
-    just check-intent
-    just check-input-context
-    just check-validate
-    just check-evaluate-scripts
-    just hlint
-    just test-playwright
+test: ci
 
 build-smokes:
     nix build .#packages.x86_64-linux.wasm-smoke
@@ -112,32 +101,9 @@ format-check:
 hlint:
     nix develop --quiet -c hlint libs apps nix/wasm
 
-ui-check:
-    nix develop --quiet -c sh -c 'cd docs/inspector && spago build'
-
 build-pages-site:
     nix build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
     rm -rf _site
     nix develop --quiet -c mkdocs build --strict --site-dir _site
     mkdir -p _site/openapi
     cp -rL result-openapi/* _site/openapi/
-
-deploy-preview pr_number="130":
-    nix --quiet build .#packages.x86_64-linux.tx-inspector-ui -o result-inspector
-    nix --quiet build .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
-    rm -rf preview-site
-    nix develop --quiet -c mkdocs build --strict --site-dir preview-site
-    mkdir -p preview-site/inspector
-    cp -RL result-inspector/. preview-site/inspector/
-    test "$(find preview-site/inspector -maxdepth 1 -name 'inspector.*.wasm' | wc -l)" -eq 1
-    test "$(find preview-site/inspector -maxdepth 1 -name 'rdf_shapes_wasm_bg.*.wasm' | wc -l)" -eq 1
-    for wasm in preview-site/inspector/inspector.*.wasm preview-site/inspector/rdf_shapes_wasm_bg.*.wasm; do test -f "$wasm"; test -f "$wasm.gz"; test -f "$wasm.br"; done
-    test -f preview-site/inspector/index.js.gz
-    test -f preview-site/inspector/index.js.br
-    mkdir -p preview-site/openapi
-    cp -L result-openapi/* preview-site/openapi/
-    chmod -R u+w preview-site
-    sudo env INPUT_PATH=preview-site INPUT_OWNER=lambdasistemi INPUT_REPOSITORY=cardano-ledger-inspector INPUT_PR_NUMBER='{{pr_number}}' bash /code/dev-assets/static-preview/scripts/preview.sh
-
-deploy-surge-preview pr_number="130":
-    just deploy-preview '{{pr_number}}'

@@ -14,17 +14,16 @@ The executable is:
 result-wasm/wasm-tx-inspector.wasm
 ```
 
-Build the browser bundle:
+Build the standalone protocol registry consumed by cardano-swiss-knife:
 
 ```bash
-nix build .#packages.x86_64-linux.tx-inspector-ui -o result-site
+nix build .#packages.x86_64-linux.protocol-registry -o result-registry
 ```
 
-The browser bundle is:
+The registry root is:
 
 ```text
-result-site/index.html
-result-site/index.js
+result-registry/registry.json
 ```
 
 Build the native CLI:
@@ -42,7 +41,7 @@ result-cli/bin/tx-deep-diagnosis
 ## Native CLI Tutorial
 
 `tx-deep-diagnosis` links the same `cardano-ledger-inspector` library that
-the browser loads as wasm. It produces a layered diagnosis of a Conway
+the engine compiles to wasm. It produces a layered diagnosis of a Conway
 transaction by combining `tx.intent` and `tx.validate` (both running real
 `cardano-ledger-conway` code) with Blockfrost-resolved producer transactions
 and identity labels from a protocol registry. The default registry —
@@ -193,7 +192,7 @@ Amaru Network Compliance treasury", not just the bare hex.
 
 ```bash
 nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.wasm-tx-inspector
-nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.tx-inspector-ui
+nix build github:lambdasistemi/cardano-ledger-inspector#packages.x86_64-linux.protocol-registry
 ```
 
 ## Download CI Artifacts
@@ -203,7 +202,6 @@ Every `CI` workflow run uploads downloadable artifacts:
 | Artifact | Contents |
 | --- | --- |
 | `wasm-tx-inspector` | `wasm-tx-inspector.wasm`, `SHA256SUMS` |
-| `tx-inspector-ui` | `index.html`, `index.js`, `SHA256SUMS` |
 | `ledger-functional-openapi` | OpenAPI JSON, referenced schemas, `SHA256SUMS` |
 
 Download them from the artifact section of a CI run:
@@ -212,7 +210,12 @@ Download them from the artifact section of a CI run:
 
 ## Published Documentation Site
 
-GitHub Pages publishes this documentation site and mounts the transaction
-inspector at:
+GitHub Pages publishes this engine documentation and Swagger/OpenAPI. The
+former transaction-inspector route redirects to the cardano-swiss-knife
+workbench:
 
 <https://lambdasistemi.github.io/cardano-ledger-inspector/inspector/>
+
+The workbench itself is:
+
+<https://lambdasistemi.github.io/cardano-swiss-knife/>

@@ -12,12 +12,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    working-directory: source
+
 jobs:
   build-gate:
     name: Build Gate
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -27,7 +33,7 @@ jobs:
         run: |
           nix build --quiet \
             .#packages.x86_64-linux.wasm-tx-inspector \
-            .#packages.x86_64-linux.tx-inspector-ui \
+            .#packages.x86_64-linux.protocol-registry \
             .#packages.x86_64-linux.ledger-functional-openapi \
             .#packages.x86_64-linux.wasm-extism-spike \
             .#packages.x86_64-linux.extism-spike-host \
@@ -35,46 +41,42 @@ jobs:
             .#checks.x86_64-linux.ledger-functional-openapi-check \
             .#checks.x86_64-linux.ledger-functional-swagger-check \
             .#checks.x86_64-linux.tx-identify-smoke \
+            .#checks.x86_64-linux.tx-rdf-smoke \
             .#checks.x86_64-linux.tx-witness-plan-smoke \
+            .#checks.x86_64-linux.tx-witness-attach-smoke \
             .#checks.x86_64-linux.tx-intent-smoke \
             .#checks.x86_64-linux.tx-validate-smoke \
             .#checks.x86_64-linux.tx-evaluate-scripts-smoke \
             .#checks.x86_64-linux.tx-input-context-smoke \
             .#checks.x86_64-linux.tx-extism-spike-smoke \
+            .#checks.x86_64-linux.tx-explain-render-smoke \
+            .#checks.x86_64-linux.tx-deep-diagnosis-emit-explain-smoke \
+            .#checks.x86_64-linux.cardano-ledger-wasm-pin-check \
+            .#checks.x86_64-linux.protocol-registry-drift-check \
             -o result-gate
 
       - name: Prepare downloadable artifacts
         run: |
           nix build --quiet .#packages.x86_64-linux.wasm-tx-inspector -o result-wasm
-          nix build --quiet .#packages.x86_64-linux.tx-inspector-ui -o result-site
           nix build --quiet .#packages.x86_64-linux.ledger-functional-openapi -o result-openapi
-          mkdir -p artifacts/wasm-tx-inspector artifacts/tx-inspector-ui artifacts/ledger-functional-openapi
+          mkdir -p artifacts/wasm-tx-inspector artifacts/ledger-functional-openapi
           cp -L result-wasm/wasm-tx-inspector.wasm artifacts/wasm-tx-inspector/
-          cp -RL result-site/. artifacts/tx-inspector-ui/
           cp -L result-openapi/* artifacts/ledger-functional-openapi/
           (cd artifacts/wasm-tx-inspector && sha256sum wasm-tx-inspector.wasm > SHA256SUMS)
-          (cd artifacts/tx-inspector-ui && sha256sum index.html index.js > SHA256SUMS)
           (cd artifacts/ledger-functional-openapi && sha256sum *.json > SHA256SUMS)
           chmod -R u+w artifacts
 
       - uses: actions/upload-artifact@v6
         with:
           name: wasm-tx-inspector
-          path: artifacts/wasm-tx-inspector
-          if-no-files-found: error
-          retention-days: 30
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: tx-inspector-ui
-          path: artifacts/tx-inspector-ui
+          path: source/artifacts/wasm-tx-inspector
           if-no-files-found: error
           retention-days: 30
 
       - uses: actions/upload-artifact@v6
         with:
           name: ledger-functional-openapi
-          path: artifacts/ledger-functional-openapi
+          path: source/artifacts/ledger-functional-openapi
           if-no-files-found: error
           retention-days: 30
 
@@ -84,6 +86,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -96,6 +100,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -108,6 +114,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -120,6 +128,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -132,6 +142,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -144,6 +156,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -156,6 +170,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -168,6 +184,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -180,6 +198,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -192,6 +212,8 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
@@ -204,20 +226,10 @@ jobs:
     runs-on: nixos
     steps:
       - uses: actions/checkout@v6
+        with:
+          path: source
       - uses: cachix/cachix-action@v17
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - run: nix run --quiet .#hlint
-
-  playwright:
-    name: Playwright
-    needs: build-gate
-    runs-on: nixos
-    steps:
-      - uses: actions/checkout@v6
-      - uses: cachix/cachix-action@v17
-        with:
-          name: paolino
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - run: nix run --quiet .#test-playwright

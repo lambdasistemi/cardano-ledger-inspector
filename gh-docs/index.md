@@ -1,31 +1,32 @@
-# Cardano Ledger WASI
+# Cardano Ledger Inspector Engine
 
-Cardano Ledger WASI packages selected Cardano ledger operations as
-`wasm32-wasi` executables and browser artifacts. The project exists so
-tools can call the ledger code directly from WASI rather than reimplementing
-ledger semantics in JavaScript or PureScript.
+This repository packages Conway ledger operations as a `wasm32-wasi`
+reactor, an Extism conformance plugin, an OpenAPI contract, a protocol
+registry, and a native diagnosis CLI. Host tools can call authoritative
+ledger code without reimplementing ledger semantics.
 
 ## Transaction Inspector
 
-The transaction inspector is the first published workbench built on this
-layer. It accepts transaction CBOR, runs the Haskell ledger WASI module in
-the browser, and renders identity, signer intent, witness planning,
-validation diagnostics, and a browsable transaction result.
+The browser transaction inspector moved to cardano-swiss-knife. It consumes
+this repository's `wasm-tx-inspector` and `protocol-registry` flake outputs
+and owns the browser UI and provider integrations.
 
-[Open the inspector](inspector/){ .md-button .md-button--primary }
+[Open the cardano-swiss-knife workbench](https://lambdasistemi.github.io/cardano-swiss-knife/){ .md-button .md-button--primary }
 
 ## Repository Scope
 
 - WASI builds for selected ledger executables.
-- A browser workbench that embeds the WASI artifact.
+- Extism and native host surfaces for conformance and diagnosis.
+- A standalone protocol-registry output for downstream consumers.
 - A functional operation contract with JSON control messages and CBOR data.
-- Nix and CI workflows for reproducible builds, GitHub Pages, and downloadable
-  artifacts.
+- Nix and CI workflows for reproducible engine builds, GitHub Pages,
+  Swagger/OpenAPI, and downloadable artifacts.
 
 ## Important Links
 
 - Repository: [lambdasistemi/cardano-ledger-inspector](https://github.com/lambdasistemi/cardano-ledger-inspector)
-- Inspector page: [GitHub Pages inspector](inspector/)
+- Browser workbench: [cardano-swiss-knife](https://lambdasistemi.github.io/cardano-swiss-knife/)
+- Former inspector route: [redirect to the workbench](inspector/)
 - API definition: [Functional API](api.md)
 - Swagger UI: [OpenAPI reference](swagger.md)
 - CI artifacts: [CI workflow runs](https://github.com/lambdasistemi/cardano-ledger-inspector/actions/workflows/ci.yml)
@@ -34,10 +35,10 @@ validation diagnostics, and a browsable transaction result.
 
 ## Design Commitments
 
-The ledger code is authoritative. UI and host code may choose which operation
+The ledger code is authoritative. Downstream hosts may choose which operation
 to run and how to present the result, but transaction interpretation belongs
 to the Haskell ledger layer.
 
 Transaction CBOR is the durable data plane. JSON is the control and response
 language for operation requests because it is inspectable, easy to version,
-and friendly to browser tooling.
+and friendly to host tooling.
