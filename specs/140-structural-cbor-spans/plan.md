@@ -179,3 +179,11 @@ planner error and stops; no further wiring correction or retry is authorized.
 If GREEN proves every criterion, the gate releases full implementation
 planning. Either outcome is navigator-verified and reported through the parent
 Q/A protocol before any subsequent work.
+
+Final result: the isolated package was untracked, so the Git-backed flake
+source omitted it and the native planner reported that its package location did
+not exist. The navigator verified this as a source-filter mistake rather than
+Haskell, cborg, or component-isolation evidence. Per A-003's unconditional
+retry cap, no correction or rerun is authorized. All probe wiring was reverted,
+the gate remains unproved, and the conditional production plan is cancelled
+for this ticket.

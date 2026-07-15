@@ -2,13 +2,13 @@
 
 Date: 2026-07-15
 
-Current decision: **UNPROVED — neither bounded ad hoc attempt executed the
-probe, so production implementation remains stopped.** The epic owner verified
-that the default dev shell intentionally has no Haskell toolchain and ruled
-that both prior failures answer only whether an ad hoc script can run. Q-002
-therefore authorizes Slice 0N: a real hermetic Nix build/check target. This
-record preserves the earlier evidence but is not the final feasibility
-decision.
+Current decision: **FINAL STOP — exact original-byte structural spans remain
+unproved, so production implementation is not authorized.** None of the
+bounded attempts executed the span assertions. The last component-isolated
+attempt failed before dependency solving because the new package was absent
+from the Git-backed flake source. This is not evidence that Haskell or cborg
+cannot retain offsets; it is the final accepted stop because A-003 explicitly
+capped the gate regardless of outcome.
 
 ## What the spike established
 
@@ -76,9 +76,10 @@ plausibility cannot authorize the production contract.
 ## Stop outcome
 
 No schema, OpenAPI, production Haskell, dependency pin, generated artifact, or
-browser work follows this record unless Slice 0R executes successfully and is
-navigator-verified. The first environmental stop must not be relabelled as an
-architectural proof, and no approximate span map may be substituted.
+browser work follows this record. The failed attempts must not be relabelled as
+an architectural proof that exact offsets are impossible, and no approximate
+span map may be substituted. A future architecture decision would require a
+new ticket and explicit authorization outside this exhausted feasibility gate.
 
 ## Parent decision on Q-001
 
@@ -171,3 +172,44 @@ Cabal package whose solve excludes `wasm-tx-inspector` and `tx-rdf-core`; their
 pins and bounds are immutable. This is the final retry regardless of outcome.
 A failure to reach behavior-specific RED is the accepted final stop. A passing
 GREEN releases full acceptance-criteria implementation planning.
+
+## Slice 0I final result
+
+The final pair removed the inspector-package coupling and authored a separate
+non-shipping package under `tests/structural-cbor-span-feasibility`. Its Cabal
+file depended only on `base`, `base16-bytestring`, `bytestring`,
+`cardano-ledger-wasm`, and `cborg`; the proposed native project-local stanza no
+longer mentioned the inspector package or `tx-rdf-core`. The proposed flake
+check invoked that executable on the committed Conway fixture.
+
+The single authorized command was:
+
+```sh
+nix build --print-build-logs \
+  .#checks.x86_64-linux.structural-cbor-span-feasibility
+```
+
+It exited `1` during native project planning:
+
+```text
+The package location 'tests/structural-cbor-span-feasibility' does not exist.
+```
+
+The new package directory was untracked when the command ran. Because local
+Git-backed flake sources omit untracked files, Nix did not include the package
+in `src`; Cabal therefore never evaluated the isolated package, compiled its
+scaffold, or executed its behavior-specific missing-span assertion.
+
+The navigator independently verified this cause and rejected describing it as
+a Haskell/library failure or a component-isolation result. That correction is
+part of the final record: exact-offset feasibility remains **unproved**, not
+disproved. A-003 nevertheless made this the last authorized retry regardless
+of outcome and required a final stop when behavior-specific RED was not
+reached. The driver reverted all uncommitted probe wiring; no test component,
+production code, pin, bound, fixture, generated artifact, or browser change is
+retained.
+
+Final pass-criteria status is unchanged: the pinned source exposes promising
+direct-offset primitives, but no executed interval, containment, exact-slice,
+repeated-path, or malformed-zero-span evidence exists. Production work on
+issue #140 stops here.
