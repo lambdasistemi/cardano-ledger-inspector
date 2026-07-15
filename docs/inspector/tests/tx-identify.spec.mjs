@@ -1567,23 +1567,17 @@ async function expectResultTabBarRightEdgeFlush(page, label) {
 
 async function configureChainData(page, options = {}) {
   const {
-    provider = "Blockfrost",
     network = "mainnet",
     blockfrostKey = "mainnet-test-project",
-    koiosBearer = "koios-test-token",
     persist = false,
   } = options;
 
   await page.goto("/settings");
-  await page.getByRole("radio", { name: provider }).check();
+  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeChecked();
   await page.getByRole("radio", { name: network }).check();
-  if (provider === "Blockfrost") {
-    await page
-      .getByPlaceholder("mainnet... / preprod... / preview...")
-      .fill(blockfrostKey);
-  } else {
-    await page.getByPlaceholder("eyJhbGciOi...").fill(koiosBearer);
-  }
+  await page
+    .getByPlaceholder("mainnet... / preprod... / preview...")
+    .fill(blockfrostKey);
   if (persist) {
     await page.getByRole("switch", { name: "Persist API credentials" }).check();
   }
@@ -2079,8 +2073,13 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.locator(".provider-panel")).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Koios" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /Koios/ })).toBeDisabled();
+  await expect(page.locator(".provider-panel")).toContainText(
+    /Koios.*unsupported in browsers.*omits.*CORS response headers/i,
+  );
+  await expect(page.getByPlaceholder("eyJhbGciOi...")).toHaveCount(0);
+  await expect(page.getByText(/Koios bearer token/i)).toHaveCount(0);
   await expect(page.getByRole("switch", { name: "Persist API credentials" })).toBeVisible();
   await expect(page.getByText("cleartext", { exact: false })).toBeVisible();
 
@@ -2267,57 +2266,92 @@ test("bundled examples stay provider-silent without external context", async ({
   expect(providerRequests, "bundled example provider request ledger").toEqual([]);
 });
 
-for (const provider of ["Blockfrost", "Koios"]) {
-  for (const action of ["hash fetch", "external context"]) {
-    test(`provider readiness blocks missing ${provider} credential for ${action}`, async ({
-      page,
-    }) => {
-      const txCbor = (await readFile(fixturePath, "utf8")).trim();
-      const providerRequests = await installProviderRequestRecorder(page);
+test("browser provider settings expose Blockfrost and disable Koios with the CORS reason", async ({
+  page,
+}) => {
+  await page.goto("/settings");
 
-      await configureChainData(page, {
-        provider,
-        blockfrostKey: "",
-        koiosBearer: "",
-      });
-      await openInspectViaShell(page);
+  const providerPanel = page.locator(".provider-panel");
+  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /Koios/ })).toBeDisabled();
+  await expect(providerPanel).toContainText(
+    /Koios.*unsupported in browsers.*omits.*CORS response headers/i,
+  );
+  await expect(page.getByPlaceholder("eyJhbGciOi...")).toHaveCount(0);
+  await expect(page.getByText(/Koios bearer token/i)).toHaveCount(0);
+});
 
-      if (action === "hash fetch") {
-        await page.getByRole("tab", { name: "Fetch by hash" }).click();
-        await page
-          .getByPlaceholder("Transaction hash (64 hex chars)")
-          .fill("0".repeat(64));
-      } else {
-        await enableExternalContext(page);
-        await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
-      }
+test("legacy Koios browser provider state fails safe to visible Blockfrost readiness", async ({
+  page,
+}) => {
+  const providerRequests = await installProviderRequestRecorder(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("provider", "Koios");
+    localStorage.setItem("persist_api_keys", "true");
+    localStorage.setItem("blockfrost_project_id", "");
+    localStorage.setItem("koios_bearer_token", "legacy-koios-token");
+  });
 
-      await page.getByRole("button", { name: "Decode" }).click();
-      await page.waitForFunction(() =>
-        !Array.from(document.querySelectorAll('[role="button"]')).some((button) =>
-          /^(Fetching|Decoding)\.\.\.$/.test(button.textContent?.trim() || ""),
-        ),
-      );
+  await page.goto("/inspect");
+  await page.getByRole("tab", { name: "Fetch by hash" }).click();
+  const settingsSummary = page.locator(".settings-summary");
+  const settingsText = await settingsSummary.innerText();
+  expect.soft(settingsText).toContain("Blockfrost");
+  expect.soft(settingsText).not.toContain("Koios");
+  expect.soft(await page.evaluate(() => localStorage.getItem("provider"))).toBe(
+    "Blockfrost",
+  );
 
-      const inlineAlert = page.locator(".decode-form").getByRole("alert");
-      expect(
-        providerRequests,
-        `${provider} ${action} missing-credential request ledger`,
-      ).toEqual([]);
-      await expect(inlineAlert).toBeVisible({ timeout: 5_000 });
-      await expect(inlineAlert).toContainText(provider);
-      await expect(inlineAlert).toContainText(/credential|required|not ready/i);
-      if (provider === "Koios") {
-        await expect(inlineAlert).toContainText(
-          /deployed browser flow is CORS-blocked/i,
-        );
-        await expect(inlineAlert).toContainText(
-          /token does not (?:remove|fix) (?:this|the) restriction/i,
-        );
-      }
-      await expect(inlineAlert.getByRole("link", { name: "Settings" })).toBeVisible();
+  await page
+    .getByPlaceholder("Transaction hash (64 hex chars)")
+    .fill("0".repeat(64));
+  await page.getByRole("button", { name: "Decode" }).click();
+
+  const inlineAlert = page.locator(".decode-form").getByRole("alert");
+  await expect.soft(inlineAlert).toBeVisible({ timeout: 5_000 });
+  await expect.soft(inlineAlert).toContainText(/Blockfrost.*credential|required|not ready/i);
+  expect.soft(providerRequests, "legacy Koios state provider request ledger").toEqual([]);
+});
+
+for (const action of ["hash fetch", "external context"]) {
+  test(`browser provider readiness blocks missing Blockfrost credential for ${action}`, async ({
+    page,
+  }) => {
+    const txCbor = (await readFile(fixturePath, "utf8")).trim();
+    const providerRequests = await installProviderRequestRecorder(page);
+
+    await configureChainData(page, {
+      blockfrostKey: "",
     });
-  }
+    await openInspectViaShell(page);
+
+    if (action === "hash fetch") {
+      await page.getByRole("tab", { name: "Fetch by hash" }).click();
+      await page
+        .getByPlaceholder("Transaction hash (64 hex chars)")
+        .fill("0".repeat(64));
+    } else {
+      await enableExternalContext(page);
+      await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
+    }
+
+    await page.getByRole("button", { name: "Decode" }).click();
+    await page.waitForFunction(() =>
+      !Array.from(document.querySelectorAll('[role="button"]')).some((button) =>
+        /^(Fetching|Decoding)\.\.\.$/.test(button.textContent?.trim() || ""),
+      ),
+    );
+
+    const inlineAlert = page.locator(".decode-form").getByRole("alert");
+    expect(
+      providerRequests,
+      `Blockfrost ${action} missing-credential request ledger`,
+    ).toEqual([]);
+    await expect(inlineAlert).toBeVisible({ timeout: 5_000 });
+    await expect(inlineAlert).toContainText("Blockfrost");
+    await expect(inlineAlert).toContainText(/credential|required|not ready/i);
+    await expect(inlineAlert.getByRole("link", { name: "Settings" })).toBeVisible();
+  });
 }
 
 test("provider readiness contract removes Blockfrost-to-Koios fallback", async () => {
@@ -2329,67 +2363,86 @@ test("provider readiness contract removes Blockfrost-to-Koios fallback", async (
   expect(providerSource).not.toMatch(
     /Blockfrost\s*->\s*\n\s*if key == "" then Koios\.fetchValidationContextEffect/,
   );
+  expect(providerSource).toMatch(/Koios\s*->\s*Koios\.fetchTxCborEffect/);
+  expect(providerSource).toMatch(/Koios\s*->\s*Koios\.fetchValidationContextEffect/);
 });
 
-test("exact provider dispatch calls only the selected provider and labels its context", async ({
-  page,
-}) => {
-  const txCbor = (await readFile(fixturePath, "utf8")).trim();
-  const validationContext = await loadValidationContext();
-  const providerRequests = await installProviderBoundary(page, (route) =>
-    fulfillSuccessfulProviderRequest(route, txCbor, validationContext),
+test("Koios adapter CORS contract explains the provider-side browser incompatibility", async () => {
+  const providerSource = await readFile(
+    path.join(repoRoot, "docs/inspector/src/Provider.js"),
+    "utf8",
+  );
+  const providerModule = await import(
+    `data:text/javascript;base64,${Buffer.from(providerSource).toString("base64")}`,
+  );
+  const guidance = providerModule.providerFailureGuidanceImpl("Koios")(
+    "provider-boundary|Koios|cors||fetch failed",
   );
 
-  for (const provider of ["Blockfrost", "Koios"]) {
-    const start = providerRequests.length;
-    const credential =
-      provider === "Blockfrost"
-        ? { blockfrostKey: "mainnet-explicit-project" }
-        : { koiosBearer: "koios-explicit-token" };
+  expect(guidance).toMatch(
+    /unsupported in browsers.*Koios omits required CORS response headers/i,
+  );
+  expect(guidance).not.toMatch(/token|credential/i);
+});
 
-    await configureChainData(page, { provider, network: "mainnet", ...credential });
+for (const action of ["hash fetch", "external context"]) {
+  test(`explicit Blockfrost browser provider ${action} calls only Blockfrost`, async ({
+    page,
+  }) => {
+    const txCbor = (await readFile(fixturePath, "utf8")).trim();
+    const validationContext = await loadValidationContext();
+    const providerRequests = await installProviderBoundary(page, (route) =>
+      fulfillSuccessfulProviderRequest(route, txCbor, validationContext),
+    );
+    const start = providerRequests.length;
+
+    await configureChainData(page, {
+      network: "mainnet",
+      blockfrostKey: "mainnet-explicit-project",
+    });
     await openInspectViaShell(page);
-    await page.getByRole("tab", { name: "Fetch by hash" }).click();
-    await enableExternalContext(page);
+    if (action === "hash fetch") {
+      await page.getByRole("tab", { name: "Fetch by hash" }).click();
+      await page
+        .getByPlaceholder("Transaction hash (64 hex chars)")
+        .fill("0".repeat(64));
+    } else {
+      await enableExternalContext(page);
+      await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
+    }
     const onlineTrustCopy = page.locator(".input-panel-title p");
     await expect(onlineTrustCopy).toContainText(
-      new RegExp(`${provider}.*contacted.*ledger decode.*local`, "i"),
+      /Blockfrost.*contacted.*ledger decode.*local/i,
     );
     await expect(onlineTrustCopy).not.toContainText(/nothing is sent/i);
-    await page
-      .getByPlaceholder("Transaction hash (64 hex chars)")
-      .fill("0".repeat(64));
     await page.getByRole("button", { name: "Decode" }).click();
 
     const loadedHeader = page.locator(".loaded-inspector-header");
     await expect(loadedHeader).toBeVisible();
-    await expect(loadedHeader).toContainText(provider);
+    await expect(loadedHeader).toContainText("Blockfrost");
 
     const dispatched = providerRequests.slice(start);
-    expect(dispatched.length, `${provider} request ledger should be non-empty`).toBeGreaterThan(0);
+    expect(dispatched.length, "Blockfrost request ledger should be non-empty").toBeGreaterThan(0);
     expect(
       [...new Set(dispatched.map((request) => request.provider))],
-      `${provider} exact-dispatch request ledger`,
-    ).toEqual([provider]);
-    if (provider === "Blockfrost") {
-      expect(dispatched.every((request) => request.headers.project_id === "mainnet-explicit-project"))
+      `Blockfrost ${action} exact-dispatch request ledger`,
+    ).toEqual(["Blockfrost"]);
+    expect(dispatched.every((request) => request.headers.project_id === "mainnet-explicit-project"))
+      .toBe(true);
+    if (action === "hash fetch") {
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched.some((request) => /\/txs\/[0-9a-f]+\/cbor$/.test(request.url)))
         .toBe(true);
+    } else {
       expect(dispatched.some((request) => request.url.endsWith("/blocks/latest"))).toBe(true);
       expect(
         dispatched.some((request) => request.url.endsWith("/epochs/latest/parameters")),
       ).toBe(true);
       expect(dispatched.some((request) => /\/txs\/[0-9a-f]+\/cbor$/.test(request.url)))
         .toBe(true);
-    } else {
-      expect(dispatched.every((request) => request.headers.authorization === "Bearer koios-explicit-token"))
-        .toBe(true);
-      expect(dispatched.some((request) => request.url.endsWith("/tip"))).toBe(true);
-      expect(dispatched.some((request) => request.url.endsWith("/cli_protocol_params")))
-        .toBe(true);
-      expect(dispatched.some((request) => request.url.endsWith("/tx_cbor"))).toBe(true);
     }
-  }
-});
+  });
+}
 
 const providerFailureCases = [
   {
@@ -2424,14 +2477,6 @@ const providerFailureCases = [
     guidance: /network request failed.*connectivity.*retry/i,
   },
   {
-    category: "CORS",
-    provider: "Koios",
-    abort: "accessdenied",
-    transportProbe: "succeeds",
-    guidance:
-      /Koios.*deployed browser flow is CORS-blocked.*token does not (?:remove|fix) (?:this|the) restriction/i,
-  },
-  {
     category: "Blockfrost CORS",
     provider: "Blockfrost",
     abort: "accessdenied",
@@ -2460,15 +2505,9 @@ for (const failure of providerFailureCases) {
         await route.fulfill(failure.response);
       }
     });
-    const credential =
-      failure.provider === "Blockfrost"
-        ? { blockfrostKey: "mainnet-failure-project" }
-        : { koiosBearer: "koios-failure-token" };
-
     await configureChainData(page, {
-      provider: failure.provider,
       network: "mainnet",
-      ...credential,
+      blockfrostKey: "mainnet-failure-project",
     });
     await openInspectViaShell(page);
     await page.getByRole("tab", { name: "Fetch by hash" }).click();
@@ -2742,65 +2781,23 @@ test("inspect lays out input, support panels, and decoded result", async ({
   await expect(decodedPanel(resultPanel)).toBeVisible();
 });
 
-test("settings changes provider state used by inspect hash decode", async ({ page }) => {
+test("settings changes Blockfrost network used by inspect hash decode", async ({ page }) => {
   const txCbor = (await readFile(fixturePath, "utf8")).trim();
   const validationContext = await loadValidationContext();
-  const requestedHashes = [];
-  let tipRequests = 0;
-  let protocolParameterRequests = 0;
-
   await installClipboardMock(page);
-  await page.route("https://preview.koios.rest/api/v1/tx_cbor", async (route) => {
-    const requestBody = route.request().postDataJSON();
-    requestedHashes.push(...requestBody._tx_hashes);
-    expect(route.request().headers().authorization).toBe("Bearer koios-settings-token");
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(
-        requestBody._tx_hashes.map((txHash) => ({
-          cbor: producerCbor(validationContext, txHash, txCbor),
-        })),
-      ),
-    });
-  });
-  await page.route("https://preview.koios.rest/api/v1/tip", async (route) => {
-    tipRequests += 1;
-    expect(route.request().headers().authorization).toBe("Bearer koios-settings-token");
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([
-        {
-          abs_slot: Number(validationContext.slot),
-          epoch_no: Number(validationContext.epoch),
-        },
-      ]),
-    });
-  });
-  await page.route(
-    "https://preview.koios.rest/api/v1/cli_protocol_params",
-    async (route) => {
-      protocolParameterRequests += 1;
-      expect(route.request().headers().authorization).toBe("Bearer koios-settings-token");
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(validationContext.protocol_parameters),
-      });
-    },
+  const providerRequests = await installProviderBoundary(page, (route) =>
+    fulfillSuccessfulProviderRequest(route, txCbor, validationContext),
   );
 
   await configureChainData(page, {
-    provider: "Koios",
     network: "preview",
-    koiosBearer: "koios-settings-token",
+    blockfrostKey: "preview-settings-project",
   });
 
   await openInspectViaShell(page);
   await page.getByRole("tab", { name: "Fetch by hash" }).click();
   await enableExternalContext(page);
-  await expect(page.locator(".settings-summary")).toContainText("Koios");
+  await expect(page.locator(".settings-summary")).toContainText("Blockfrost");
   await expect(page.locator(".settings-summary")).toContainText("preview");
   await page
     .getByPlaceholder("Transaction hash (64 hex chars)")
@@ -2810,9 +2807,17 @@ test("settings changes provider state used by inspect hash decode", async ({ pag
   await expect(
     page.getByRole("heading", { name: "Identity metadata" }),
   ).toBeVisible();
-  expect(requestedHashes).toContain("0".repeat(64));
-  expect(tipRequests).toBe(1);
-  expect(protocolParameterRequests).toBe(1);
+  expect(providerRequests.length).toBeGreaterThan(0);
+  expect([...new Set(providerRequests.map((request) => request.provider))]).toEqual([
+    "Blockfrost",
+  ]);
+  expect(
+    providerRequests.every(
+      (request) =>
+        request.url.startsWith("https://cardano-preview.blockfrost.io/") &&
+        request.headers.project_id === "preview-settings-project",
+    ),
+  ).toBe(true);
 });
 
 test("decodes a Conway transaction and exposes compact identity values", async ({
@@ -4195,11 +4200,11 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
   await installClipboardMock(page);
   const providerRequests = await installProviderBoundary(page, async (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname.endsWith("/tx_cbor")) {
+    if (/\/txs\/[0-9a-f]+\/cbor$/.test(url.pathname)) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "[]",
+        body: "not-json",
       });
       return;
     }
@@ -4207,9 +4212,8 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
   });
 
   await configureChainData(page, {
-    provider: "Koios",
     network: "mainnet",
-    koiosBearer: "koios-validation-diagnostics-token",
+    blockfrostKey: "mainnet-validation-diagnostics-project",
   });
   await openInspectViaShell(page);
   await enableExternalContext(page);
@@ -4246,7 +4250,9 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
   await expect(
     missingContextSection.locator(".validation-check-row").filter({ hasText: "protocol parameters" }),
   ).toHaveCount(0);
-  await expect(validationPanel.getByText("koios.tip+cli_protocol_params")).toBeVisible();
+  await expect(
+    validationPanel.getByText("blockfrost.blocks.latest+epochs.latest.parameters"),
+  ).toBeVisible();
   await expect(
     validationPanel
       .locator(".validation-section", { hasText: "Checks" })
@@ -4264,12 +4270,12 @@ test("surfaces ledger validation diagnostics", async ({ page }) => {
   expect(copied).toMatch(/^[0-9a-f]{64}$/);
   expect(providerRequests.length).toBeGreaterThan(0);
   expect([...new Set(providerRequests.map((request) => request.provider))]).toEqual([
-    "Koios",
+    "Blockfrost",
   ]);
   expect(
     providerRequests.every(
       (request) =>
-        request.headers.authorization === "Bearer koios-validation-diagnostics-token",
+        request.headers.project_id === "mainnet-validation-diagnostics-project",
     ),
   ).toBe(true);
 });
@@ -4526,87 +4532,15 @@ test("surfaces hard provider context resolution failures", async ({
   await expect(providerResolution).toContainText(/provider context|Unexpected token|JSON/);
 });
 
-test("uses the same tx CBOR provider boundary for Koios", async ({ page }) => {
-  const txCbor = (await readFile(fixturePath, "utf8")).trim();
-  const validationContext = await loadValidationContext();
-  let koiosCborRequests = 0;
-  let koiosTipRequests = 0;
-  let koiosPParamRequests = 0;
-
-  await installClipboardMock(page);
-  await page.route("https://api.koios.rest/api/v1/tx_cbor", async (route) => {
-    koiosCborRequests += 1;
-    const requestBody = route.request().postDataJSON();
-    expect(requestBody._tx_hashes).toHaveLength(1);
-    const txHash = requestBody._tx_hashes[0];
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{ cbor: producerCbor(validationContext, txHash, txCbor) }]),
-    });
-  });
-  await page.route("https://api.koios.rest/api/v1/tip", async (route) => {
-    koiosTipRequests += 1;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([
-        {
-          abs_slot: Number(validationContext.slot),
-          epoch_no: Number(validationContext.epoch),
-        },
-      ]),
-    });
-  });
-  await page.route("https://api.koios.rest/api/v1/cli_protocol_params", async (route) => {
-    koiosPParamRequests += 1;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(validationContext.protocol_parameters),
-    });
-  });
-
-  await configureChainData(page, {
-    provider: "Koios",
-    network: "mainnet",
-    koiosBearer: "koios-test-token",
-  });
-  await openInspectViaShell(page);
-  await enableExternalContext(page);
-  await page.getByRole("tab", { name: "Paste CBOR" }).click();
-  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
-  await page.getByRole("button", { name: "Decode" }).click();
-
-  await selectResultTab(page, "Witness");
-  await expect(
-    page.getByText("Producer transaction CBOR resolved every visible transaction input"),
-  ).toBeVisible();
-  await selectResultTab(page, "Validation");
-  await expect(
-    page
-      .locator(".validation-panel .validation-section", { hasText: "Validation summary" })
-      .locator(".validation-check-row", { hasText: "Resolved inputs" }),
-  ).toBeVisible();
-  await expect(
-    page
-      .locator(".validation-panel .validation-check-row", { hasText: "Status" })
-      .locator(".validation-status-badge", { hasText: "valid" }),
-  ).toBeVisible();
-  expect(koiosCborRequests).toBeGreaterThan(0);
-  expect(koiosTipRequests).toBe(1);
-  expect(koiosPParamRequests).toBe(1);
-});
-
-test("routes Blockfrost-shaped keys away from Koios auth", async ({ page }) => {
-  await page.goto("/settings");
-  await page.getByRole("radio", { name: "Koios" }).check();
-  await page.getByPlaceholder("eyJhbGciOi...").fill("mainnet-test-project");
-
-  await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeChecked();
-  await expect(page.getByPlaceholder("mainnet... / preprod... / preview...")).toHaveValue(
-    "mainnet-test-project",
+test("Koios provider adapters remain available only as a non-browser contract", async () => {
+  const providerSource = await readFile(
+    path.join(repoRoot, "docs/inspector/src/Provider.purs"),
+    "utf8",
   );
+
+  expect(providerSource).toContain("Koios.fetchTxCborEffect");
+  expect(providerSource).toContain("Koios.fetchValidationContextEffect");
+  expect(providerSource).toContain('Koios      -> "koios.tx_cbor"');
 });
 
 test("opens browser rows in place without losing identity context", async ({
