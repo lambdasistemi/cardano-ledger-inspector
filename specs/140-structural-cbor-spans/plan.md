@@ -92,3 +92,49 @@ entry point. The original pass criteria remain unchanged.
 
 No production, schema, OpenAPI, dependency-pin, generated-artifact, gate, or
 browser edit is authorized in Slice 0R.
+
+## Slice 0N: Hermetic Nix feasibility check
+
+Time box: three hours, including normal Nix evaluation and compilation time.
+
+The pair will add one tracked, non-shipping Haskell test executable which uses
+the pinned native package plan and the existing committed Conway fixture. The
+native haskell.nix project will expose that executable component, and a new
+flake `runCommand` check will invoke it. `nix build` must execute the assertion;
+merely packaging a script or compiling an executable is not a pass.
+
+Owned files:
+
+- `libs/cardano-ledger-inspector/test/StructuralCborSpanFeasibility.hs`
+- `libs/cardano-ledger-inspector/cardano-ledger-inspector.cabal`
+- `nix/host/tx-deep-diagnosis-native/default.nix`
+- `nix/host/default.nix`
+- `flake.nix`
+
+RED adds the component/check wiring and a focused failing assertion, then runs:
+
+```sh
+nix build --print-build-logs \
+  .#checks.x86_64-linux.structural-cbor-span-feasibility
+```
+
+The observed failure must come from the test assertion, not evaluation,
+dependency resolution, a missing fixture, or an unexecuted wrapper. GREEN
+implements only the minimal Conway-specific ledger-first scanner necessary to
+flip that assertion and prove:
+
+- offsets come from `decodeWithByteSpan` / `peekByteOffset` while consuming the
+  original decoded bytes;
+- root, body, witness set, and at least two indexed nested/repeated paths have
+  distinct, non-empty, in-bounds intervals;
+- child containment and exact original-slice equality hold;
+- malformed input uses the existing `MalformedCbor` path and produces no
+  spans;
+- no reserialization, byte search, guessed offset, JavaScript, or general CBOR
+  architecture is introduced.
+
+After GREEN the pair runs the focused check again, `just format-check`,
+`just hlint`, and inherited `./gate.sh` without modifying it. A navigator-
+verified single commit closes the slice. Production/schema/OpenAPI/browser
+work remains forbidden until the ticket owner records the successful gate and
+amends the remaining implementation plan.
