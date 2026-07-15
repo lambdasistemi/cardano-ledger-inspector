@@ -51,18 +51,18 @@ contains successful `04-resolution` entries for all three viewports; each
 image visibly contains the resolved required-signer label and the judge/report
 pipeline emits parsed resolution scores for those entries.
 
-- [ ] T007-S2 [US1] Run the existing UX capture against the PR preview and
+- [X] T007-S2 [US1] Run the existing UX capture against the PR preview and
   record RED because no `04-resolution` scenario exists; add the scenario to
   `tools/ux-judge/capture.mjs`, reusing the exact “Amaru owner-key resolution”
   example and waiting for “Amaru Network Compliance owner key” on a resolved
   required-signer Structure row before each screenshot.
-- [ ] T008-S2 [US1] Keep the three existing capture journeys green, run the
+- [X] T008-S2 [US1] Keep the three existing capture journeys green, run the
   capture/judge/report pipeline at all configured viewports, verify every
   capture succeeds, verify each resolution judgment parses with a non-null
   resolution score, and verify the aggregate report lists all three resolution
   screenshots. Remove generated untracked history after preserving evidence;
   do not commit `out/` or generated report/history files.
-- [ ] T009-S2 [US1] Commit one bisect-safe change as
+- [X] T009-S2 [US1] Commit one bisect-safe change as
   `test(ux): capture credential resolution scenario` with
   `Tasks: T007, T008, T009`, then stop without pushing.
 
