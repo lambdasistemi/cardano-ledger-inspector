@@ -120,6 +120,7 @@ type State =
   , blockfrostKey :: String
   , koiosBearer :: String
   , persistKeys :: Boolean
+  , externalContext :: Boolean
   , mode :: Mode
   , network :: Network
   , txHash :: String
@@ -227,6 +228,7 @@ data Action
   | SetKoiosBearer String
   | SelectProvider Provider
   | TogglePersist Boolean
+  | ToggleExternalContext Boolean
   | SelectMode Mode
   | SelectNetwork Network
   | SetTxHash String
@@ -283,7 +285,8 @@ inspectorComponent initial =
         , blockfrostKey: initial.bf
         , koiosBearer: initial.koios
         , persistKeys: initial.persistKeys
-        , mode: ByHash
+        , externalContext: false
+        , mode: ByHex
         , network: initial.network
         , txHash: ""
         , txHex: ""
@@ -723,7 +726,14 @@ inspectorComponent initial =
                   [ HH.h2
                       [ classNames [ "li-panel-title" ] ]
                       [ HH.text "Decode config" ]
-                  , HH.p_ [ HH.text "Provider context used when a hash lookup needs chain data." ]
+                  , HH.p_
+                      [ HH.text
+                          ( if state.externalContext then
+                              "External chain context is enabled for local inspection."
+                            else
+                              "Offline decode uses no external chain-data provider."
+                          )
+                      ]
                   ]
               ]
           , HH.a
@@ -735,7 +745,7 @@ inspectorComponent initial =
           ]
       , HH.div
           [ classNames [ "decode-config-body" ] ]
-          [ renderConfigRow "hub" "Provider" (Provider.providerName state.provider)
+          [ renderConfigRow "hub" "Context" (contextSourceLabel state)
           , renderConfigRow "public" "Network" (networkName state.network)
           , renderConfigRow
               "vpn_key"
@@ -746,7 +756,39 @@ inspectorComponent initial =
                   "Session only"
               )
           ]
+      , renderExternalContextToggle state
       ]
+
+  renderExternalContextToggle state =
+    HH.div
+      [ classNames [ "external-context-toggle" ] ]
+      [ HH.label
+          [ classNames [ "switch-row" ] ]
+          [ HH.input
+              [ HP.type_ HP.InputCheckbox
+              , HH.attr (HH.AttrName "role") "switch"
+              , HP.checked state.externalContext
+              , HE.onChecked ToggleExternalContext
+              ]
+          , HH.element (HH.ElemName "md-switch")
+              [ classNames [ "external-context-md-switch" ]
+              , HH.attr (HH.AttrName "aria-hidden") "true"
+              , HH.attr (HH.AttrName "tabindex") "-1"
+              ]
+              []
+          , HH.span_ [ HH.text "Use external provider context" ]
+          ]
+      , HH.p_
+          [ HH.text
+              "Off by default for this browser session. Enable only when producer transactions and ledger context should be fetched."
+          ]
+      ]
+
+  contextSourceLabel state =
+    if state.mode == ByHash || state.externalContext then
+      Provider.providerName state.provider
+    else
+      "Offline/no external provider"
 
   renderConfigRow icon label value =
     HH.div
@@ -804,7 +846,7 @@ inspectorComponent initial =
         [ HH.div
             [ classNames [ "loaded-inspector-context" ] ]
             ( [ renderContextItem "Source" [] [ HH.strong_ [ HH.text (modeLabel state.mode) ] ]
-              , renderContextItem "Provider" [] [ HH.strong_ [ HH.text (Provider.providerName state.provider) ] ]
+              , renderContextItem "Context" [] [ HH.strong_ [ HH.text (contextSourceLabel state) ] ]
               , renderContextItem "Network" [] [ HH.strong_ [ HH.text (networkName state.network) ] ]
               , renderContextItem "Tx id/hash"
                   [ "loaded-context-hash" ]
@@ -1950,7 +1992,14 @@ inspectorComponent initial =
       [ classNames [ "examples-picker" ] ]
       [ HH.div
           [ classNames [ "examples-heading" ] ]
-          [ HH.h3_ [ HH.text "Examples" ] ]
+          [ HH.div_
+              [ HH.h3_ [ HH.text "Examples" ]
+              , HH.p_
+                  [ HH.text
+                      "Offline examples prove structural conformance; ledger validation can be incomplete without external context."
+                  ]
+              ]
+          ]
       , HH.div
           [ classNames [ "example-chips" ] ]
           (map renderExampleChip Examples.examples)
@@ -3723,6 +3772,8 @@ inspectorComponent initial =
           else do
             Storage.setItem blockfrostKey ""
             Storage.setItem koiosKey ""
+    ToggleExternalContext on ->
+      H.modify_ _ { externalContext = on, fetchError = Nothing, copiedPath = Nothing }
     SelectMode m -> H.modify_ _ { mode = m, fetchError = Nothing, copiedPath = Nothing }
     SelectNetwork n -> do
       H.modify_ _ { network = n, fetchError = Nothing, copiedPath = Nothing }
@@ -4055,7 +4106,7 @@ inspectorComponent initial =
               operationResult.exitOk
                 && (not (Provider.needsKey st.provider) || providerKeyValue /= "")
           inputContextArgs <-
-            if operationResult.exitOk then do
+            if operationResult.exitOk && st.externalContext then do
               ctx <- H.liftAff
                 (attempt (Provider.resolveProducerTxContext st.provider st.network providerKeyValue canFetchProducerTxs operationResult.stdout))
               case ctx of
