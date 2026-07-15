@@ -6,15 +6,15 @@ protocol.
 
 ## Slice 0 — time-boxed feasibility gate
 
-- [ ] T140-S0A Confirm the existing pinned Conway decoder accepts the selected
+- [X] T140-S0A Confirm the existing pinned Conway decoder accepts the selected
   committed fixture and identify the exact original-byte decoder/cursor API
   available in the pinned native and WASM closure.
-- [ ] T140-S0B Produce a bounded Haskell probe demonstrating, or disproving,
+- [X] T140-S0B Produce a bounded Haskell probe demonstrating, or disproving,
   direct original-byte intervals for root, body, witness set, and distinct
   repeated/nested structural paths without reserialization or byte searching.
-- [ ] T140-S0C Record bounds, containment, exact-slice, malformed-input, and
+- [X] T140-S0C Record bounds, containment, exact-slice, malformed-input, and
   WASM-availability evidence under the driver runtime root.
-- [ ] T140-S0D Obtain navigator verification of the probe and evidence, then
+- [X] T140-S0D Obtain navigator verification of the probe and evidence, then
   publish the feasibility outcome through `Q-001-feasibility-outcome` before
   scheduling any implementation slice.
 
