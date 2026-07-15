@@ -36,3 +36,17 @@ passing feasibility result.
   dev-shell error if it still cannot run.
 - [X] T140-S0R-D Obtain navigator verification and publish the executed rerun
   outcome before scheduling production work.
+
+## Slice 0N — hermetic Nix feasibility check
+
+- [ ] T140-S0N-A Add a non-shipping Haskell test executable and expose it from
+  the existing native haskell.nix project.
+- [ ] T140-S0N-B Wire a real flake `runCommand` check which invokes the test on
+  the committed Conway fixture, then observe RED from the focused assertion.
+- [ ] T140-S0N-C Implement the minimal ledger-first, Conway-specific scanner
+  using direct cborg byte offsets and observe the hermetic check GREEN for
+  bounds, containment, exact original slices, repeated paths, and malformed
+  zero-span behavior.
+- [ ] T140-S0N-D Run format, lint, and inherited gates; obtain navigator
+  verification of the single feasibility commit and publish the final gate
+  outcome before any production slice.

@@ -2,14 +2,13 @@
 
 Date: 2026-07-15
 
-Final gate decision: **FAIL — neither bounded attempt executed the probe, so
-exact original-byte offsets remain unproved and implementation is stopped.**
-The epic owner rejected the first environmental result as conclusive and
-authorized Slice 0R: one fresh 90-minute rerun of the same probe through the
-literal repository-standard `nix develop --quiet -c <command>` entry point.
-That corrected rerun also stopped before compilation with the specific error
-authorized as the final stop condition. This is a feasibility-gate failure,
-not proof that the source-level architecture is impossible.
+Current decision: **UNPROVED — neither bounded ad hoc attempt executed the
+probe, so production implementation remains stopped.** The epic owner verified
+that the default dev shell intentionally has no Haskell toolchain and ruled
+that both prior failures answer only whether an ad hoc script can run. Q-002
+therefore authorizes Slice 0N: a real hermetic Nix build/check target. This
+record preserves the earlier evidence but is not the final feasibility
+decision.
 
 ## What the spike established
 
@@ -134,3 +133,18 @@ bounds, containment, exact original slicing, distinct repeated paths, and the
 malformed zero-span outcome remain unproved. Per Q-001's conditional answer,
 this specific proper-shell failure justifies the option-1 stop and is returned
 to the epic owner through Q-002 before finalization.
+
+## Parent decision on Q-002
+
+The epic owner independently verified that `devShells.default` intentionally
+contains no Cabal, GHC, or pkg-config toolchain and that this repository builds
+Haskell only through hermetic package/check derivations. The exit-127 result is
+real and reproducible, but it is not evidence against cborg's offset
+capability.
+
+One three-hour feasibility slice is authorized to add a small tracked Haskell
+test executable and a real `checks.x86_64-linux` derivation which invokes it
+against an existing fixture. A passing executed check proves feasibility and
+releases full implementation planning. A compiler/runtime/assertion failure
+caused by Haskell or the pinned library, rather than another tooling gap, is the
+first acceptable feasibility stop.
