@@ -39,6 +39,11 @@ passing feasibility result.
 
 ## Slice 0N — hermetic Nix feasibility check
 
+Outcome: stopped before a behavior-specific RED because the native solve
+coupled the inspector package's shipping executable and pinned `tx-rdf-core`
+into the GHC 9.8.4 plan. These tasks remain incomplete and are superseded by
+the final component-isolated retry below.
+
 - [ ] T140-S0N-A Add a non-shipping Haskell test executable and expose it from
   the existing native haskell.nix project.
 - [ ] T140-S0N-B Wire a real flake `runCommand` check which invokes the test on
@@ -50,3 +55,18 @@ passing feasibility result.
 - [ ] T140-S0N-D Run format, lint, and inherited gates; obtain navigator
   verification of the single feasibility commit and publish the final gate
   outcome before any production slice.
+
+## Slice 0I — final component-isolated hermetic check
+
+- [ ] T140-S0I-A Remove the uncommitted Slice 0N package coupling and add a
+  separate non-shipping Cabal package whose dependency graph excludes
+  `wasm-tx-inspector` and `tx-rdf-core` without changing their pins or bounds.
+- [ ] T140-S0I-B Expose that isolated component through the native haskell.nix
+  host targets and observe a behavior-specific RED from the existing focused
+  flake check.
+- [ ] T140-S0I-C Implement the minimal ledger-first Conway scanner and observe
+  GREEN for direct offsets, exact slices, bounds, containment, repeated paths,
+  and malformed zero-span behavior.
+- [ ] T140-S0I-D Run the focused check, format, lint, and inherited gate;
+  obtain navigator verification and publish the final accepted feasibility
+  result or stop without another retry.

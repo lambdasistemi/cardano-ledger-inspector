@@ -138,3 +138,44 @@ After GREEN the pair runs the focused check again, `just format-check`,
 verified single commit closes the slice. Production/schema/OpenAPI/browser
 work remains forbidden until the ticket owner records the successful gate and
 amends the remaining implementation plan.
+
+Slice 0N stopped before a valid RED. Adding the inspector package to the native
+GHC 9.8.4 plan also enabled its shipping `wasm-tx-inspector` executable. After
+one wiring correction, Cabal reported an irreconcilable plan between the
+compiler's boot `containers-0.6.8` and the shipping executable's pinned
+`tx-rdf-core`, which requires `containers >=0.7 && <0.8`. No offset assertion
+executed, so this result neither proves nor disproves the cborg cursor API.
+
+## Slice 0I: Final component-isolated hermetic check
+
+Time box: the same three-hour bound. This is the final authorized feasibility
+retry regardless of outcome.
+
+The pair will remove the uncommitted Slice 0N wiring and place the probe in a
+separate, non-shipping Cabal package. That package must depend only on the core
+ledger/CBOR libraries used by the probe, so the native solve cannot include
+`wasm-tx-inspector` or `tx-rdf-core`. No `tx-rdf-core` pin or bound may change.
+
+Owned files:
+
+- `tests/structural-cbor-span-feasibility/structural-cbor-span-feasibility.cabal`
+- `tests/structural-cbor-span-feasibility/Main.hs`
+- `nix/host/tx-deep-diagnosis-native/default.nix`
+- `nix/host/default.nix`
+- `flake.nix`
+
+The prior uncommitted additions to
+`libs/cardano-ledger-inspector/cardano-ledger-inspector.cabal` and
+`libs/cardano-ledger-inspector/test/StructuralCborSpanFeasibility.hs` must be
+removed. The separate package is added only to the native haskell.nix project,
+exposed through the host targets, and invoked by the same
+`checks.x86_64-linux.structural-cbor-span-feasibility` `runCommand` against the
+committed Conway fixture.
+
+RED and GREEN use the same command and behavior criteria as Slice 0N. A valid
+RED must reach and fail the behavior-specific assertion. If component
+isolation cannot reach that assertion, the pair records the exact compiler or
+planner error and stops; no further wiring correction or retry is authorized.
+If GREEN proves every criterion, the gate releases full implementation
+planning. Either outcome is navigator-verified and reported through the parent
+Q/A protocol before any subsequent work.
