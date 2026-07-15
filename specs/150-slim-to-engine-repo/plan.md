@@ -131,4 +131,3 @@ deletion. Slice 2 is deliberately one vertical deletion commit: source,
 packaging, CI, gate, and current documentation move together so no commit has a
 missing package referenced by an active build or presents the deleted UI as a
 current repository capability.
-

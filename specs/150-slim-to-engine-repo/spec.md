@@ -153,4 +153,3 @@ the release-assets workflow is byte-identical to `origin/main`.
   exit 0.
 - **SC-004**: Before/after Nix store paths match for `wasm-tx-inspector` and
   `protocol-registry`, and the release-assets workflow checksum is unchanged.
-
