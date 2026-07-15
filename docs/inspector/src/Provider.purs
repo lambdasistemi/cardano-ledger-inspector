@@ -29,9 +29,8 @@ providerName = case _ of
   Blockfrost -> "Blockfrost"
   Koios      -> "Koios"
 
--- | The browser workflow requires the selected provider's credential before
--- any provider request. A Koios token permits an attempt but does not imply
--- that the deployed browser origin will pass Koios' CORS policy.
+-- | Provider adapters retain their credential contracts. The browser UI only
+-- offers Blockfrost because Koios omits the CORS headers required by fetch.
 needsKey :: Provider -> Boolean
 needsKey = case _ of
   Blockfrost -> true
@@ -46,7 +45,7 @@ readinessGuidance = case _ of
   Blockfrost ->
     "Blockfrost credential required: the provider is not ready. Add a project ID in Settings."
   Koios ->
-    "Koios credential required: the provider is not ready. This deployed browser flow is CORS-blocked. Add a bearer token in Settings to satisfy the credential gate; a token does not remove this restriction."
+    "Koios is unsupported in browsers because Koios omits required CORS response headers."
 
 providerFailureGuidance :: Provider -> String -> String
 providerFailureGuidance provider =

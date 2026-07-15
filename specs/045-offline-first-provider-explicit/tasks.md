@@ -31,14 +31,25 @@
 - [X] T0461 Add focused readiness and CORS guidance assertions reflecting the
   empirical token/no-token live-browser finding.
 
+## Follow-up: Disable unsupported Koios browser provider
+
+- [X] T0462 Remove Koios as a selectable/usable browser provider, migrate
+  legacy Koios browser state to Blockfrost readiness, and state that Koios is
+  unsupported because its responses omit the required CORS headers.
+- [X] T0463 Replace browser-success assumptions for Koios with hermetic
+  coverage for disabled/nonactionable Koios, legacy-state fail-safe behavior,
+  Blockfrost-only dispatch, and retained non-browser Koios adapter contracts.
+
 ## Orchestrator Finalization
 
 - [X] T0457 Run the inherited `./gate.sh` and full
   `nix develop --quiet -c just ci` at final HEAD.
-- [ ] T0458 Record a real preview-browser network transcript for authenticated
-  Koios and explicit Blockfrost, proving no cross-provider request; escalate
-  unsupported CORS and keep the PR draft until resolved.
-- [ ] T0459 Audit the issue checklist and PR body, and verify `gate.sh` remains
+- [X] T0458 Record a real preview-browser network transcript for explicit
+  Blockfrost with no cross-provider requests, the disabled Koios browser UI,
+  and the empirical Koios token/no-token diagnostic proving that token
+  presence changes authentication status but does not supply the missing CORS
+  response header. No valid Koios bearer transcript is required by A-002.
+- [X] T0459 Audit the issue checklist and PR body, and verify `gate.sh` remains
   byte-identical to `origin/main` before marking ready.
 
 ## Commit Contracts
@@ -57,6 +68,14 @@ Slice 2:
 fix(inspector): make provider dispatch explicit
 
 Tasks: T0453, T0454, T0455, T0456
+```
+
+Koios browser support correction:
+
+```text
+fix(inspector): disable unsupported Koios browser provider
+
+Tasks: T0462, T0463
 ```
 
 The ticket orchestrator marks each accepted implementation task complete by

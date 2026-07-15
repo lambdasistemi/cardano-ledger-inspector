@@ -75,9 +75,9 @@ main = HA.runHalogenAff do
   routeBase <- liftEffect Routing.currentBasePath
   theme <- liftEffect Shell.initialTheme
   bookStore <- liftEffect BookStore.load
-  let initialProv = case prov of
-        "Koios"      -> Koios
-        _            -> Blockfrost
+  when (prov == "Koios")
+    (liftEffect (Storage.setItem providerKey (Provider.providerName Blockfrost)))
+  let initialProv = Blockfrost
       initialNetwork = case net of
         "preprod" -> Preprod
         "preview" -> Preview
@@ -1817,49 +1817,29 @@ inspectorComponent initial =
           , HH.div
               [ classNames [ "option-stack" ] ]
               [ providerRadio state Blockfrost "Blockfrost"
-              , providerRadio state Koios      "Koios"
+              , providerRadioDisabled
+                  "Koios"
+                  "Unsupported in browsers because Koios omits required CORS response headers."
               ]
           ]
       , HH.div
           [ classNames [ "field-stack" ] ]
-          [ case state.provider of
-              Blockfrost ->
-                HH.label
-                  [ classNames [ "field-label" ] ]
-                  [ HH.text "Blockfrost project ID"
-                  , HH.a
-                      [ HP.href "https://blockfrost.io/dashboard"
-                      , HP.target "_blank"
-                      , HP.rel "noopener noreferrer"
-                      ]
-                      [ HH.text "Dashboard" ]
+          [ HH.label
+              [ classNames [ "field-label" ] ]
+              [ HH.text "Blockfrost project ID"
+              , HH.a
+                  [ HP.href "https://blockfrost.io/dashboard"
+                  , HP.target "_blank"
+                  , HP.rel "noopener noreferrer"
                   ]
-              Koios ->
-                HH.label
-                  [ classNames [ "field-label" ] ]
-                  [ HH.text "Koios bearer token"
-                  , HH.a
-                      [ HP.href "https://koios.rest/auth/Auth.html"
-                      , HP.target "_blank"
-                      , HP.rel "noopener noreferrer"
-                      ]
-                      [ HH.text "Auth" ]
-                  ]
-          , case state.provider of
-              Blockfrost ->
-                HH.input
-                  [ HP.type_ HP.InputPassword
-                  , HP.placeholder "mainnet... / preprod... / preview..."
-                  , HP.value state.blockfrostKey
-                  , HE.onValueInput SetBlockfrostKey
-                  ]
-              Koios ->
-                HH.input
-                  [ HP.type_ HP.InputPassword
-                  , HP.placeholder "eyJhbGciOi..."
-                  , HP.value state.koiosBearer
-                  , HE.onValueInput SetKoiosBearer
-                  ]
+                  [ HH.text "Dashboard" ]
+              ]
+          , HH.input
+              [ HP.type_ HP.InputPassword
+              , HP.placeholder "mainnet... / preprod... / preview..."
+              , HP.value state.blockfrostKey
+              , HE.onValueInput SetBlockfrostKey
+              ]
           ]
       , HH.fieldset
           [ classNames [ "control-group" ] ]
@@ -1915,6 +1895,24 @@ inspectorComponent initial =
           [ HH.span
               [ classNames [ "choice-title" ] ]
               [ HH.text label ]
+          ]
+      ]
+
+  providerRadioDisabled label reason =
+    HH.label
+      [ choiceClass false ]
+      [ HH.input
+          [ HP.type_ HP.InputRadio
+          , HP.name "provider"
+          , HP.checked false
+          , HP.disabled true
+          ]
+      , HH.span
+          [ classNames [ "choice-copy" ] ]
+          [ HH.span
+              [ classNames [ "choice-title" ] ]
+              [ HH.text label ]
+          , HH.span_ [ HH.text reason ]
           ]
       ]
 
