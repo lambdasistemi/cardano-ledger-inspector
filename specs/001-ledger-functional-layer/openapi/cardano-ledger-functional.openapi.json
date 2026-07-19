@@ -401,6 +401,28 @@
                       "op": "tx.intent",
                       "result": {
                         "intent": {
+                          "auxiliary_data": {
+                            "metadata": [
+                              {
+                                "label": "1694",
+                                "value": {
+                                  "entries": [
+                                    {
+                                      "key": {
+                                        "type": "text",
+                                        "value": "label"
+                                      },
+                                      "value": {
+                                        "type": "text",
+                                        "value": "Swap ADA<->USDM"
+                                      }
+                                    }
+                                  ],
+                                  "type": "map"
+                                }
+                              }
+                            ]
+                          },
                           "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
                           "claims": [
                             {

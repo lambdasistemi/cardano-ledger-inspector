@@ -603,8 +603,52 @@
                 .result.intent.value.outputs[];
                 .assets["193ee65211bb3b4e0ea5f751f415269355a650e2e3706f625cdf1a4b"][""] == "1"
               )
+              and (.result.intent.claims | type) == "array"
+              and (.result.intent.metadata_claims | type) == "array"
             ' response.json
-            cp request.json response.json $out/
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/tx-intent-metadata-all-types.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.intent",
+                args: {}
+              }' > metadata-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < metadata-request.json > metadata-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.intent.auxiliary_data.metadata == [
+                {"label": "0", "value": {"type": "int", "value": "9007199254740993"}},
+                {"label": "1", "value": {"type": "bytes", "hex": "00ff"}},
+                {"label": "2", "value": {"type": "text", "value": "hello"}},
+                {"label": "3", "value": {"type": "list", "items": [
+                  {"type": "int", "value": "-1"},
+                  {"type": "text", "value": "nested"}
+                ]}},
+                {"label": "4", "value": {"type": "map", "entries": [
+                  {"key": {"type": "bytes", "hex": "aa"}, "value": {"type": "list", "items": [{"type": "int", "value": "1"}]}},
+                  {"key": {"type": "text", "value": "d"}, "value": {"type": "int", "value": "1"}},
+                  {"key": {"type": "text", "value": "d"}, "value": {"type": "int", "value": "2"}}
+                ]}}
+              ]
+            ' metadata-response.json
+            ${pkgs.jq}/bin/jq -n \
+              --arg tx_cbor '84a300d901028001800200a0f5f6' \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: $tx_cbor,
+                op: "tx.intent",
+                args: {}
+              }' > no-metadata-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < no-metadata-request.json > no-metadata-response.json
+            ${pkgs.jq}/bin/jq -e \
+              '.result.intent.auxiliary_data.metadata == []' \
+              no-metadata-response.json
+            cp request.json response.json metadata-request.json metadata-response.json \
+              no-metadata-request.json no-metadata-response.json $out/
           '';
 
           tx-input-context-smoke = pkgs.runCommand "tx-input-context-smoke" { } ''
