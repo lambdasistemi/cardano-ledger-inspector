@@ -10,6 +10,7 @@ import Cardano.Crypto.Hash (hashFromStringAsHex, hashToBytes)
 import qualified Cardano.Crypto.Hash as Crypto
 import qualified Cardano.Ledger.Api as L
 import Cardano.Ledger.BaseTypes (TxIx (..))
+import qualified Cardano.Ledger.BaseTypes as BaseTypes
 import Cardano.Ledger.Conway (ConwayEra)
 import qualified Cardano.Ledger.Core as Core
 import Cardano.Ledger.Hashes (ScriptHash (..), extractHash)
@@ -30,6 +31,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TextEncoding
+import Data.Word (Word64)
 import Lens.Micro ((^.))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr, stdout)
@@ -454,7 +456,103 @@ runInspectorOperation input =
             die "malformed_ledger_operation" err
         Left (Inspector.UnknownLedgerOperation operation) ->
             die "unknown_ledger_operation" (T.unpack operation)
-        Right value -> writeJson value
+        Right value -> writeJson (enrichIntentResponse input value)
+
+enrichIntentResponse :: BS.ByteString -> Aeson.Value -> Aeson.Value
+enrichIntentResponse input response =
+    case (intentTxCbor input, intentResponse response) of
+        (Just txCbor, True) ->
+            case TxDecode.decodeConwayTxInput (TextEncoding.encodeUtf8 txCbor) of
+                Left _ -> response
+                Right tx -> insertIntentMetadata tx response
+        _ -> response
+
+intentTxCbor :: BS.ByteString -> Maybe T.Text
+intentTxCbor input = do
+    Aeson.Object request <- Aeson.decodeStrict' input
+    Aeson.String operation <- KeyMap.lookup "op" request
+    Aeson.String txCbor <- KeyMap.lookup "tx_cbor" request
+    if operation == "tx.intent" || operation == "intent"
+        then Just txCbor
+        else Nothing
+
+intentResponse :: Aeson.Value -> Bool
+intentResponse (Aeson.Object response) =
+    KeyMap.lookup "op" response == Just (Aeson.String "tx.intent")
+intentResponse _ = False
+
+insertIntentMetadata
+    :: TxDecode.ConwayTx -> Aeson.Value -> Aeson.Value
+insertIntentMetadata tx (Aeson.Object response) =
+    Aeson.Object $ case KeyMap.lookup "result" response of
+        Nothing -> response
+        Just result -> KeyMap.insert "result" (insertIntoResult result) response
+  where
+    insertIntoResult (Aeson.Object result) =
+        Aeson.Object $ case KeyMap.lookup "intent" result of
+            Nothing -> result
+            Just intent -> KeyMap.insert "intent" (insertIntoIntent intent) result
+    insertIntoResult result = result
+
+    insertIntoIntent (Aeson.Object intent) =
+        Aeson.Object $
+            KeyMap.insert
+                "auxiliary_data"
+                (Aeson.object ["metadata" .= typedMetadataEntries tx])
+                intent
+    insertIntoIntent intent = intent
+insertIntentMetadata _ response = response
+
+typedMetadataEntries :: TxDecode.ConwayTx -> [Aeson.Value]
+typedMetadataEntries tx =
+    case tx ^. Core.auxDataTxL of
+        BaseTypes.SNothing -> []
+        BaseTypes.SJust auxData ->
+            map
+                typedMetadataEntry
+                (Map.toList (auxData ^. Core.metadataTxAuxDataL))
+
+typedMetadataEntry :: (Word64, L.Metadatum) -> Aeson.Value
+typedMetadataEntry (label, value) =
+    Aeson.object
+        [ "label" .= T.pack (show label)
+        , "value" .= typedMetadataValue value
+        ]
+
+typedMetadataValue :: L.Metadatum -> Aeson.Value
+typedMetadataValue datum =
+    case datum of
+        L.I number ->
+            Aeson.object
+                [ "type" .= ("int" :: T.Text)
+                , "value" .= T.pack (show number)
+                ]
+        L.B bytes ->
+            Aeson.object
+                [ "type" .= ("bytes" :: T.Text)
+                , "hex" .= TextEncoding.decodeUtf8 (B16.encode bytes)
+                ]
+        L.S text ->
+            Aeson.object
+                [ "type" .= ("text" :: T.Text)
+                , "value" .= text
+                ]
+        L.List items ->
+            Aeson.object
+                [ "type" .= ("list" :: T.Text)
+                , "items" .= map typedMetadataValue items
+                ]
+        L.Map entries ->
+            Aeson.object
+                [ "type" .= ("map" :: T.Text)
+                , "entries"
+                    .= [ Aeson.object
+                        [ "key" .= typedMetadataValue key
+                        , "value" .= typedMetadataValue value
+                        ]
+                       | (key, value) <- entries
+                       ]
+                ]
 
 writeJson :: (Aeson.ToJSON a) => a -> IO ()
 writeJson value = do

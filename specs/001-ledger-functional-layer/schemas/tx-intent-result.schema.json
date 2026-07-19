@@ -3,7 +3,7 @@
   "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-intent-result.schema.json",
   "title": "Cardano Ledger WASI Transaction Intent Result",
   "type": "object",
-  "required": ["title", "subtitle", "metrics", "claims", "signing", "sections", "withdrawals", "warnings"],
+  "required": ["title", "subtitle", "metrics", "claims", "auxiliary_data", "signing", "sections", "withdrawals", "warnings"],
   "properties": {
     "title": { "type": "string" },
     "subtitle": { "type": "string" },
@@ -23,6 +23,17 @@
     "metadata_claims": {
       "type": "array",
       "items": { "type": "object", "additionalProperties": true }
+    },
+    "auxiliary_data": {
+      "type": "object",
+      "required": ["metadata"],
+      "properties": {
+        "metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/metadataEntry" }
+        }
+      },
+      "additionalProperties": true
     },
     "signing": { "$ref": "#/$defs/signing" },
     "value": {
@@ -90,6 +101,60 @@
   },
   "additionalProperties": true,
   "$defs": {
+    "metadataEntry": {
+      "type": "object",
+      "required": ["label", "value"],
+      "properties": {
+        "label": { "type": "string", "pattern": "^[0-9]+$" },
+        "value": { "$ref": "#/$defs/metadataValue" }
+      },
+      "additionalProperties": false
+    },
+    "metadataValue": {
+      "oneOf": [
+        { "$ref": "#/$defs/metadataInt" },
+        { "$ref": "#/$defs/metadataBytes" },
+        { "$ref": "#/$defs/metadataText" },
+        { "$ref": "#/$defs/metadataList" },
+        { "$ref": "#/$defs/metadataMap" }
+      ]
+    },
+    "metadataInt": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": { "type": { "const": "int" }, "value": { "type": "string", "pattern": "^-?[0-9]+$" } },
+      "additionalProperties": false
+    },
+    "metadataBytes": {
+      "type": "object",
+      "required": ["type", "hex"],
+      "properties": { "type": { "const": "bytes" }, "hex": { "type": "string", "pattern": "^[0-9a-f]*$" } },
+      "additionalProperties": false
+    },
+    "metadataText": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": { "type": { "const": "text" }, "value": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "metadataList": {
+      "type": "object",
+      "required": ["type", "items"],
+      "properties": { "type": { "const": "list" }, "items": { "type": "array", "items": { "$ref": "#/$defs/metadataValue" } } },
+      "additionalProperties": false
+    },
+    "metadataMap": {
+      "type": "object",
+      "required": ["type", "entries"],
+      "properties": { "type": { "const": "map" }, "entries": { "type": "array", "items": { "$ref": "#/$defs/metadataMapEntry" } } },
+      "additionalProperties": false
+    },
+    "metadataMapEntry": {
+      "type": "object",
+      "required": ["key", "value"],
+      "properties": { "key": { "$ref": "#/$defs/metadataValue" }, "value": { "$ref": "#/$defs/metadataValue" } },
+      "additionalProperties": false
+    },
     "metric": {
       "type": "object",
       "required": ["label", "value"],

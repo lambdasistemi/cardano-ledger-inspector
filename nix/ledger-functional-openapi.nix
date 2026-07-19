@@ -305,6 +305,22 @@
                               detail = "Required to pay Antithesis as vendor / destination Network Compliance's treasury / metadata label 1694 / self-declared";
                             }
                           ];
+                          auxiliary_data = {
+                            metadata = [
+                              {
+                                label = "1694";
+                                value = {
+                                  type = "map";
+                                  entries = [
+                                    {
+                                      key = { type = "text"; value = "label"; };
+                                      value = { type = "text"; value = "Swap ADA<->USDM"; };
+                                    }
+                                  ];
+                                };
+                              }
+                            ];
+                          };
                           sections = [
                             {
                               title = "Signer value perspective";
