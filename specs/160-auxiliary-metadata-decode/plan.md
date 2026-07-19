@@ -47,6 +47,7 @@ Owned files:
   only if needed for hermetic all-constructor coverage)
 - `specs/001-ledger-functional-layer/schemas/tx-intent-result.schema.json`
 - `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md`
+- `nix/ledger-functional-openapi.nix`
 - `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
 
 Implementation shape:
@@ -77,4 +78,3 @@ Final proof: `./gate.sh`.
 
 No live boundary exists: the feature is a pure CBOR-to-JSON transformation over
 committed fixtures.
-
