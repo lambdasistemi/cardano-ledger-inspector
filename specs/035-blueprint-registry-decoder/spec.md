@@ -55,10 +55,15 @@ hand-walking PlutusData or adding protocol-specific Haskell.
   blueprint intentionally declares opaque `Data`.
 - **FR-005**: Successful decoded values MUST retain constructor names, schema
   field names, exact decimal integers, lowercase hexadecimal bytes, list order,
-  and map entry order without lossy JSON-object coercion.
+  and map entry order without lossy JSON-object coercion. Nested values use
+  tagged `constructor`/`name`/`fields`, `map`/`entries`, `list`/`items`,
+  `integer`/`value`, and `bytes`/`hex` nodes; the top-level constructor remains
+  the annotation's `constructor` plus named `fields` object.
 - **FR-006**: A decoded annotation MUST identify `protocol`, `version`,
-  `validator`, `label`, and `parameterized`, expose decoded
-  `fields`, and carry deployment metadata when available.
+  `validator`, `label`, `parameterized`, and a stable `schema_ref`, expose
+  decoded `fields`, and carry deployment metadata when available. Blueprint
+  schemas retain their exact CIP-57 `$ref`; curated or inline schemas use
+  `registry://<blueprint-id>/<validator-title>/<datum|redeemer>`.
 - **FR-007**: Parameterized annotations MUST distinguish unknown parameters
   from known parameters. Unparameterized annotations MUST explicitly report
   `parameterized: false`.

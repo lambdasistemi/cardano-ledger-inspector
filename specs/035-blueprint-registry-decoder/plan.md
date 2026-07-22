@@ -30,6 +30,7 @@ Known output rows gain:
     "label": "SundaeSwap V3 order",
     "parameterized": false,
     "parameters_known": true,
+    "schema_ref": "registry://sundaeswap-v3/order.spend/datum",
     "constructor": "Order",
     "fields": {}
   }
@@ -37,9 +38,15 @@ Known output rows gain:
 ```
 
 Known script rows use the same annotation envelope under
-`decoded_redeemer`. Scalar and collection field values are lossless tagged
-nodes: constructor/name/fields, map/entries, list/items, integer/value, and
-bytes/hex. A deployment-enriched annotation additionally carries
+`decoded_redeemer`. Nested field values are lossless tagged nodes:
+`{"kind":"constructor","name":...,"fields":...}`,
+`{"kind":"map","entries":[{"key":...,"value":...}]}`,
+`{"kind":"list","items":[...]}`,
+`{"kind":"integer","value":"<decimal>"}`, and
+`{"kind":"bytes","hex":"<lowercase>"}`. Blueprint-backed annotations retain
+the exact CIP-57 `$ref` as `schema_ref`; curated or inline schemas use the
+stable `registry://<blueprint-id>/<validator-title>/<datum|redeemer>` form.
+A deployment-enriched annotation additionally carries
 `deployment` with registry id, scope, owner, address, script role,
 `deployed_at`, and stable `reference_input_matches`.
 
