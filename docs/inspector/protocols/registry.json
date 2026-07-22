@@ -1,5 +1,5 @@
 {
-  "$schema_note": "Draft shape for the inspector's protocol registry. Spec under iteration in https://github.com/lambdasistemi/cardano-ledger-inspector/issues/35.",
+  "$schema_note": "Build-time registry for tx.intent. Each manifest path is embedded into the WASI artifact; direct validators take precedence over parameterized instances, and journal deployments enrich registered annotations without runtime filesystem access.",
   "blueprints": [
     {
       "id": "sundaeswap-v3",

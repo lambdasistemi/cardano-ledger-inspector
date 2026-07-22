@@ -53,7 +53,8 @@
         "$ref": "tx-identify-result.schema.json"
       },
       "TxIntentResult": {
-        "$ref": "tx-intent-result.schema.json"
+        "$ref": "tx-intent-result.schema.json",
+        "description": "Known registered output datums and resolvable script redeemers may include decoded_datum or decoded_redeemer annotations. Both use the recursive lossless decoded-node wire and identify direct and parameterized registry matches."
       },
       "TxValidateResult": {
         "$ref": "tx-validate-result.schema.json"

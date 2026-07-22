@@ -112,6 +112,28 @@
               chmod -R u+w "$out"
               mkdir -p "$out/external"
               cp -rL ${txRdfCoreSrc}/tx-rdf-core "$out/external/tx-rdf-core"
+              mkdir -p "$out/app/Conway/Inspector"
+              cat > "$out/app/Conway/Inspector/EmbeddedRegistry.hs" <<'EOF'
+              {-# LANGUAGE OverloadedStrings #-}
+              {-# LANGUAGE ImportQualifiedPost #-}
+              module Conway.Inspector.EmbeddedRegistry (embeddedRegistryJson) where
+
+              import Data.ByteString (ByteString)
+              import Data.ByteString.Char8 qualified as BS8
+
+              embeddedRegistryJson :: ByteString
+              embeddedRegistryJson = BS8.pack ${builtins.toJSON (builtins.toJSON (
+                let
+                  protocolRoot = ./docs/inspector/protocols;
+                  registry = builtins.fromJSON (builtins.readFile (protocolRoot + "/registry.json"));
+                  manifestEntries = registry.blueprints ++ registry.deployment_registries;
+                  embeddedFiles = builtins.listToAttrs (map (entry: {
+                    name = entry.path;
+                    value = builtins.fromJSON (builtins.readFile (protocolRoot + "/${entry.path}"));
+                  }) manifestEntries);
+                in registry // { embedded_files = embeddedFiles; }
+              ))}
+              EOF
             '';
 
           wasmTargetsBase = import ./nix/wasm-targets.nix {
@@ -607,6 +629,77 @@
               and (.result.intent.metadata_claims | type) == "array"
             ' response.json
             ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
+              --rawfile producer ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement-input-64f27254.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.intent",
+                args: {
+                  context: {
+                    producer_txs: {
+                      "64f27254f3c0311fb2e672cdb87de200089a596aa90dc09f8be4248540267cf0": {
+                        tx_cbor: ($producer | gsub("\\s"; "")),
+                        source: "fixture.sundae-swap-usdm-disbursement-input"
+                      }
+                    }
+                  }
+                }
+              }' > registered-request.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < registered-request.json > registered-response-1.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < registered-request.json > registered-response-2.json
+            ${pkgs.diffutils}/bin/diff -u registered-response-1.json registered-response-2.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.intent as $intent
+              | ([ $intent.value.outputs[]? | select(.decoded_datum.label == "Amaru Network Compliance treasury") ] | length == 1)
+              and ([ $intent.value.outputs[]? | select(.decoded_datum.label == "SundaeSwap V3 order") ] | length == 9)
+              and ([ $intent.value.outputs[]? | select(.decoded_datum.parameterized == true) ] | length == 1)
+              and ([ $intent.value.outputs[]? | select(.decoded_datum.parameterized == false) ] | length == 9)
+              and ([ $intent.value.outputs[]?.decoded_datum.deployment.reference_input_matches[]? ] | unique | length == 4)
+              and any(
+                $intent.value.outputs[]?;
+                .decoded_datum.label == "Amaru Network Compliance treasury"
+                and .decoded_datum.protocol == "sundaeswap-treasury-v3"
+                and .decoded_datum.validator == "treasury.treasury.spend"
+                and .decoded_datum.schema_ref == "registry://sundaeswap-treasury-v3/treasury.treasury.spend/datum"
+                and .decoded_datum.constructor == "Commitment"
+                and .decoded_datum.fields.pool_ident == {kind: "constructor", name: "Some", fields: {value: {kind: "bytes", hex: "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef"}}}
+                and .decoded_datum.fields.max_protocol_fee == {kind: "integer", value: "1280000"}
+                and (.decoded_datum.deployment.reference_input_matches | length == 4)
+              )
+              and any(
+                $intent.value.outputs[]?;
+                .decoded_datum.label == "SundaeSwap V3 order"
+                and .decoded_datum.protocol == "sundaeswap-v3"
+                and .decoded_datum.validator == "order.spend"
+                and .decoded_datum.schema_ref == "registry://sundaeswap-v3/order.spend/datum"
+                and .decoded_datum.constructor == "Order"
+                and .decoded_datum.fields.pool_ident == {kind: "constructor", name: "Some", fields: {value: {kind: "bytes", hex: "64f35d26b237ad58e099041bc14c687ea7fdc58969d7d5b66e2540ef"}}}
+                and .decoded_datum.fields.max_protocol_fee == {kind: "integer", value: "1280000"}
+                and .decoded_datum.fields.owner.fields.scripts.kind == "list"
+              )
+              and any(
+                $intent.scripts[]?;
+                .purpose == "spending"
+                and .decoded_redeemer.label == "Amaru Network Compliance treasury"
+                and .decoded_redeemer.protocol == "sundaeswap-treasury-v3"
+                and .decoded_redeemer.validator == "treasury.treasury.spend"
+                and .decoded_redeemer.schema_ref == "#/definitions/types~1TreasurySpendRedeemer"
+                and .decoded_redeemer.constructor == "Disburse"
+                and .decoded_redeemer.fields.amount.kind == "map"
+                and .decoded_redeemer.fields.amount.entries[0].key == {kind: "bytes", hex: ""}
+                and .decoded_redeemer.fields.amount.entries[0].value.entries[0].key == {kind: "bytes", hex: ""}
+                and .decoded_redeemer.fields.amount.entries[0].value.entries[0].value == {kind: "integer", value: "408163265306"}
+              )
+              and ([ $intent.value.outputs[]? | select(.decoded_datum.label == "Amaru Network Compliance treasury" or .decoded_datum.label == "SundaeSwap V3 order") ] | length == 10)
+              and ($intent.value.outputs[10].decoded_datum == null)
+              and ($intent.value.outputs[11].decoded_datum == null)
+            ' registered-response-1.json
+            ${pkgs.jq}/bin/jq -n \
               --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/tx-intent-metadata-all-types.hex} \
               '{
                 ledger_functional_layer: "cardano-ledger-functional/v1",
@@ -647,7 +740,8 @@
             ${pkgs.jq}/bin/jq -e \
               '.result.intent.auxiliary_data.metadata == []' \
               no-metadata-response.json
-            cp request.json response.json metadata-request.json metadata-response.json \
+            cp request.json response.json registered-request.json registered-response-1.json \
+              registered-response-2.json metadata-request.json metadata-response.json \
               no-metadata-request.json no-metadata-response.json $out/
           '';
 
