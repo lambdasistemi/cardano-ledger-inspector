@@ -1,4 +1,7 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 
 {- | WASI reactor entry: read either raw Conway tx hex or a JSON ledger-operation
   envelope on stdin, write JSON on stdout. Error category on stderr, non-zero
@@ -8,17 +11,23 @@ module Main (main) where
 
 import Cardano.Crypto.Hash (hashFromStringAsHex, hashToBytes)
 import qualified Cardano.Crypto.Hash as Crypto
+import Cardano.Ledger.Address (Addr (..))
 import qualified Cardano.Ledger.Api as L
+import Cardano.Ledger.Api.Scripts.Data (Data)
+import Cardano.Ledger.Api.Tx.Out (TxOut, addrTxOutL)
 import Cardano.Ledger.BaseTypes (TxIx (..))
 import qualified Cardano.Ledger.BaseTypes as BaseTypes
+import Cardano.Ledger.Binary (decodeFullFromHexText, natVersion)
 import Cardano.Ledger.Conway (ConwayEra)
 import qualified Cardano.Ledger.Core as Core
+import Cardano.Ledger.Credential (Credential (ScriptHashObj))
 import Cardano.Ledger.Hashes (ScriptHash (..), extractHash)
 import qualified Cardano.Ledger.TxIn as TxIn
 import qualified Cardano.Tx.Blueprint as Blueprint
 import qualified Cardano.Tx.Decode as TxDecode
 import qualified Cardano.Tx.Graph.Emit as TxGraph
 import qualified Conway.Inspector as Inspector
+import qualified Conway.Inspector.ProtocolRegistry as ProtocolRegistry
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
@@ -26,9 +35,11 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
+import Data.Either (fromRight)
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TextEncoding
 import Data.Word (Word64)
@@ -464,7 +475,13 @@ enrichIntentResponse input response =
         (Just txCbor, True) ->
             case TxDecode.decodeConwayTxInput (TextEncoding.encodeUtf8 txCbor) of
                 Left _ -> response
-                Right tx -> insertIntentMetadata tx response
+                Right tx ->
+                    insertIntentMetadata tx $
+                        ProtocolRegistry.enrichIntent
+                            (referenceInputOutrefs tx)
+                            (producerInputScriptHashes (intentProducerContext input))
+                            (intentRedeemers response)
+                            response
         _ -> response
 
 intentTxCbor :: BS.ByteString -> Maybe T.Text
@@ -475,6 +492,91 @@ intentTxCbor input = do
     if operation == "tx.intent" || operation == "intent"
         then Just txCbor
         else Nothing
+
+intentProducerContext :: BS.ByteString -> ProducerContext
+intentProducerContext input =
+    case Aeson.decodeStrict' input of
+        Just (Aeson.Object request) ->
+            fromRight (ProducerContext Map.empty) $
+                producerContextFromArgs $
+                    fromMaybe Aeson.Null (KeyMap.lookup "args" request)
+        _ -> ProducerContext Map.empty
+
+{- | Decode redeemers through the pinned Conway ledger decoder.  The
+protocol registry only receives already-decoded ledger data; it never
+interprets CBOR itself.
+-}
+intentRedeemers :: Aeson.Value -> Map.Map T.Text (Data ConwayEra)
+intentRedeemers response =
+    Map.fromList (mapMaybe decodeScript scripts)
+  where
+    scripts =
+        case response of
+            Aeson.Object root ->
+                maybe [] Foldable.toList $
+                    KeyMap.lookup "result" root
+                        >>= asObject
+                        >>= KeyMap.lookup "intent"
+                        >>= asObject
+                        >>= KeyMap.lookup "scripts"
+                        >>= asArray
+            _ -> []
+    decodeScript (Aeson.Object script) = do
+        Aeson.Object input <- KeyMap.lookup "input" script
+        Aeson.String txId <- KeyMap.lookup "tx_id" input
+        index <- KeyMap.lookup "index" input >>= asInteger
+        Aeson.String cbor <- KeyMap.lookup "redeemer_cbor_hex" script
+        datum <- decodePlutusData cbor
+        pure (txId <> "#" <> T.pack (show index), datum)
+    decodeScript _ = Nothing
+    asObject (Aeson.Object value) = Just value
+    asObject _ = Nothing
+    asArray (Aeson.Array value) = Just value
+    asArray _ = Nothing
+    asInteger (Aeson.Number value) = Just (floor value :: Integer)
+    asInteger _ = Nothing
+
+decodePlutusData :: T.Text -> Maybe (Data ConwayEra)
+decodePlutusData hex =
+    either (const Nothing) Just $
+        decodeFullFromHexText (natVersion @11) (T.strip hex)
+
+referenceInputOutrefs :: TxDecode.ConwayTx -> [T.Text]
+referenceInputOutrefs tx =
+    map txInOutref $
+        Set.toAscList $
+            tx ^. (Core.bodyTxL . L.referenceInputsTxBodyL)
+
+producerInputScriptHashes :: ProducerContext -> Map.Map T.Text T.Text
+producerInputScriptHashes (ProducerContext producers) =
+    Map.fromList $
+        concatMap producerOutputs (Map.toList producers)
+  where
+    producerOutputs (txId, ProducerTx _ (Right tx)) =
+        mapMaybe
+            ( \(ix, output) ->
+                fmap
+                    (txId <> "#" <> T.pack (show ix),)
+                    (outputScriptHash output)
+            )
+            ( zip
+                [0 :: Int ..]
+                (Foldable.toList (tx ^. (Core.bodyTxL . L.outputsTxBodyL)))
+            )
+    producerOutputs _ = []
+
+outputScriptHash :: TxOut ConwayEra -> Maybe T.Text
+outputScriptHash output =
+    case output ^. addrTxOutL of
+        Addr _ (ScriptHashObj (ScriptHash hash)) _ ->
+            Just (TextEncoding.decodeUtf8 (B16.encode (hashToBytes hash)))
+        _ -> Nothing
+
+txInOutref :: TxIn.TxIn -> T.Text
+txInOutref (TxIn.TxIn (TxIn.TxId hash) (TxIx index)) =
+    TextEncoding.decodeUtf8 (B16.encode (hashToBytes (extractHash hash)))
+        <> "#"
+        <> T.pack (show index)
 
 intentResponse :: Aeson.Value -> Bool
 intentResponse (Aeson.Object response) =

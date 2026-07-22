@@ -9,6 +9,8 @@ build-type:    Simple
 executable wasm-tx-inspector
   main-is:          Main.hs
   hs-source-dirs:   app
+  other-modules:    Conway.Inspector.ProtocolRegistry
+                  , Conway.Inspector.EmbeddedRegistry
   build-depends:    base                  >=4.19 && <5
                   , aeson
                   , base16-bytestring
@@ -17,6 +19,7 @@ executable wasm-tx-inspector
                   , containers
                   , cardano-crypto-class
                   , cardano-ledger-api
+                  , cardano-ledger-binary
                   , cardano-ledger-conway
                   , cardano-ledger-core
                   , cardano-ledger-wasm

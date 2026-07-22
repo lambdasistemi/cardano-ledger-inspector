@@ -579,6 +579,12 @@ and whether that signer is already covered by a vkey witness, a bootstrap
 witness, or still missing. Each `value.outputs[]` row exposes the exact output
 address, its lovelace amount, its native-asset map (`policy_id -> asset_name ->
 quantity`), and its datum state (`no_datum`, `datum_hash`, or `inline_datum`).
+When a payment script hash is registered and its inline datum conforms to the
+registered schema, the row additionally contains `decoded_datum`. Successful
+script rows may similarly contain `decoded_redeemer` after their ledger purpose
+is resolved through explicit producer context. An annotation carries protocol
+identity, parameterization, stable `schema_ref`, constructor and named fields;
+nested data uses lossless tagged constructor/map/list/integer/bytes nodes.
 When `context.producer_txs` resolves every regular input, `value.signer_lovelace`
 reports a known net ADA amount from resolved signer-controlled inputs minus
 signer-controlled outputs. Ownership is intentionally conservative: only output

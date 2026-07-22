@@ -765,6 +765,7 @@
       };
       TxIntentResult = {
         "$ref" = "tx-intent-result.schema.json";
+        description = "Known registered output datums and resolvable script redeemers may include decoded_datum or decoded_redeemer annotations. Both use the recursive lossless decoded-node wire and identify direct and parameterized registry matches.";
       };
       TxWitnessPlanResult = {
         "$ref" = "tx-witness-plan-result.schema.json";

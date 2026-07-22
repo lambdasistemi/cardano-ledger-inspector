@@ -330,9 +330,61 @@
         "index": { "type": "integer", "minimum": 0 },
         "input": { "$ref": "#/$defs/txInRef" },
         "redeemer_cbor_hex": { "type": "string" },
+        "decoded_redeemer": { "$ref": "#/$defs/decodedAnnotation" },
         "ex_units_committed": { "$ref": "#/$defs/exUnitsCommitted" }
       },
       "additionalProperties": true
+    },
+    "decodedAnnotation": {
+      "type": "object",
+      "required": ["protocol", "version", "validator", "label", "parameterized", "parameters_known", "schema_ref", "constructor", "fields"],
+      "properties": {
+        "protocol": { "type": "string" },
+        "version": { "type": "string" },
+        "validator": { "type": "string" },
+        "label": { "type": "string" },
+        "parameterized": { "type": "boolean" },
+        "parameters_known": { "type": "boolean" },
+        "schema_ref": { "type": "string" },
+        "constructor": { "type": "string" },
+        "fields": { "type": "object", "additionalProperties": { "$ref": "#/$defs/decodedNode" } },
+        "deployment": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "decodedNode": {
+      "oneOf": [
+        { "$ref": "#/$defs/decodedConstructorNode" },
+        { "$ref": "#/$defs/decodedMapNode" },
+        { "$ref": "#/$defs/decodedListNode" },
+        { "$ref": "#/$defs/decodedIntegerNode" },
+        { "$ref": "#/$defs/decodedBytesNode" }
+      ]
+    },
+    "decodedConstructorNode": {
+      "type": "object", "required": ["kind", "fields"],
+      "properties": { "kind": { "const": "constructor" }, "name": { "type": "string" }, "index": { "type": "integer", "minimum": 0 }, "fields": { "type": "object", "additionalProperties": { "$ref": "#/$defs/decodedNode" } } },
+      "additionalProperties": false
+    },
+    "decodedMapNode": {
+      "type": "object", "required": ["kind", "entries"],
+      "properties": { "kind": { "const": "map" }, "entries": { "type": "array", "items": { "type": "object", "required": ["key", "value"], "properties": { "key": { "$ref": "#/$defs/decodedNode" }, "value": { "$ref": "#/$defs/decodedNode" } }, "additionalProperties": false } } },
+      "additionalProperties": false
+    },
+    "decodedListNode": {
+      "type": "object", "required": ["kind", "items"],
+      "properties": { "kind": { "const": "list" }, "items": { "type": "array", "items": { "$ref": "#/$defs/decodedNode" } } },
+      "additionalProperties": false
+    },
+    "decodedIntegerNode": {
+      "type": "object", "required": ["kind", "value"],
+      "properties": { "kind": { "const": "integer" }, "value": { "type": "string", "pattern": "^-?[0-9]+$" } },
+      "additionalProperties": false
+    },
+    "decodedBytesNode": {
+      "type": "object", "required": ["kind", "hex"],
+      "properties": { "kind": { "const": "bytes" }, "hex": { "type": "string", "pattern": "^[0-9a-f]*$" } },
+      "additionalProperties": false
     },
     "valueBucket": {
       "type": "object",
@@ -375,6 +427,7 @@
       "type": "object",
       "required": ["index", "bucket", "address_hex", "coin_lovelace", "assets", "datum"],
       "properties": {
+        "decoded_datum": { "$ref": "#/$defs/decodedAnnotation" },
         "index": { "type": "integer", "minimum": 0 },
         "bucket": {
           "type": "string",
