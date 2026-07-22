@@ -9,6 +9,11 @@
       "path": "journal-2026.json",
       "upstream_path": "journal/2026/metadata.json",
       "describes": "Applied script hashes, owners, addresses, and deployment outrefs for the 5 Amaru treasury scopes (core_development, ops_and_use_cases, network_compliance, middleware, contingency)."
+    },
+    {
+      "path": "journal-2026.ttl",
+      "generated_from": "journal-2026.json",
+      "describes": "Generic RDF/Turtle deployment overlay for transaction-book consumers; resolves the same owners, addresses, script hashes, and deployment outrefs without requiring an Amaru-specific JSON parser."
     }
   ],
   "refresh_command": "gh api -H 'Accept: application/vnd.github.raw' 'repos/pragma-org/amaru-treasury/contents/journal/2026/metadata.json?ref=<NEW_REF>' > journal-2026.json"
