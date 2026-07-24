@@ -59,9 +59,12 @@ does not depend on hidden browser state or provider calls.
 `Conway.Inspector.runLedgerOperationInput` delegates base operation semantics
 to the package-qualified, pinned `cardano-ledger-wasm` kernel and then applies
 the local typed-metadata and embedded protocol-registry enrichments to
-successful `tx.intent` responses. WASI, Extism, and native consumers all link
-this same wrapper rather than importing the kernel as their operation
-boundary.
+successful `tx.intent` responses. The wrapper also recognizes `tx.review`
+(alias `review`): it routes the request through the kernel's `tx.intent` path,
+applies the same enrichments, and projects the enriched intent plus the decoded
+Conway transaction into `result.review`, restoring `op` to `tx.review`. WASI,
+Extism, and native consumers all link this same wrapper rather than importing
+the kernel as their operation boundary.
 
 ### WASI Layer
 
@@ -185,6 +188,8 @@ implicit network access during the final build.
 | `checks.<system>.tx-validate-smoke` | Covers missing context, unsupported provider-style UTxO JSON, complete valid context, deterministic validation output, and invalid supplied network context. |
 | `checks.<system>.tx-evaluate-scripts-smoke` | Covers missing context, rejected provider-style UTxO JSON, complete script evaluation, deterministic output, budgeted units, and evaluated units. |
 | `checks.<system>.tx-extism-spike-smoke` | Calls the Extism plugin through `extism-spike-host`; for registered and unknown-script `tx.intent`, compares raw response bytes across WASI, the native wrapper runner, and Extism while asserting enrichment and fallback semantics. |
+| `checks.<system>.tx-review-smoke` | Runs `tx.review` for a complete-context request (provable signer net) and the issue fixture (output control groups, fee, conditional collateral, high-value movements, isolated claims, unprovable-net note), and compares registered and unknown-registry review bytes across WASI, native, and the Extism `tx_review` export. |
+| `checks.<system>.tx-review-types-test` | Runs the native Hspec contract test for the review vocabulary and JSON encoders. |
 | `checks.<system>.tx-explain-render-smoke` | Runs the render-snapshot harness in compare mode against the committed golden explain artifacts. |
 | `checks.<system>.tx-deep-diagnosis-emit-explain-smoke` | Runs the native CLI with `--emit-explain` end-to-end and verifies the emitted artifact set. |
 | `checks.<system>.cardano-ledger-wasm-pin-check` | Verifies the WASM source pins and fork metadata remain aligned. |

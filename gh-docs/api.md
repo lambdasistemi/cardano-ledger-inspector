@@ -72,6 +72,7 @@ Haskell ledger layer derives referenced outputs.
 | `tx.browse` | Decode transaction CBOR and return a browser view at `args.path`. |
 | `tx.identify` | Return transaction id, body hash, era, byte size, fee, structural counts, and witness counts. |
 | `tx.intent` | Return a signer-focused summary of visible transaction effects, self-declared metadata intent, required signers, scripts, withdrawals, mint/burn, collateral, and context coverage. |
+| `tx.review` | Project the enriched `tx.intent` result into a signer-facing review: output control groups, value sources, high-value movements, fee, conditional collateral, net-signer-value status, and isolated self-declared metadata claims. |
 | `tx.witness.plan` | Return signer, witness, script, redeemer, datum, reference-input, and explicit producer-transaction context coverage data. |
 | `tx.witness.attach` | Attach or replace one vkey witness, preserve all other witness-set content, and return patched transaction CBOR plus stable diagnostics. |
 | `tx.validate` | Decode explicit context, build a Conway ledger environment, run `applyTx` when context is complete, and report ledger failures without mutating CBOR. |
@@ -122,6 +123,7 @@ The detailed contract and schemas are tracked in the repository:
 - [Browser view schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/browser-view.schema.json)
 - [tx.identify result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-identify-result.schema.json)
 - [tx.intent result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-intent-result.schema.json)
+- [tx.review result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-review-result.schema.json)
 - [tx.witness.plan result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-witness-plan-result.schema.json)
 - [tx.witness.attach result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-witness-attach-result.schema.json)
 - [tx.validate result schema](https://github.com/lambdasistemi/cardano-ledger-inspector/blob/main/specs/001-ledger-functional-layer/schemas/tx-validate-result.schema.json)

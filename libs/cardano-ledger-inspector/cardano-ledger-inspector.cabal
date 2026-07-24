@@ -9,6 +9,7 @@ build-type:    Simple
 library
   exposed-modules:
     Conway.Inspector
+    Conway.Inspector.Review
 
   other-modules:
     Conway.Inspector.ProtocolRegistry
@@ -63,5 +64,16 @@ executable tx-inspector-native
                   , bytestring
                   , cardano-ledger-inspector
                   , text
+  default-language: Haskell2010
+  ghc-options:      -Wall
+
+test-suite review-types
+  type:             exitcode-stdio-1.0
+  main-is:          ReviewSpec.hs
+  hs-source-dirs:   test
+  build-depends:    base                  >=4.18 && <5
+                  , aeson
+                  , cardano-ledger-inspector
+                  , hspec
   default-language: Haskell2010
   ghc-options:      -Wall

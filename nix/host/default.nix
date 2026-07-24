@@ -56,8 +56,14 @@ let
     if txDeepDiagnosisNative == null
       then null
       else txDeepDiagnosisNative.tx-inspector-native;
+
+  review-types =
+    if txDeepDiagnosisNative == null
+      then null
+      else txDeepDiagnosisNative.review-types;
 in
 {
   inherit libextism extism-spike-host
-    tx-deep-diagnosis tx-deep-diagnosis-render-snapshot tx-inspector-native;
+    tx-deep-diagnosis tx-deep-diagnosis-render-snapshot tx-inspector-native
+    review-types;
 }

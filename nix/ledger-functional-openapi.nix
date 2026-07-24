@@ -85,6 +85,24 @@
                     };
                   };
                 };
+                review = {
+                  summary = "Review signer-facing transaction value flow";
+                  value = {
+                    ledger_functional_layer = "cardano-ledger-functional/v1";
+                    tx_cbor = "84a4...";
+                    op = "tx.review";
+                    args = {
+                      context = {
+                        producer_txs = {
+                          "0000000000000000000000000000000000000000000000000000000000000000" = {
+                            tx_cbor = "84a4...";
+                            source = "blockfrost.txs.cbor";
+                          };
+                        };
+                      };
+                    };
+                  };
+                };
                 witnessPlan = {
                   summary = "Plan transaction witnesses";
                   value = {
@@ -434,6 +452,102 @@
                       };
                     };
                   };
+                  review = {
+                    summary = "Signer-facing review response envelope";
+                    value = {
+                      ledger_functional_layer = "cardano-ledger-functional/v1";
+                      op = "tx.review";
+                      result = {
+                        review = {
+                          version = "cardano-tx-review/v1";
+                          tx_id = "0000000000000000000000000000000000000000000000000000000000000000";
+                          body_hash = "1111111111111111111111111111111111111111111111111111111111111111";
+                          context = {
+                            input_status = "incomplete";
+                            regular_input_count = 2;
+                            resolved_regular_input_count = 1;
+                            missing_regular_input_count = 1;
+                          };
+                          sources = [
+                            {
+                              kind = "regular_input";
+                              count = 2;
+                              resolved_count = 1;
+                              missing_count = 1;
+                              resolved_lovelace = "1041836734694";
+                            }
+                            {
+                              kind = "withdrawal";
+                              count = 0;
+                              lovelace = "0";
+                            }
+                            {
+                              kind = "collateral";
+                              conditional = true;
+                              input_count = 1;
+                              body_total_lovelace = "1565693";
+                              return_lovelace = "50005673583";
+                            }
+                            {
+                              kind = "reference_input";
+                              read_only = true;
+                              count = 4;
+                            }
+                          ];
+                          control_groups = [
+                            {
+                              category = "script";
+                              addresses = [ "3132201dc1e82708..." ];
+                              output_indices = [ 0 ];
+                              output_count = 1;
+                              lovelace = "1041836734694";
+                              asset_class_count = 0;
+                              role = "Amaru Network Compliance treasury";
+                              role_provenance = "context_proven";
+                              evidence = [ "ledger_proven" "context_proven" "registry_decoded" ];
+                            }
+                          ];
+                          high_value_movements = [
+                            {
+                              category = "script";
+                              addresses = [ "3132201dc1e82708..." ];
+                              output_indices = [ 0 ];
+                              output_count = 1;
+                              lovelace = "1041836734694";
+                              asset_class_count = 0;
+                              role = "Amaru Network Compliance treasury";
+                              role_provenance = "context_proven";
+                              evidence = [ "ledger_proven" "context_proven" "registry_decoded" ];
+                            }
+                          ];
+                          fee = {
+                            lovelace = "1043795";
+                          };
+                          collateral = {
+                            conditional = true;
+                            input_count = 1;
+                            body_total_lovelace = "1565693";
+                            return_lovelace = "50005673583";
+                          };
+                          net_signer_value = {
+                            provable = false;
+                            lovelace = null;
+                            note = "missing input context, net signer gain/loss unprovable";
+                          };
+                          claims = [
+                            {
+                              label = "Swap ADA<->USDM";
+                              value = "Swapping ADA for USDM";
+                              detail = "metadata label 1694 / self-declared";
+                              provenance = "metadata_claim";
+                              self_declared = true;
+                            }
+                          ];
+                          warnings = [ ];
+                        };
+                      };
+                    };
+                  };
                   witnessPlan = {
                     summary = "Witness plan response envelope";
                     value = {
@@ -766,6 +880,10 @@
       TxIntentResult = {
         "$ref" = "tx-intent-result.schema.json";
         description = "Known registered output datums and resolvable script redeemers may include decoded_datum or decoded_redeemer annotations. Both use the recursive lossless decoded-node wire and identify direct and parameterized registry matches.";
+      };
+      TxReviewResult = {
+        "$ref" = "tx-review-result.schema.json";
+        description = "Signer-facing transaction value-flow review: a deterministic projection over the shared, locally enriched tx.intent result plus the decoded Conway transaction. Ledger amounts are decimal strings; metadata claims are isolated and self-declared.";
       };
       TxWitnessPlanResult = {
         "$ref" = "tx-witness-plan-result.schema.json";

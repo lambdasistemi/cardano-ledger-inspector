@@ -8,10 +8,10 @@ The browser product that consumes this engine lives in
 ## What Is This
 
 One Haskell library, `libs/cardano-ledger-inspector/`, is the canonical
-target-independent wrapper for eight Conway ledger operations —
+target-independent wrapper for nine Conway ledger operations —
 `tx.inspect`, `tx.browse`, `tx.identify`,
-`tx.intent`, `tx.witness.plan`, `tx.witness.attach`, `tx.validate`, and
-`tx.evaluate.scripts` — behind a single JSON dispatcher
+`tx.intent`, `tx.review`, `tx.witness.plan`, `tx.witness.attach`, `tx.validate`,
+and `tx.evaluate.scripts` — behind a single JSON dispatcher
 (`Conway.Inspector.runLedgerOperationInput`). Operations receive a JSON
 control envelope carrying the transaction as CBOR hex. The wrapper delegates
 base semantics to the pinned `cardano-ledger-wasm` kernel, which runs real
@@ -144,6 +144,7 @@ nix develop --quiet -c sh -c '
 | `tx.browse` | Return a navigable representation of the transaction at `args.path`. |
 | `tx.identify` | Return transaction id, body hash, era, byte size, fee, structural counts, and witness counts. |
 | `tx.intent` | Return a signer-focused summary: visible effects, self-declared metadata claims, required signers, scripts, withdrawals, mint/burn, collateral, and context coverage. |
+| `tx.review` | Project the enriched `tx.intent` result into a signer-facing review: output control groups, value sources, high-value movements, fee, conditional collateral, net-signer-value status, and isolated self-declared claims. |
 | `tx.witness.plan` | Return signer, witness, script, redeemer, datum, reference-input, and producer-transaction context coverage data. |
 | `tx.witness.attach` | Attach or replace one vkey witness and return patched transaction CBOR plus stable diagnostics. |
 | `tx.validate` | Build a Conway ledger environment from explicit context, run `applyTx` when context is complete, and report ledger failures. |
@@ -222,6 +223,12 @@ The positive validation fixture is
 `just check-evaluate-scripts` verifies the implemented `tx.evaluate.scripts`
 response shape, including incomplete-context diagnostics, per-redeemer budget
 data, and complete-context execution-unit reporting.
+`just check-review` verifies the implemented `tx.review` projection: a
+complete-context request with a provable signer net, the issue fixture's
+output control groups, fee, conditional collateral, high-value movements,
+isolated metadata claims, and the explicit unprovable-net note, plus
+byte-identical registered and unknown-registry responses across WASI, native,
+and Extism.
 `just check-extism-spike` verifies Extism responses against the WASI reactor
 byte-for-byte. For registered and unknown-script `tx.intent` envelopes it also
 compares the private native wrapper runner, proving identical typed metadata,

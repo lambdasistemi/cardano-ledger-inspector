@@ -35,6 +35,28 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "enum": ["tx.review"]
+          }
+        },
+        "required": ["op"]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "required": ["review"],
+            "properties": {
+              "review": {
+                "$ref": "tx-review-result.schema.json"
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "additionalProperties": true

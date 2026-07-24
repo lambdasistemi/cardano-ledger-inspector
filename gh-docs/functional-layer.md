@@ -87,6 +87,18 @@ workbench owns the browser provider integrations that consume this boundary.
   context coverage. Metadata is surfaced as self-declared intent, not verified
   off-chain truth.
 
+`tx.review`
+: Project the shared, locally enriched `tx.intent` result into one versioned
+  signer-facing review (`result.review`): output control groups (signer
+  controlled, external key, script, bootstrap, unknown), value sources kept
+  separate (regular inputs, withdrawals, conditional collateral, read-only
+  reference inputs), high-value movements in descending lovelace order, fee,
+  collateral, net-signer-value status, and isolated self-declared metadata
+  claims. The net signer result is provable only when every regular input
+  resolves from explicit producer transaction CBOR; otherwise it is reported
+  unprovable. Recognized in the target-independent wrapper, so WASI, native,
+  and Extism return byte-identical review bytes.
+
 `tx.witness.plan`
 : Return transaction-derived signer, witness, script, redeemer, datum, and
   reference-input planning data. When `args.context.producer_txs` is present,

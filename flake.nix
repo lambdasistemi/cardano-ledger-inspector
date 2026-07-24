@@ -1351,6 +1351,171 @@
                 [ "$fail" -eq 0 ] || exit 1
                 touch $out
               '';
+
+          tx-review-smoke = pkgs.runCommand "tx-review-smoke" { } ''
+            mkdir -p $out
+            # Wasmtime writes a compile cache; sandbox HOME is unwritable.
+            export HOME="$PWD"
+            export XDG_CACHE_HOME="$PWD/.cache"
+            mkdir -p "$XDG_CACHE_HOME"
+
+            HOST=${hostTargets.extism-spike-host}/bin/extism-spike-host
+            NATIVE=${hostTargets.tx-inspector-native}/bin/tx-inspector-native
+            WASM=${wasmTargets.wasm-extism-spike}/wasm-extism-spike.wasm
+            REACTOR=${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm
+
+            # Complete-context review request: every regular input resolves,
+            # so the signer net result is provable.
+            ${pkgs.jq}/bin/jq '.op = "tx.review"' \
+              ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > complete-request.json
+            ${pkgs.wasmtime}/bin/wasmtime "$REACTOR" \
+              < complete-request.json > complete-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.review as $r
+              | .ledger_functional_layer == "cardano-ledger-functional/v1"
+              and .op == "tx.review"
+              and $r.version == "cardano-tx-review/v1"
+              and ($r.tx_id | test("^[0-9a-f]{64}$"))
+              and ($r.body_hash | test("^[0-9a-f]{64}$"))
+              and $r.context.input_status == "complete"
+              and $r.context.missing_regular_input_count == 0
+              and ($r.context.regular_input_count == $r.context.resolved_regular_input_count)
+              and $r.net_signer_value.provable == true
+              and $r.net_signer_value.lovelace == "-5900913"
+              and ($r.fee.lovelace | test("^[0-9]+$"))
+              and ($r.control_groups | type == "array")
+              and ($r.high_value_movements | type == "array")
+              and ($r.sources | type == "array")
+              and ($r.claims | type == "array")
+              and ($r.warnings | type == "array")
+              and ($r.sources | length >= 1)
+              and any($r.sources[]; .kind == "regular_input" and .missing_count == 0)
+              and any($r.sources[]; .kind == "withdrawal" and .count == 0 and .lovelace == "0")
+            ' complete-response.json
+
+            # Issue-fixture review request: the SundaeSwap/USDM disbursement
+            # with only one of its two regular inputs resolved.
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
+              --rawfile producer ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement-input-64f27254.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.review",
+                args: {
+                  context: {
+                    producer_txs: {
+                      "64f27254f3c0311fb2e672cdb87de200089a596aa90dc09f8be4248540267cf0": {
+                        tx_cbor: ($producer | gsub("\\s"; "")),
+                        source: "fixture.sundae-swap-usdm-disbursement-input"
+                      }
+                    }
+                  }
+                }
+              }' > registered-request.json
+            ${pkgs.wasmtime}/bin/wasmtime "$REACTOR" \
+              < registered-request.json > registered-response-1.json
+            ${pkgs.wasmtime}/bin/wasmtime "$REACTOR" \
+              < registered-request.json > registered-response-2.json
+            ${pkgs.diffutils}/bin/diff -u registered-response-1.json registered-response-2.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.review as $r
+              | .op == "tx.review"
+              and $r.version == "cardano-tx-review/v1"
+              and $r.fee.lovelace == "1043795"
+              and $r.context.input_status == "incomplete"
+              and $r.context.regular_input_count == 2
+              and $r.context.resolved_regular_input_count == 1
+              and $r.context.missing_regular_input_count == 1
+              and $r.net_signer_value.provable == false
+              and $r.net_signer_value.lovelace == null
+              and $r.net_signer_value.note == "missing input context, net signer gain/loss unprovable"
+              and ([$r.control_groups[].output_indices[]] | length == 12)
+              and any(
+                $r.control_groups[];
+                .output_indices == [0]
+                and .lovelace == "1041836734694"
+                and .category == "script"
+                and .role == "Amaru Network Compliance treasury"
+                and .role_provenance == "context_proven"
+                and (.evidence | index("context_proven") != null)
+                and (.evidence | index("registry_decoded") != null)
+              )
+              and any(
+                $r.control_groups[];
+                .output_indices == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+                and .output_count == 9
+                and .category == "script"
+                and .role == "SundaeSwap V3 order"
+                and .role_provenance == "registry_decoded"
+              )
+              and any(
+                $r.control_groups[];
+                .output_indices == [10]
+                and .category == "script"
+                and .role_provenance == "ledger_proven"
+              )
+              and any(
+                $r.control_groups[];
+                .output_indices == [11]
+                and .category == "external_key"
+                and .lovelace == "49897955481"
+                and .role_provenance == "ledger_proven"
+              )
+              and $r.collateral.conditional == true
+              and $r.collateral.body_total_lovelace == "1565693"
+              and $r.collateral.return_lovelace == "50005673583"
+              and ($r.sources | length >= 3)
+              and any($r.sources[]; .kind == "regular_input" and .count == 2 and .resolved_count == 1 and .missing_count == 1)
+              and any($r.sources[]; .kind == "reference_input" and .read_only == true and .count == 4)
+              and any($r.sources[]; .kind == "collateral" and .conditional == true)
+              and ($r.high_value_movements | length == 3)
+              and ([$r.high_value_movements[].lovelace | tonumber] as $l | $l == ($l | sort | reverse))
+              and ([$r.high_value_movements[].lovelace] == ["1041836734694", "112529520000", "49897955481"])
+              and ([$r.high_value_movements[].category] == ["script", "script", "external_key"])
+              and ($r.high_value_movements[0].lovelace == "1041836734694")
+              and ($r.high_value_movements[0].role == "Amaru Network Compliance treasury")
+              and ($r.high_value_movements[0].role_provenance == "context_proven")
+              and ($r.high_value_movements[1].role == "SundaeSwap V3 order")
+              and any($r.high_value_movements[]; .category == "external_key")
+              and ($r.claims | length >= 1)
+              and ([$r.claims[] | select(.provenance == "metadata_claim" and .self_declared == true)] | length == ($r.claims | length))
+            ' registered-response-1.json
+
+            # Conformance: registered review response is byte-identical
+            # across WASI, native, and Extism (tx_review export).
+            "$HOST" "$WASM" tx_review \
+              < registered-request.json > extism-registered-response.json
+            "$NATIVE" \
+              < registered-request.json > native-registered-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              extism-registered-response.json registered-response-1.json
+            ${pkgs.diffutils}/bin/cmp \
+              native-registered-response.json registered-response-1.json
+
+            # Conformance: unknown-registry review response (complete-context
+            # fixture, no registered scripts) is byte-identical across targets.
+            "$HOST" "$WASM" tx_review \
+              < complete-request.json > extism-complete-response.json
+            "$NATIVE" \
+              < complete-request.json > native-complete-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              extism-complete-response.json complete-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              native-complete-response.json complete-response.json
+
+            cp complete-request.json complete-response.json \
+              registered-request.json registered-response-1.json registered-response-2.json \
+              extism-registered-response.json native-registered-response.json \
+              extism-complete-response.json native-complete-response.json \
+              $out/
+          '';
+
+          tx-review-types-test = pkgs.runCommand "tx-review-types-test" { } ''
+            ${hostTargets.review-types}/bin/review-types
+            touch $out
+          '';
         in
         {
           packages = {
@@ -1382,7 +1547,9 @@
               tx-explain-render-smoke
               tx-deep-diagnosis-emit-explain-smoke
               cardano-ledger-wasm-pin-check
-              protocol-registry-drift-check;
+              protocol-registry-drift-check
+              tx-review-smoke
+              tx-review-types-test;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
@@ -1459,6 +1626,8 @@
                 mkApp (mkSmokeApp "tx-input-context-smoke" tx-input-context-smoke);
               tx-extism-spike-smoke =
                 mkApp (mkSmokeApp "tx-extism-spike-smoke" tx-extism-spike-smoke);
+              tx-review-smoke =
+                mkApp (mkSmokeApp "tx-review-smoke" tx-review-smoke);
               tx-explain-render-smoke =
                 mkApp (mkSmokeApp "tx-explain-render-smoke" tx-explain-render-smoke);
               tx-deep-diagnosis-emit-explain-smoke =
