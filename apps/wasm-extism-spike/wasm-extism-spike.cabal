@@ -22,7 +22,7 @@ library wasm-extism-spike-lib
     , aeson
     , base               >=4.19 && <5
     , bytestring
-    , cardano-ledger-wasm
+    , cardano-ledger-inspector
     , extism-pdk
     , text
 
@@ -40,5 +40,6 @@ executable wasm-extism-spike
   ghc-options:
     -Wall -no-hs-main -optl-mexec-model=reactor
     "-optl-Wl,--export=hs_init" "-optl-Wl,--export=tx_identify"
-    "-optl-Wl,--export=tx_validate" "-optl-Wl,--export=tx_evaluate_scripts"
+    "-optl-Wl,--export=tx_intent" "-optl-Wl,--export=tx_validate"
+    "-optl-Wl,--export=tx_evaluate_scripts"
     "-optl-Wl,--allow-undefined"

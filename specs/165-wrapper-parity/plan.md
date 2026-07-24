@@ -36,10 +36,15 @@ tree to the library's `src/` tree and is applied to:
    `tx-rdf-core`; and
 3. the full-repository source passed to the native haskell.nix project.
 
-The native `cabal.project` adds the local inspector package and the pinned
-`tx-rdf-core` source-repository package. The Extism project lists the local
-inspector and injected `tx-rdf-core` path packages. Any affected WASM fixed
-dependency hashes are regenerated deliberately.
+The native `cabal.project` adds the local inspector package. The reusable
+library replaces its former `tx-rdf-core` decoder imports with the equivalent
+ledger transaction decoder and embedded CIP-57 schema adapter, keeping
+`tx-rdf-core` WASI-only. The Extism project still lists the injected
+`tx-rdf-core` path because GHC 9.12 resolves the package's WASI executable
+component even though the plugin builds the library. The WASI executable is
+explicitly unavailable under native GHC 9.8, and the local library declares
+compatibility floors matching the repository's clean native ledger plan.
+Any affected WASM fixed dependency hashes are regenerated deliberately.
 
 ## Conformance Shape
 

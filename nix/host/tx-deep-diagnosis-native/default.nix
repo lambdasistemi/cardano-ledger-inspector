@@ -1,4 +1,4 @@
-{ CHaP, pkgs }:
+{ CHaP, pkgs, src }:
 
 let
   fix-libs = { lib, pkgs, ... }: {
@@ -10,7 +10,7 @@ let
 
   project = pkgs.haskell-nix.cabalProject' {
     name = "tx-deep-diagnosis-native";
-    src = ./../../..;
+    inherit src;
     compiler-nix-name = "ghc984";
     modules = [ fix-libs ];
     inputMap = { "https://chap.intersectmbo.org/" = CHaP; };
@@ -22,4 +22,6 @@ in
     project.hsPkgs.tx-deep-diagnosis.components.exes.tx-deep-diagnosis;
   tx-deep-diagnosis-render-snapshot =
     project.hsPkgs.tx-deep-diagnosis.components.exes.tx-deep-diagnosis-render-snapshot;
+  tx-inspector-native =
+    project.hsPkgs.cardano-ledger-inspector.components.exes.tx-inspector-native;
 }

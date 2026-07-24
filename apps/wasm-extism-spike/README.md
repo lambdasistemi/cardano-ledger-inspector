@@ -11,8 +11,8 @@ this Haskell ledger by feeding identical inputs to both.
 
 - `wasm-extism-spike/` — Haskell package depending on `extism-pdk` and
   the inspector library. The foreign exports — `tx_identify`,
-  `tx_validate`, and `tx_evaluate_scripts` — all delegate to the inspector's
-  `runLedgerOperationInput`. The Extism response is therefore
+  `tx_intent`, `tx_validate`, and `tx_evaluate_scripts` — all delegate to the
+  local wrapper's `runLedgerOperationInput`. The Extism response is therefore
   byte-identical to the WASI reactor's response on the same input,
   which is exactly what conformance vs another implementation needs.
 - `cabal-wasm.project` — same fork overrides as `tx-inspector` plus
@@ -28,10 +28,12 @@ just build-extism-spike
 just check-extism-spike
 ```
 
-`check-extism-spike` runs `tx_identify`, `tx_validate`, and
-`tx_evaluate_scripts` against the canonical Conway fixtures and asserts
-the operation responses match the WASI reactor's response **byte-for-byte**
-where the same envelope is run through both paths.
+`check-extism-spike` runs `tx_identify`, `tx_intent`, `tx_validate`, and
+`tx_evaluate_scripts` against canonical Conway fixtures. Registered and
+unknown-script `tx.intent` requests are compared **byte-for-byte** across the
+WASI reactor, native wrapper runner, and Extism plugin, with semantic
+assertions for typed metadata, registered datum/redeemer/deployment meaning,
+and unknown raw fallback.
 
 ## Spike outcome
 
@@ -40,8 +42,8 @@ where the same envelope is run through both paths.
 | `extism-pdk` co-exists with the Conway closure under `wasm32-wasi-ghc 9.12` | ✅ |
 | Cabal solver accepts the combined dep set at the inspector's index-state | ✅ |
 | Resulting `.wasm` is a valid Extism plugin shape (named exports + WASI) | ✅ |
-| Plugin runs end-to-end (libextism + Wasmtime, `tx_identify`, `tx_validate`, and `tx_evaluate_scripts`) | ✅ |
-| Extism response is byte-identical to WASI reactor response on the same envelope | ✅ |
+| Plugin runs end-to-end (libextism + Wasmtime, `tx_identify`, `tx_intent`, `tx_validate`, and `tx_evaluate_scripts`) | ✅ |
+| Registered and unknown-script `tx.intent` responses are byte-identical across WASI, native, and Extism | ✅ |
 | Plugin runs through `pkgs.extism-cli` (Go, wazero) | ❌ (see below) |
 
 ## Two host paths — only one currently works
@@ -57,8 +59,8 @@ extism-spike-host PATH-TO-WASM [FUNCTION] < envelope.json > response.json
 ```
 
 `FUNCTION` defaults to `tx_identify`; pass `tx_validate` or
-`tx_evaluate_scripts` for the other implemented operations. The envelope
-is the same JSON the WASI reactor accepts on stdin.
+`tx_intent` or `tx_evaluate_scripts` for the other implemented operations.
+The envelope is the same JSON the WASI reactor accepts on stdin.
 
 **Blocked: `pkgs.extism-cli` (Go, wazero).** Version 1.6.3 (July 2024)
 embeds a wazero that predates

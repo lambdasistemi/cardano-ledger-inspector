@@ -86,8 +86,6 @@
             ]
           );
 
-          hostTargets = import ./nix/host { inherit pkgs CHaP; };
-
           # The protocol registry (docs/inspector/protocols) is the same
           # tree cabal's `data-dir: ../../docs/inspector/protocols` bundles
           # into tx-deep-diagnosis. Package it standalone so an external
@@ -105,15 +103,15 @@
             hash = "sha256:${expectedTxRdfCore.sha256}";
           };
 
-          txInspectorWithRdfSrc =
-            pkgs.runCommand "wasm-tx-inspector-src-with-tx-rdf-core" { } ''
+          withInspectorSources = name: src: inspectorSourceDir:
+            pkgs.runCommand name { } ''
               mkdir -p "$out"
-              cp -rL ${./libs/cardano-ledger-inspector}/. "$out/"
+              cp -rL ${src}/. "$out/"
               chmod -R u+w "$out"
               mkdir -p "$out/external"
               cp -rL ${txRdfCoreSrc}/tx-rdf-core "$out/external/tx-rdf-core"
-              mkdir -p "$out/app/Conway/Inspector"
-              cat > "$out/app/Conway/Inspector/EmbeddedRegistry.hs" <<'EOF'
+              mkdir -p "$out/${inspectorSourceDir}/Conway/Inspector"
+              cat > "$out/${inspectorSourceDir}/Conway/Inspector/EmbeddedRegistry.hs" <<'EOF'
               {-# LANGUAGE OverloadedStrings #-}
               {-# LANGUAGE ImportQualifiedPost #-}
               module Conway.Inspector.EmbeddedRegistry (embeddedRegistryJson) where
@@ -136,6 +134,26 @@
               EOF
             '';
 
+          txInspectorWithRdfSrc = withInspectorSources
+            "wasm-tx-inspector-src-with-wrapper-inputs"
+            ./libs/cardano-ledger-inspector
+            "src";
+
+          extismInspectorSrc = withInspectorSources
+            "wasm-extism-spike-src-with-wrapper-inputs"
+            ./.
+            "libs/cardano-ledger-inspector/src";
+
+          nativeInspectorSrc = withInspectorSources
+            "native-inspector-src-with-wrapper-inputs"
+            ./.
+            "libs/cardano-ledger-inspector/src";
+
+          hostTargets = import ./nix/host {
+            inherit pkgs CHaP;
+            src = nativeInspectorSrc;
+          };
+
           wasmTargetsBase = import ./nix/wasm-targets.nix {
             inherit pkgs;
             libWasm = self.lib.wasm;
@@ -146,7 +164,7 @@
             smokeSrc = ./nix/wasm/smoke;
             ledgerSmokeSrc = ./nix/wasm/ledger-smoke;
             txInspectorSrc = txInspectorWithRdfSrc;
-            extismSpikeSrc = ./.;
+            extismSpikeSrc = extismInspectorSrc;
           };
 
           wasmTargets = wasmTargetsBase // {
@@ -1066,6 +1084,7 @@
             mkdir -p "$XDG_CACHE_HOME"
 
             HOST=${hostTargets.extism-spike-host}/bin/extism-spike-host
+            NATIVE=${hostTargets.tx-inspector-native}/bin/tx-inspector-native
             WASM=${wasmTargets.wasm-extism-spike}/wasm-extism-spike.wasm
 
             # tx.identify
@@ -1113,6 +1132,86 @@
             ${pkgs.jq}/bin/jq -s -e '.[0] == .[1]' \
               validate-response.json wasi-validate-response.json
 
+            # tx.intent - registered SundaeSwap/Amaru fixture
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement.hex} \
+              --rawfile producer ${./specs/001-ledger-functional-layer/fixtures/sundae-swap-usdm-disbursement-input-64f27254.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.intent",
+                args: {
+                  context: {
+                    producer_txs: {
+                      "64f27254f3c0311fb2e672cdb87de200089a596aa90dc09f8be4248540267cf0": {
+                        tx_cbor: ($producer | gsub("\\s"; "")),
+                        source: "fixture.sundae-swap-usdm-disbursement-input"
+                      }
+                    }
+                  }
+                }
+              }' > registered-intent-request.json
+            "$HOST" "$WASM" tx_intent \
+              < registered-intent-request.json > extism-registered-intent-response.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < registered-intent-request.json > wasi-registered-intent-response.json
+            "$NATIVE" \
+              < registered-intent-request.json > native-registered-intent-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              extism-registered-intent-response.json \
+              wasi-registered-intent-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              native-registered-intent-response.json \
+              wasi-registered-intent-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.intent as $intent
+              | $intent.auxiliary_data.metadata[0].label == "1694"
+              and $intent.auxiliary_data.metadata[0].value.type == "map"
+              and ([ $intent.value.outputs[]?
+                | select(.decoded_datum.label == "Amaru Network Compliance treasury")
+              ] | length == 1)
+              and ([ $intent.value.outputs[]?
+                | select(.decoded_datum.label == "SundaeSwap V3 order")
+              ] | length == 9)
+              and ([ $intent.value.outputs[]?
+                | .decoded_datum.deployment.reference_input_matches[]?
+              ] | unique | length == 4)
+              and any(
+                $intent.scripts[]?;
+                .purpose == "spending"
+                and .decoded_redeemer.label == "Amaru Network Compliance treasury"
+                and .decoded_redeemer.constructor == "Disburse"
+              )
+            ' extism-registered-intent-response.json
+
+            # tx.intent - unknown-script fixture keeps raw fallback only
+            ${pkgs.jq}/bin/jq '.op = "tx.intent"' \
+              ${./specs/001-ledger-functional-layer/fixtures/tx-validate-complete-request.json} \
+              > unknown-intent-request.json
+            "$HOST" "$WASM" tx_intent \
+              < unknown-intent-request.json > extism-unknown-intent-response.json
+            ${pkgs.wasmtime}/bin/wasmtime \
+              ${wasmTargets.wasm-tx-inspector}/wasm-tx-inspector.wasm \
+              < unknown-intent-request.json > wasi-unknown-intent-response.json
+            "$NATIVE" \
+              < unknown-intent-request.json > native-unknown-intent-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              extism-unknown-intent-response.json \
+              wasi-unknown-intent-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              native-unknown-intent-response.json \
+              wasi-unknown-intent-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.intent as $intent
+              | ([ $intent.value.outputs[]?
+                | select(.datum.decoded != null and (has("decoded_datum") | not))
+              ] | length == 4)
+              and ([ $intent.scripts[]?
+                | select(.redeemer_cbor_hex != null and (has("decoded_redeemer") | not))
+              ] | length == 1)
+            ' extism-unknown-intent-response.json
+
             # tx.evaluate.scripts - complete-context fixture (status=succeeded)
             "$HOST" "$WASM" tx_evaluate_scripts \
               < ${./specs/001-ledger-functional-layer/fixtures/tx-evaluate-scripts-complete-request.json} \
@@ -1139,6 +1238,14 @@
 
             cp identify-request.json identify-response.json \
               validate-response.json wasi-validate-response.json \
+              registered-intent-request.json \
+              extism-registered-intent-response.json \
+              native-registered-intent-response.json \
+              wasi-registered-intent-response.json \
+              unknown-intent-request.json \
+              extism-unknown-intent-response.json \
+              native-unknown-intent-response.json \
+              wasi-unknown-intent-response.json \
               evaluate-scripts-response.json wasi-evaluate-scripts-response.json \
               $out/
           '';

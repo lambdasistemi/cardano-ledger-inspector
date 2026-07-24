@@ -4,9 +4,9 @@ name: release-assets
 # the conformance-relevant artifacts and uploads them to the release.
 #
 # Conformance artifact: cardano-ledger-reference.wasm — Extism plugin
-# exposing tx_identify and tx_validate. Alternative-node implementors
-# load this in their own test runner via any extism host SDK and diff
-# their results against ours.
+# exposing tx_identify, tx_intent, tx_validate, and tx_evaluate_scripts.
+# Alternative-node implementors load this in their own test runner via any
+# extism host SDK and diff their results against ours.
 
 on:
   release:

@@ -7,14 +7,17 @@ The browser product that consumes this engine lives in
 
 ## What Is This
 
-One Haskell library, `libs/cardano-ledger-inspector/`, implements eight
-Conway ledger operations — `tx.inspect`, `tx.browse`, `tx.identify`,
+One Haskell library, `libs/cardano-ledger-inspector/`, is the canonical
+target-independent wrapper for eight Conway ledger operations —
+`tx.inspect`, `tx.browse`, `tx.identify`,
 `tx.intent`, `tx.witness.plan`, `tx.witness.attach`, `tx.validate`, and
 `tx.evaluate.scripts` — behind a single JSON dispatcher
 (`Conway.Inspector.runLedgerOperationInput`). Operations receive a JSON
-control envelope carrying the transaction as CBOR hex, run real
+control envelope carrying the transaction as CBOR hex. The wrapper delegates
+base semantics to the pinned `cardano-ledger-wasm` kernel, which runs real
 `cardano-ledger-conway` code (including `applyTx` and phase-2 script
-evaluation), and return JSON results.
+evaluation), then owns the typed metadata and embedded protocol-registry
+`tx.intent` enrichments.
 
 The library is compiled three ways from the same source: to a `wasm32-wasi`
 reactor (`wasm-tx-inspector.wasm`) consumed by the cardano-swiss-knife
@@ -49,10 +52,10 @@ flowchart TB
   Lib --> Ledger
 ```
 
-- `libs/cardano-ledger-inspector/` — Haskell library implementing the Conway
-  ledger operations. The library plus a 34-line WASI `Main.hs` compile to
-  `wasm-tx-inspector.wasm`; the same library is also linked natively by the
-  CLI below.
+- `libs/cardano-ledger-inspector/` — canonical Haskell wrapper owning the
+  target-independent operation boundary and `tx.intent` enrichments. Its WASI
+  shell compiles to `wasm-tx-inspector.wasm`; the same library is linked by the
+  native CLI and Extism plugin below.
 - `apps/tx-deep-diagnosis/` — native CLI that links the inspector library
   directly, resolves producer transactions via Blockfrost, and labels script
   hashes against the protocol registry to produce a layered diagnosis report.
@@ -61,7 +64,8 @@ flowchart TB
   checkout. Pass `--registry DIR` (repeatable) to layer your own protocol
   identifications on top.
 - `apps/wasm-extism-spike/` — wasm Extism plugin exposing the inspector's
-  operations as named exports for cross-implementation conformance testing.
+  operations, including `tx_intent`, as named exports for
+  cross-implementation conformance testing.
 - `apps/extism-spike-host/` — native Extism host that loads the wasm spike
   via libextism for CI-side conformance checks.
 - `docs/inspector/protocols/` — protocol registry source consumed by the
@@ -78,10 +82,11 @@ Tagged releases are produced by
 conventional-commit history. Each release attaches:
 
 - `cardano-ledger-reference-<tag>.wasm` — Extism plugin exposing
-  `tx_identify`, `tx_validate`, and `tx_evaluate_scripts`. The conformance
-  reference for alternative node implementations: load this in your test
-  runner via any [Extism host SDK](https://extism.org/docs/concepts/host-sdk),
-  call the same exports against the same input, diff your output. The
+  `tx_identify`, `tx_intent`, `tx_validate`, and `tx_evaluate_scripts`. The
+  conformance reference for alternative node implementations: load this in
+  your test runner via any
+  [Extism host SDK](https://extism.org/docs/concepts/host-sdk), call the same
+  exports against the same input, diff your output. The
   Wasmtime-backed SDKs (Rust, Haskell, Python via libextism, etc.)
   work; the Go SDK currently does not because its bundled wazero
   predates wasm tail-call support.
@@ -156,8 +161,8 @@ Hosts and entry points:
   for registries, Blockfrost resolution, and `--emit-explain` artifacts.
 - **Extism host** —
   `extism-spike-host PATH-TO-WASM [FUNCTION] < envelope.json > response.json`
-  calls the plugin's `tx_identify`, `tx_validate`, or `tx_evaluate_scripts`
-  exports.
+  calls the plugin's `tx_identify`, `tx_intent`, `tx_validate`, or
+  `tx_evaluate_scripts` exports.
 
 ## Documentation
 
@@ -218,7 +223,10 @@ The positive validation fixture is
 response shape, including incomplete-context diagnostics, per-redeemer budget
 data, and complete-context execution-unit reporting.
 `just check-extism-spike` verifies Extism responses against the WASI reactor
-byte-for-byte. `just test` runs the complete engine CI recipe.
+byte-for-byte. For registered and unknown-script `tx.intent` envelopes it also
+compares the private native wrapper runner, proving identical typed metadata,
+registered datum/redeemer/deployment enrichment, and raw fallback across all
+three targets. `just test` runs the complete engine CI recipe.
 
 ## License
 

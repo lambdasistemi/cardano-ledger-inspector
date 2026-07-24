@@ -11,21 +11,23 @@ module Conway.Inspector.ProtocolRegistry
     ( enrichIntent
     ) where
 
-import Cardano.Ledger.Api.Scripts.Data (Data)
+import Cardano.Ledger.Api.Scripts.Data (Data, getPlutusData)
 import Cardano.Ledger.Conway (ConwayEra)
-import Cardano.Tx.Blueprint qualified as Blueprint
 import Control.Applicative ((<|>))
 import Control.Monad (when, (<=<), (>=>))
 import Data.Aeson ((.=))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
+import Data.ByteString.Base16 qualified as Base16
 import Data.Foldable qualified as Foldable
 import Data.List (find)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Text.Encoding qualified as TextEncoding
+import PlutusLedgerApi.V1 qualified as Plutus
 
 import Conway.Inspector.EmbeddedRegistry (embeddedRegistryJson)
 
@@ -109,11 +111,6 @@ decodeRedeemer
     :: Aeson.Value -> Aeson.Object -> Data ConwayEra -> Maybe Aeson.Value
 decodeRedeemer registry entry raw = do
     blueprintValue <- blueprintFor registry entry
-    blueprint <-
-        either
-            (const Nothing)
-            Just
-            (Blueprint.parseBlueprintJSON (Aeson.encode blueprintValue))
     validator <- lookupText "validator" entry
     rawValidators <- lookupArray "validators" blueprintValue
     rawValidator <-
@@ -122,44 +119,18 @@ decodeRedeemer registry entry raw = do
             (Foldable.toList rawValidators)
     rawRedeemer <- lookupObject "redeemer" =<< asObject rawValidator
     rawSchema <- lookupObject "schema" rawRedeemer
-    validatorEntry <-
-        find
-            ((== Just validator) . Blueprint.validatorTitle)
-            (Blueprint.blueprintValidators blueprint)
-    redeemer <- Blueprint.validatorRedeemer validatorEntry
-    schema <-
-        either
-            (const Nothing)
-            Just
-            ( Blueprint.resolveBlueprintSchema
-                blueprint
-                (Blueprint.argumentSchema redeemer)
-            )
     decoded <-
-        either (const Nothing) Just (Blueprint.decodeBlueprintData schema raw)
-    let renderSchema = selectedSchema raw schema
+        decodeSchema
+            (Aeson.Object blueprintValue)
+            rawSchema
+            (plutusDataNode raw)
     annotation
         registry
         []
         entry
         "redeemer"
         rawSchema
-        (openValueNode renderSchema decoded)
-
-selectedSchema
-    :: Data ConwayEra
-    -> Blueprint.BlueprintSchema
-    -> Blueprint.BlueprintSchema
-selectedSchema datum schema =
-    case Blueprint.schemaKind schema of
-        Blueprint.SchemaAnyOf alternatives ->
-            case [ alternative
-                 | alternative <- alternatives
-                 , Right _ <- [Blueprint.decodeBlueprintData alternative datum]
-                 ] of
-                [alternative] -> selectedSchema datum alternative
-                _ -> schema
-        _ -> schema
+        decoded
 
 annotation
     :: Aeson.Value
@@ -484,81 +455,52 @@ rawNode value@(Aeson.Object object) = case lookupText "kind" object of
 rawNode value = value
 
 resolveReference :: Aeson.Value -> Text -> Maybe Aeson.Object
-resolveReference _ _ =
-    -- Curated datum schemas do not carry a blueprint identity. Blueprint
-    -- schemas resolve only through their matched Blueprint value above.
-    Nothing
-
-openValueNode
-    :: Blueprint.BlueprintSchema -> Blueprint.OpenValue -> Aeson.Value
-openValueNode schema value =
-    case (Blueprint.schemaKind schema, value) of
-        (Blueprint.SchemaConstructor _ fields, Blueprint.OpenObject values) ->
-            Aeson.object
-                [ "kind" .= ("constructor" :: Text)
-                , "name" .= fromMaybe "Constructor" (Blueprint.schemaTitle schema)
-                , "fields" .= Aeson.Object (KeyMap.fromList (map field fields))
-                ]
-          where
-            field fieldSchema =
-                let name = fromMaybe "field" (Blueprint.schemaTitle fieldSchema)
-                in  ( Key.fromText name
-                    , maybe Aeson.Null (openValueNode fieldSchema) (Map.lookup name values)
-                    )
-        ( Blueprint.SchemaMap keySchema valueSchema
-            , Blueprint.OpenArray entries
-            ) ->
-                Aeson.object
-                    [ "kind" .= ("map" :: Text)
-                    , "entries" .= map (mapEntry keySchema valueSchema) entries
-                    ]
-        (Blueprint.SchemaList _, Blueprint.OpenArray items) ->
-            Aeson.object
-                ["kind" .= ("list" :: Text), "items" .= map rawOpenValue items]
-        (Blueprint.SchemaListOf itemSchema, Blueprint.OpenArray items) ->
-            Aeson.object
-                [ "kind" .= ("list" :: Text)
-                , "items" .= map (openValueNode itemSchema) items
-                ]
-        (_, Blueprint.OpenInteger integer) ->
-            Aeson.object
-                ["kind" .= ("integer" :: Text), "value" .= Text.pack (show integer)]
-        (_, Blueprint.OpenBytes hex) -> Aeson.object ["kind" .= ("bytes" :: Text), "hex" .= hex]
-        _ -> rawOpenValue value
+resolveReference root ref = do
+    pointer <- Text.stripPrefix "#/" ref
+    resolved <-
+        lookupPointer (map decodePointerToken (Text.splitOn "/" pointer)) root
+    asObject resolved
   where
-    mapEntry keySchema valueSchema (Blueprint.OpenObject entry) =
-        Aeson.object
-            [ "key"
-                .= maybe Aeson.Null (openValueNode keySchema) (Map.lookup "key" entry)
-            , "value"
-                .= maybe
-                    Aeson.Null
-                    (openValueNode valueSchema)
-                    (Map.lookup "value" entry)
-            ]
-    mapEntry _ _ entry = rawOpenValue entry
+    lookupPointer [] value = Just value
+    lookupPointer (key : keys) value =
+        asObject value
+            >>= KeyMap.lookup (Key.fromText key)
+            >>= lookupPointer keys
+    decodePointerToken = Text.replace "~1" "/" . Text.replace "~0" "~"
 
-rawOpenValue :: Blueprint.OpenValue -> Aeson.Value
-rawOpenValue = \case
-    Blueprint.OpenInteger integer ->
+plutusDataNode :: Data ConwayEra -> Aeson.Value
+plutusDataNode = rawPlutusDataNode . getPlutusData
+
+rawPlutusDataNode :: Plutus.Data -> Aeson.Value
+rawPlutusDataNode = \case
+    Plutus.I integer ->
         Aeson.object
-            ["kind" .= ("integer" :: Text), "value" .= Text.pack (show integer)]
-    Blueprint.OpenBytes hex -> Aeson.object ["kind" .= ("bytes" :: Text), "hex" .= hex]
-    Blueprint.OpenArray values ->
+            ["kind" .= ("int" :: Text), "value" .= Text.pack (show integer)]
+    Plutus.B bytes ->
         Aeson.object
-            ["kind" .= ("list" :: Text), "items" .= map rawOpenValue values]
-    Blueprint.OpenObject values ->
-        Aeson.object
-            [ "kind" .= ("constructor" :: Text)
-            , "fields"
-                .= Aeson.Object
-                    ( KeyMap.fromList
-                        [ (Key.fromText key, rawOpenValue value)
-                        | (key, value) <- Map.toList values
-                        ]
-                    )
+            [ "kind" .= ("bytes" :: Text)
+            , "hex" .= TextEncoding.decodeUtf8 (Base16.encode bytes)
             ]
-    Blueprint.OpenText text -> Aeson.String text
+    Plutus.List values ->
+        Aeson.object
+            ["kind" .= ("list" :: Text), "items" .= map rawPlutusDataNode values]
+    Plutus.Map entries ->
+        Aeson.object
+            [ "kind" .= ("map" :: Text)
+            , "entries"
+                .= [ Aeson.object
+                    [ "key" .= rawPlutusDataNode key
+                    , "value" .= rawPlutusDataNode value
+                    ]
+                   | (key, value) <- entries
+                   ]
+            ]
+    Plutus.Constr index fields ->
+        Aeson.object
+            [ "kind" .= ("constr" :: Text)
+            , "index" .= index
+            , "fields" .= map rawPlutusDataNode fields
+            ]
 
 modifyPath
     :: [Text] -> (Aeson.Value -> Aeson.Value) -> Aeson.Value -> Aeson.Value

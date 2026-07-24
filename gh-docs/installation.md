@@ -8,7 +8,7 @@ conventional-commit history. Each release attaches:
 
 | Asset | Contents |
 | --- | --- |
-| `cardano-ledger-reference-<tag>.wasm` | Extism plugin exposing `tx_identify`, `tx_validate`, and `tx_evaluate_scripts`. The conformance reference for alternative node implementations: load it with any Wasmtime-backed [Extism host SDK](https://extism.org/docs/concepts/host-sdk). The Go SDK does not work yet because its bundled wazero predates wasm tail-call support. |
+| `cardano-ledger-reference-<tag>.wasm` | Extism plugin exposing `tx_identify`, `tx_intent`, `tx_validate`, and `tx_evaluate_scripts`. Its `tx_intent` bytes are checked against both the WASI reactor and native wrapper for registered and unknown scripts. Load it with any Wasmtime-backed [Extism host SDK](https://extism.org/docs/concepts/host-sdk). The Go SDK does not work yet because its bundled wazero predates wasm tail-call support. |
 | `wasm-tx-inspector-<tag>.wasm` | The same Conway ledger packaged as a WASI reactor (stdin/stdout JSON), for shell-driven debugging and external hosts such as cardano-swiss-knife. |
 | `ledger-functional-openapi-<tag>.tar.gz` | OpenAPI contract for the JSON envelope. |
 | `SHA256SUMS-<tag>.txt` | Checksums for the assets above. |
