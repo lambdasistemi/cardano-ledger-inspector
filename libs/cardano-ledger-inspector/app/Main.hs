@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE PackageImports #-}
 
 {- | WASI reactor entry: read either raw Conway tx hex or a JSON ledger-operation
   envelope on stdin, write JSON on stdout. Error category on stderr, non-zero
@@ -11,23 +10,15 @@ module Main (main) where
 
 import Cardano.Crypto.Hash (hashFromStringAsHex, hashToBytes)
 import qualified Cardano.Crypto.Hash as Crypto
-import Cardano.Ledger.Address (Addr (..))
 import qualified Cardano.Ledger.Api as L
-import Cardano.Ledger.Api.Scripts.Data (Data)
-import Cardano.Ledger.Api.Tx.Out (TxOut, addrTxOutL)
 import Cardano.Ledger.BaseTypes (TxIx (..))
-import qualified Cardano.Ledger.BaseTypes as BaseTypes
-import Cardano.Ledger.Binary (decodeFullFromHexText, natVersion)
 import Cardano.Ledger.Conway (ConwayEra)
 import qualified Cardano.Ledger.Core as Core
-import Cardano.Ledger.Credential (Credential (ScriptHashObj))
 import Cardano.Ledger.Hashes (ScriptHash (..), extractHash)
 import qualified Cardano.Ledger.TxIn as TxIn
 import qualified Cardano.Tx.Blueprint as Blueprint
 import qualified Cardano.Tx.Decode as TxDecode
 import qualified Cardano.Tx.Graph.Emit as TxGraph
-import qualified Conway.Inspector as Inspector
-import qualified Conway.Inspector.ProtocolRegistry as ProtocolRegistry
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
@@ -35,17 +26,15 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BSL
-import Data.Either (fromRight)
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
-import qualified Data.Set as Set
+import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TextEncoding
-import Data.Word (Word64)
 import Lens.Micro ((^.))
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr, stdout)
+import qualified "cardano-ledger-inspector" Conway.Inspector as Inspector
 
 data RdfRequest
     = RdfRequest
@@ -467,194 +456,7 @@ runInspectorOperation input =
             die "malformed_ledger_operation" err
         Left (Inspector.UnknownLedgerOperation operation) ->
             die "unknown_ledger_operation" (T.unpack operation)
-        Right value -> writeJson (enrichIntentResponse input value)
-
-enrichIntentResponse :: BS.ByteString -> Aeson.Value -> Aeson.Value
-enrichIntentResponse input response =
-    case (intentTxCbor input, intentResponse response) of
-        (Just txCbor, True) ->
-            case TxDecode.decodeConwayTxInput (TextEncoding.encodeUtf8 txCbor) of
-                Left _ -> response
-                Right tx ->
-                    insertIntentMetadata tx $
-                        ProtocolRegistry.enrichIntent
-                            (referenceInputOutrefs tx)
-                            (producerInputScriptHashes (intentProducerContext input))
-                            (intentRedeemers response)
-                            response
-        _ -> response
-
-intentTxCbor :: BS.ByteString -> Maybe T.Text
-intentTxCbor input = do
-    Aeson.Object request <- Aeson.decodeStrict' input
-    Aeson.String operation <- KeyMap.lookup "op" request
-    Aeson.String txCbor <- KeyMap.lookup "tx_cbor" request
-    if operation == "tx.intent" || operation == "intent"
-        then Just txCbor
-        else Nothing
-
-intentProducerContext :: BS.ByteString -> ProducerContext
-intentProducerContext input =
-    case Aeson.decodeStrict' input of
-        Just (Aeson.Object request) ->
-            fromRight (ProducerContext Map.empty) $
-                producerContextFromArgs $
-                    fromMaybe Aeson.Null (KeyMap.lookup "args" request)
-        _ -> ProducerContext Map.empty
-
-{- | Decode redeemers through the pinned Conway ledger decoder.  The
-protocol registry only receives already-decoded ledger data; it never
-interprets CBOR itself.
--}
-intentRedeemers :: Aeson.Value -> Map.Map T.Text (Data ConwayEra)
-intentRedeemers response =
-    Map.fromList (mapMaybe decodeScript scripts)
-  where
-    scripts =
-        case response of
-            Aeson.Object root ->
-                maybe [] Foldable.toList $
-                    KeyMap.lookup "result" root
-                        >>= asObject
-                        >>= KeyMap.lookup "intent"
-                        >>= asObject
-                        >>= KeyMap.lookup "scripts"
-                        >>= asArray
-            _ -> []
-    decodeScript (Aeson.Object script) = do
-        Aeson.Object input <- KeyMap.lookup "input" script
-        Aeson.String txId <- KeyMap.lookup "tx_id" input
-        index <- KeyMap.lookup "index" input >>= asInteger
-        Aeson.String cbor <- KeyMap.lookup "redeemer_cbor_hex" script
-        datum <- decodePlutusData cbor
-        pure (txId <> "#" <> T.pack (show index), datum)
-    decodeScript _ = Nothing
-    asObject (Aeson.Object value) = Just value
-    asObject _ = Nothing
-    asArray (Aeson.Array value) = Just value
-    asArray _ = Nothing
-    asInteger (Aeson.Number value) = Just (floor value :: Integer)
-    asInteger _ = Nothing
-
-decodePlutusData :: T.Text -> Maybe (Data ConwayEra)
-decodePlutusData hex =
-    either (const Nothing) Just $
-        decodeFullFromHexText (natVersion @11) (T.strip hex)
-
-referenceInputOutrefs :: TxDecode.ConwayTx -> [T.Text]
-referenceInputOutrefs tx =
-    map txInOutref $
-        Set.toAscList $
-            tx ^. (Core.bodyTxL . L.referenceInputsTxBodyL)
-
-producerInputScriptHashes :: ProducerContext -> Map.Map T.Text T.Text
-producerInputScriptHashes (ProducerContext producers) =
-    Map.fromList $
-        concatMap producerOutputs (Map.toList producers)
-  where
-    producerOutputs (txId, ProducerTx _ (Right tx)) =
-        mapMaybe
-            ( \(ix, output) ->
-                fmap
-                    (txId <> "#" <> T.pack (show ix),)
-                    (outputScriptHash output)
-            )
-            ( zip
-                [0 :: Int ..]
-                (Foldable.toList (tx ^. (Core.bodyTxL . L.outputsTxBodyL)))
-            )
-    producerOutputs _ = []
-
-outputScriptHash :: TxOut ConwayEra -> Maybe T.Text
-outputScriptHash output =
-    case output ^. addrTxOutL of
-        Addr _ (ScriptHashObj (ScriptHash hash)) _ ->
-            Just (TextEncoding.decodeUtf8 (B16.encode (hashToBytes hash)))
-        _ -> Nothing
-
-txInOutref :: TxIn.TxIn -> T.Text
-txInOutref (TxIn.TxIn (TxIn.TxId hash) (TxIx index)) =
-    TextEncoding.decodeUtf8 (B16.encode (hashToBytes (extractHash hash)))
-        <> "#"
-        <> T.pack (show index)
-
-intentResponse :: Aeson.Value -> Bool
-intentResponse (Aeson.Object response) =
-    KeyMap.lookup "op" response == Just (Aeson.String "tx.intent")
-intentResponse _ = False
-
-insertIntentMetadata
-    :: TxDecode.ConwayTx -> Aeson.Value -> Aeson.Value
-insertIntentMetadata tx (Aeson.Object response) =
-    Aeson.Object $ case KeyMap.lookup "result" response of
-        Nothing -> response
-        Just result -> KeyMap.insert "result" (insertIntoResult result) response
-  where
-    insertIntoResult (Aeson.Object result) =
-        Aeson.Object $ case KeyMap.lookup "intent" result of
-            Nothing -> result
-            Just intent -> KeyMap.insert "intent" (insertIntoIntent intent) result
-    insertIntoResult result = result
-
-    insertIntoIntent (Aeson.Object intent) =
-        Aeson.Object $
-            KeyMap.insert
-                "auxiliary_data"
-                (Aeson.object ["metadata" .= typedMetadataEntries tx])
-                intent
-    insertIntoIntent intent = intent
-insertIntentMetadata _ response = response
-
-typedMetadataEntries :: TxDecode.ConwayTx -> [Aeson.Value]
-typedMetadataEntries tx =
-    case tx ^. Core.auxDataTxL of
-        BaseTypes.SNothing -> []
-        BaseTypes.SJust auxData ->
-            map
-                typedMetadataEntry
-                (Map.toList (auxData ^. Core.metadataTxAuxDataL))
-
-typedMetadataEntry :: (Word64, L.Metadatum) -> Aeson.Value
-typedMetadataEntry (label, value) =
-    Aeson.object
-        [ "label" .= T.pack (show label)
-        , "value" .= typedMetadataValue value
-        ]
-
-typedMetadataValue :: L.Metadatum -> Aeson.Value
-typedMetadataValue datum =
-    case datum of
-        L.I number ->
-            Aeson.object
-                [ "type" .= ("int" :: T.Text)
-                , "value" .= T.pack (show number)
-                ]
-        L.B bytes ->
-            Aeson.object
-                [ "type" .= ("bytes" :: T.Text)
-                , "hex" .= TextEncoding.decodeUtf8 (B16.encode bytes)
-                ]
-        L.S text ->
-            Aeson.object
-                [ "type" .= ("text" :: T.Text)
-                , "value" .= text
-                ]
-        L.List items ->
-            Aeson.object
-                [ "type" .= ("list" :: T.Text)
-                , "items" .= map typedMetadataValue items
-                ]
-        L.Map entries ->
-            Aeson.object
-                [ "type" .= ("map" :: T.Text)
-                , "entries"
-                    .= [ Aeson.object
-                        [ "key" .= typedMetadataValue key
-                        , "value" .= typedMetadataValue value
-                        ]
-                       | (key, value) <- entries
-                       ]
-                ]
+        Right value -> writeJson value
 
 writeJson :: (Aeson.ToJSON a) => a -> IO ()
 writeJson value = do

@@ -25,6 +25,7 @@ Output is the matching response envelope. Errors go through
 module Extism.Spike
     ( txEvaluateScripts
     , txIdentify
+    , txIntent
     , txValidate
     )
 where
@@ -37,6 +38,9 @@ import Extism.PDK (inputByteString, output, setError)
 
 txIdentify :: IO ()
 txIdentify = runOp
+
+txIntent :: IO ()
+txIntent = runOp
 
 txValidate :: IO ()
 txValidate = runOp
@@ -63,5 +67,6 @@ errorMessage = \case
         "unknown_ledger_operation: " <> T.unpack operation
 
 foreign export ccall "tx_identify" txIdentify :: IO ()
+foreign export ccall "tx_intent" txIntent :: IO ()
 foreign export ccall "tx_validate" txValidate :: IO ()
 foreign export ccall "tx_evaluate_scripts" txEvaluateScripts :: IO ()

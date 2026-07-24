@@ -1,6 +1,6 @@
 -- WASM build configuration for the Extism PDK spike. It keeps the local
--- spike package by path and consumes the ledger kernel through the pinned
--- external cardano-ledger-wasm package.
+-- spike and canonical wrapper packages by path. The wrapper consumes the
+-- ledger kernel through the pinned external cardano-ledger-wasm package.
 
 repository cardano-haskell-packages
   url: https://chap.intersectmbo.org/
@@ -33,7 +33,9 @@ index-state:
 
 packages:
   apps/wasm-extism-spike
+  libs/cardano-ledger-inspector
   external/cardano-ledger-wasm
+  external/tx-rdf-core
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf

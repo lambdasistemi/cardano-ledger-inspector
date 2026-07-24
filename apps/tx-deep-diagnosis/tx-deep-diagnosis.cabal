@@ -1,7 +1,7 @@
 cabal-version: 3.0
 name:          tx-deep-diagnosis
 version:       0.1.0.0
-synopsis:      Layered Conway tx diagnosis using the cardano-ledger-wasm kernel
+synopsis:      Layered Conway tx diagnosis using the local inspector wrapper
 author:        lambdasistemi
 license:       Apache-2.0
 build-type:    Simple
@@ -52,7 +52,7 @@ library
     , scientific
     , text
     , vector
-    , cardano-ledger-wasm
+    , cardano-ledger-inspector
 
   default-language: Haskell2010
   ghc-options:      -Wall -Wno-name-shadowing -Wno-unused-imports
@@ -72,7 +72,7 @@ executable tx-deep-diagnosis
     , optparse-applicative
     , text
     , tx-deep-diagnosis
-    , cardano-ledger-wasm
+    , cardano-ledger-inspector
 
   default-language: Haskell2010
   ghc-options:      -Wall

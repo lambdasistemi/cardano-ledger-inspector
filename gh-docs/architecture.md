@@ -55,12 +55,13 @@ does not depend on hidden browser state or provider calls.
 
 ### Inspector library
 
-`libs/cardano-ledger-inspector/` is the canonical Haskell library. Modules
-under `src/Conway/Inspector*` decode Conway transaction CBOR via the upstream
-`cardano-ledger-conway` packages, run `applyTx`, evaluate Plutus scripts, and
-return typed JSON results behind a single dispatcher entry
-(`runLedgerOperationInput`). Three executables compile this library to
-different targets, all from the same source.
+`libs/cardano-ledger-inspector/` is the canonical Haskell wrapper.
+`Conway.Inspector.runLedgerOperationInput` delegates base operation semantics
+to the package-qualified, pinned `cardano-ledger-wasm` kernel and then applies
+the local typed-metadata and embedded protocol-registry enrichments to
+successful `tx.intent` responses. WASI, Extism, and native consumers all link
+this same wrapper rather than importing the kernel as their operation
+boundary.
 
 ### WASI Layer
 
@@ -74,9 +75,9 @@ the JSON response on stdout.
 
 `apps/wasm-extism-spike/` packages the same inspector library as an Extism PDK
 plugin. The exported functions are operation entry points such as
-`tx_identify`, `tx_validate`, and `tx_evaluate_scripts`; each one accepts the
-same JSON envelope as the WASI reactor and delegates to the shared inspector
-dispatcher.
+`tx_identify`, `tx_intent`, `tx_validate`, and `tx_evaluate_scripts`; each one
+accepts the same JSON envelope as the WASI reactor and delegates to the shared
+inspector dispatcher.
 
 `apps/extism-spike-host/` is a native Haskell host used for conformance checks.
 It links the prebuilt `libextism` runtime from `nix/host/libextism.nix` because
@@ -183,7 +184,7 @@ implicit network access during the final build.
 | `checks.<system>.tx-input-context-smoke` | Derives synthetic producer transaction context from inspection output and verifies resolved input reporting. |
 | `checks.<system>.tx-validate-smoke` | Covers missing context, unsupported provider-style UTxO JSON, complete valid context, deterministic validation output, and invalid supplied network context. |
 | `checks.<system>.tx-evaluate-scripts-smoke` | Covers missing context, rejected provider-style UTxO JSON, complete script evaluation, deterministic output, budgeted units, and evaluated units. |
-| `checks.<system>.tx-extism-spike-smoke` | Calls the Extism plugin through `extism-spike-host` and checks that Extism responses for shared envelopes match the WASI reactor byte-for-byte. |
+| `checks.<system>.tx-extism-spike-smoke` | Calls the Extism plugin through `extism-spike-host`; for registered and unknown-script `tx.intent`, compares raw response bytes across WASI, the native wrapper runner, and Extism while asserting enrichment and fallback semantics. |
 | `checks.<system>.tx-explain-render-smoke` | Runs the render-snapshot harness in compare mode against the committed golden explain artifacts. |
 | `checks.<system>.tx-deep-diagnosis-emit-explain-smoke` | Runs the native CLI with `--emit-explain` end-to-end and verifies the emitted artifact set. |
 | `checks.<system>.cardano-ledger-wasm-pin-check` | Verifies the WASM source pins and fork metadata remain aligned. |
