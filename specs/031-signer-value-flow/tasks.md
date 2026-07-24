@@ -2,17 +2,17 @@
 
 ## Slice 1 — review vocabulary and native contract test
 
-- [ ] T031 Add RED Hspec expectations for the five output-control categories,
+- [X] T031 Add RED Hspec expectations for the five output-control categories,
       five evidence-provenance tags, version, lossless decimal amounts,
       nullable net amount, and deterministic review-record JSON shape.
-- [ ] T032 Add the internal `Conway.Inspector.Review` vocabulary and JSON
+- [X] T032 Add the internal `Conway.Inspector.Review` vocabulary and JSON
       encoders needed to turn the focused contract test GREEN, without wiring
       `tx.review` or implementing output classification.
-- [ ] T033 Expose and execute the native review contract test as a real Nix
+- [X] T033 Expose and execute the native review contract test as a real Nix
       check using the haskell.nix test component.
-- [ ] T034 Add `just check-review-types` and include the check in `just ci`
+- [X] T034 Add `just check-review-types` and include the check in `just ci`
       while leaving permanent `gate.sh` unchanged.
-- [ ] T035 Run the focused check, format, hlint, and permanent gate, then
+- [X] T035 Run the focused check, format, hlint, and permanent gate, then
       commit one bisect-safe slice as
       `test: establish tx.review vocabulary contract` with
       `Tasks: T031, T032, T033, T034, T035`.

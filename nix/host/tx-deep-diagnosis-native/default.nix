@@ -24,4 +24,6 @@ in
     project.hsPkgs.tx-deep-diagnosis.components.exes.tx-deep-diagnosis-render-snapshot;
   tx-inspector-native =
     project.hsPkgs.cardano-ledger-inspector.components.exes.tx-inspector-native;
+  review-types =
+    project.hsPkgs.cardano-ledger-inspector.components.tests.review-types;
 }

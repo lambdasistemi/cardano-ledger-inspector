@@ -1351,6 +1351,11 @@
                 [ "$fail" -eq 0 ] || exit 1
                 touch $out
               '';
+
+          tx-review-types-test = pkgs.runCommand "tx-review-types-test" { } ''
+            ${hostTargets.review-types}/bin/review-types
+            touch $out
+          '';
         in
         {
           packages = {
@@ -1382,7 +1387,8 @@
               tx-explain-render-smoke
               tx-deep-diagnosis-emit-explain-smoke
               cardano-ledger-wasm-pin-check
-              protocol-registry-drift-check;
+              protocol-registry-drift-check
+              tx-review-types-test;
             ledger-functional-swagger-check = ledger-functional-openapi-check;
           };
 
