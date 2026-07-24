@@ -56,6 +56,10 @@
         "$ref": "tx-intent-result.schema.json",
         "description": "Known registered output datums and resolvable script redeemers may include decoded_datum or decoded_redeemer annotations. Both use the recursive lossless decoded-node wire and identify direct and parameterized registry matches."
       },
+      "TxReviewResult": {
+        "$ref": "tx-review-result.schema.json",
+        "description": "Signer-facing transaction value-flow review: a deterministic projection over the shared, locally enriched tx.intent result plus the decoded Conway transaction. Ledger amounts are decimal strings; metadata claims are isolated and self-declared."
+      },
       "TxValidateResult": {
         "$ref": "tx-validate-result.schema.json"
       },
@@ -180,6 +184,24 @@
                     },
                     "ledger_functional_layer": "cardano-ledger-functional/v1",
                     "op": "tx.intent",
+                    "tx_cbor": "84a4..."
+                  }
+                },
+                "review": {
+                  "summary": "Review signer-facing transaction value flow",
+                  "value": {
+                    "args": {
+                      "context": {
+                        "producer_txs": {
+                          "0000000000000000000000000000000000000000000000000000000000000000": {
+                            "source": "blockfrost.txs.cbor",
+                            "tx_cbor": "84a4..."
+                          }
+                        }
+                      }
+                    },
+                    "ledger_functional_layer": "cardano-ledger-functional/v1",
+                    "op": "tx.review",
                     "tx_cbor": "84a4..."
                   }
                 },
@@ -573,6 +595,118 @@
                         "changes": [],
                         "tx_cbor": "84a4...",
                         "warnings": []
+                      }
+                    }
+                  },
+                  "review": {
+                    "summary": "Signer-facing review response envelope",
+                    "value": {
+                      "ledger_functional_layer": "cardano-ledger-functional/v1",
+                      "op": "tx.review",
+                      "result": {
+                        "review": {
+                          "body_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "claims": [
+                            {
+                              "detail": "metadata label 1694 / self-declared",
+                              "label": "Swap ADA<->USDM",
+                              "provenance": "metadata_claim",
+                              "self_declared": true,
+                              "value": "Swapping ADA for USDM"
+                            }
+                          ],
+                          "collateral": {
+                            "body_total_lovelace": "1565693",
+                            "conditional": true,
+                            "input_count": 1,
+                            "return_lovelace": "50005673583"
+                          },
+                          "context": {
+                            "input_status": "incomplete",
+                            "missing_regular_input_count": 1,
+                            "regular_input_count": 2,
+                            "resolved_regular_input_count": 1
+                          },
+                          "control_groups": [
+                            {
+                              "addresses": [
+                                "3132201dc1e82708..."
+                              ],
+                              "asset_class_count": 0,
+                              "category": "script",
+                              "evidence": [
+                                "ledger_proven",
+                                "context_proven",
+                                "registry_decoded"
+                              ],
+                              "lovelace": "1041836734694",
+                              "output_count": 1,
+                              "output_indices": [
+                                0
+                              ],
+                              "role": "Amaru Network Compliance treasury",
+                              "role_provenance": "context_proven"
+                            }
+                          ],
+                          "fee": {
+                            "lovelace": "1043795"
+                          },
+                          "high_value_movements": [
+                            {
+                              "addresses": [
+                                "3132201dc1e82708..."
+                              ],
+                              "asset_class_count": 0,
+                              "category": "script",
+                              "evidence": [
+                                "ledger_proven",
+                                "context_proven",
+                                "registry_decoded"
+                              ],
+                              "lovelace": "1041836734694",
+                              "output_count": 1,
+                              "output_indices": [
+                                0
+                              ],
+                              "role": "Amaru Network Compliance treasury",
+                              "role_provenance": "context_proven"
+                            }
+                          ],
+                          "net_signer_value": {
+                            "lovelace": null,
+                            "note": "missing input context, net signer gain/loss unprovable",
+                            "provable": false
+                          },
+                          "sources": [
+                            {
+                              "count": 2,
+                              "kind": "regular_input",
+                              "missing_count": 1,
+                              "resolved_count": 1,
+                              "resolved_lovelace": "1041836734694"
+                            },
+                            {
+                              "count": 0,
+                              "kind": "withdrawal",
+                              "lovelace": "0"
+                            },
+                            {
+                              "body_total_lovelace": "1565693",
+                              "conditional": true,
+                              "input_count": 1,
+                              "kind": "collateral",
+                              "return_lovelace": "50005673583"
+                            },
+                            {
+                              "count": 4,
+                              "kind": "reference_input",
+                              "read_only": true
+                            }
+                          ],
+                          "tx_id": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "version": "cardano-tx-review/v1",
+                          "warnings": []
+                        }
                       }
                     }
                   },

@@ -295,6 +295,7 @@ and null it is compact JSON.
 | `tx.browse` | implemented | Decode transaction CBOR and return a browser view at a path. |
 | `tx.identify` | implemented | Return stable identifiers and metadata such as transaction id, body hash, era, size, and witness counts. |
 | `tx.intent` | implemented | Return a signer-focused summary of visible transaction effects, signer value perspective, self-declared metadata intent, required signers, scripts, withdrawals, mint/burn, collateral, and context coverage. |
+| `tx.review` | implemented | Project the shared enriched `tx.intent` result into a versioned signer-facing review: output control groups, value sources, high-value movements, fee, conditional collateral, net-signer-value status, and isolated self-declared metadata claims. Alias `review`. |
 | `tx.witness.plan` | implemented | Explain body-declared signer hashes, present witnesses, scripts, redeemers, datums, and reference inputs that are visible from the transaction alone. |
 | `tx.witness.attach` | implemented | Attach or replace one vkey witness in transaction CBOR, preserve all other witness-set content, and return patched transaction bytes plus stable diagnostics. |
 | `tx.validate` | implemented | Report whether explicit validation context is usable or incomplete; run Conway `applyTx` when modeled context is complete. |
@@ -611,6 +612,98 @@ integer values are decimal strings. Each value preserves its ledger constructor
 as `int`, `bytes` (lowercase hex), `text`, `list`, or `map`; maps use ordered
 `entries` with recursive `key` and `value` nodes so non-text and duplicate keys
 are not collapsed into a JSON object.
+
+### `tx.review`
+
+Project the shared, locally enriched `tx.intent` result plus the same decoded
+Conway transaction into one versioned signer-facing review. The operation is
+recognized only in the target-independent wrapper: it routes the request
+through the kernel's `tx.intent` path, applies the same local typed-metadata
+and protocol-registry enrichments, then projects the enriched intent into
+`result.review` and restores `op` to `tx.review`. WASI, native, and Extism
+therefore return byte-identical review bytes. The legacy short name `review`
+is accepted. Existing operations, including `tx.intent`, keep their current
+response bytes.
+
+```json
+{
+  "ledger_functional_layer": "cardano-ledger-functional/v1",
+  "op": "tx.review",
+  "result": {
+    "review": {
+      "version": "cardano-tx-review/v1",
+      "tx_id": "<hex>",
+      "body_hash": "<hex>",
+      "context": {
+        "input_status": "incomplete",
+        "regular_input_count": 2,
+        "resolved_regular_input_count": 1,
+        "missing_regular_input_count": 1
+      },
+      "sources": [
+        { "kind": "regular_input", "count": 2, "resolved_count": 1, "missing_count": 1, "resolved_lovelace": "1041836734694" },
+        { "kind": "withdrawal", "count": 1, "lovelace": "0" },
+        { "kind": "collateral", "conditional": true, "input_count": 1, "body_total_lovelace": "1565693", "return_lovelace": "50005673583" },
+        { "kind": "reference_input", "read_only": true, "count": 4 }
+      ],
+      "control_groups": [
+        {
+          "category": "script",
+          "addresses": ["<address hex>"],
+          "output_indices": [0],
+          "output_count": 1,
+          "lovelace": "1041836734694",
+          "asset_class_count": 0,
+          "role": "Amaru Network Compliance treasury",
+          "role_provenance": "context_proven",
+          "evidence": ["ledger_proven", "context_proven", "registry_decoded"]
+        }
+      ],
+      "high_value_movements": [],
+      "fee": { "lovelace": "1043795" },
+      "collateral": { "conditional": true, "input_count": 1, "body_total_lovelace": "1565693", "return_lovelace": "50005673583" },
+      "net_signer_value": {
+        "provable": false,
+        "lovelace": null,
+        "note": "missing input context, net signer gain/loss unprovable"
+      },
+      "claims": [
+        { "label": "Swap ADA<->USDM", "value": "...", "detail": "...", "provenance": "metadata_claim", "self_declared": true }
+      ],
+      "warnings": []
+    }
+  }
+}
+```
+
+Output control categories are exactly `signer_controlled`, `external_key`,
+`script`, `bootstrap`, and `unknown`; the existing `tx.intent` signer matching
+is the authority for the first four and anything unrecognized maps to
+`unknown`. Control groups are deterministic, grouped by control category,
+address, and authoritative role. Role authority descends from a
+context-proven same-address continuation, to a registry-decoded protocol
+label, to a heuristic signer return/change candidate, to a generic
+ledger-proven role; metadata never selects a role. Evidence provenance uses
+the explicit tags `ledger_proven`, `context_proven`, `registry_decoded`,
+`metadata_claim`, and `heuristic`.
+
+Sources keep regular inputs, withdrawals, conditional collateral, and
+read-only reference inputs separate. High-value movements list every control
+group holding at least one percent of total output lovelace, with the largest
+non-empty group always included, in descending lovelace order. Every ledger
+amount is a decimal string. The net-signer-value object is unprovable, with
+the literal note `missing input context, net signer gain/loss unprovable`,
+unless every regular input resolves from explicit producer transaction CBOR.
+Metadata claims are copied into a separate collection tagged `metadata_claim`
+and marked self-declared; they never change a control category, role, amount,
+or high-value decision.
+
+Arguments:
+
+`context.producer_txs`
+: Optional producer transaction CBOR map keyed by transaction id, exactly as
+for `tx.intent`. Resolving every regular input makes the net signer value
+provable.
 
 ### `tx.witness.plan`
 

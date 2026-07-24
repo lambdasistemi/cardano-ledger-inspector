@@ -26,6 +26,7 @@ module Extism.Spike
     ( txEvaluateScripts
     , txIdentify
     , txIntent
+    , txReview
     , txValidate
     )
 where
@@ -41,6 +42,9 @@ txIdentify = runOp
 
 txIntent :: IO ()
 txIntent = runOp
+
+txReview :: IO ()
+txReview = runOp
 
 txValidate :: IO ()
 txValidate = runOp
@@ -68,5 +72,6 @@ errorMessage = \case
 
 foreign export ccall "tx_identify" txIdentify :: IO ()
 foreign export ccall "tx_intent" txIntent :: IO ()
+foreign export ccall "tx_review" txReview :: IO ()
 foreign export ccall "tx_validate" txValidate :: IO ()
 foreign export ccall "tx_evaluate_scripts" txEvaluateScripts :: IO ()

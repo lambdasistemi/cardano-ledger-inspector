@@ -21,7 +21,7 @@ module Conway.Inspector
 where
 
 import Cardano.Crypto.Hash (hashToBytes)
-import Cardano.Ledger.Address (Addr (..))
+import Cardano.Ledger.Address (Addr (..), serialiseAddr)
 import Cardano.Ledger.Alonzo.Core (TopTx, Tx)
 import qualified Cardano.Ledger.Api as L
 import Cardano.Ledger.Api.Scripts.Data (Data)
@@ -36,18 +36,21 @@ import Cardano.Ledger.Binary
     , decodeFullFromHexText
     , natVersion
     )
+import qualified Cardano.Ledger.Coin as Coin
 import Cardano.Ledger.Conway (ConwayEra)
 import qualified Cardano.Ledger.Core as Core
 import Cardano.Ledger.Credential (Credential (ScriptHashObj))
 import Cardano.Ledger.Hashes (ScriptHash (..), extractHash)
 import qualified Cardano.Ledger.TxIn as TxIn
 import qualified Conway.Inspector.ProtocolRegistry as ProtocolRegistry
+import qualified Conway.Inspector.Review as Review
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Lazy as BSL
 import Data.Either (fromRight)
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
@@ -70,11 +73,153 @@ newtype ProducerTx = ProducerTx
     { ptDecoded :: Either T.Text ConwayTx
     }
 
--- | Run the pinned ledger kernel and enrich successful intent responses.
+{- | Run the pinned ledger kernel and enrich successful intent responses.
+
+A @tx.review@ (or legacy @review@) request is recognized here in the
+target-independent wrapper: it is routed through the kernel's @tx.intent@
+path, locally enriched, then projected into the versioned signer-review
+result with @op@ restored to @tx.review@. Every other operation keeps its
+existing path and response bytes unchanged.
+-}
 runLedgerOperationInput
     :: BS.ByteString -> Either InspectError Aeson.Value
-runLedgerOperationInput input =
-    enrichIntentResponse input <$> Kernel.runLedgerOperationInput input
+runLedgerOperationInput input
+    | reviewRequested input = runReview input
+    | otherwise =
+        enrichIntentResponse input <$> Kernel.runLedgerOperationInput input
+
+-- | True when the request asks for the signer-facing review operation.
+reviewRequested :: BS.ByteString -> Bool
+reviewRequested input =
+    case Aeson.decodeStrict' input of
+        Just (Aeson.Object request) ->
+            case KeyMap.lookup "op" request of
+                Just (Aeson.String operation) ->
+                    operation == "tx.review" || operation == "review"
+                _ -> False
+        _ -> False
+
+-- | Run @tx.review@ by reusing the enriched @tx.intent@ path and projecting.
+runReview :: BS.ByteString -> Either InspectError Aeson.Value
+runReview input = do
+    let intentRequest = rewriteOpToIntent input
+    intentResponse <- Kernel.runLedgerOperationInput intentRequest
+    let enriched = enrichIntentResponse intentRequest intentResponse
+    txCbor <-
+        maybe
+            (Left (MalformedLedgerOperation "tx.review requires tx_cbor"))
+            Right
+            (reviewTxCbor input)
+    tx <-
+        either
+            (Left . MalformedCbor . T.unpack)
+            Right
+            (decodeConwayTxInput txCbor)
+    let intentObject = fromMaybe Aeson.Null (intentResultObject enriched)
+        producerContext = intentProducerContext input
+        resolvedAddrs = resolvedRegularInputAddresses tx producerContext
+        totalCollateral =
+            fmap
+                Coin.unCoin
+                ( BaseTypes.strictMaybeToMaybe
+                    (tx ^. (Core.bodyTxL . L.totalCollateralTxBodyL))
+                )
+        collateralReturn = collateralReturnCoin tx
+    pure
+        ( reviewResponse
+            ( Review.projectReview
+                resolvedAddrs
+                totalCollateral
+                collateralReturn
+                intentObject
+            )
+        )
+
+-- | Rewrite a review request's @op@ to @tx.intent@, preserving all else.
+rewriteOpToIntent :: BS.ByteString -> BS.ByteString
+rewriteOpToIntent input =
+    case Aeson.decodeStrict' input of
+        Just (Aeson.Object request) ->
+            BSL.toStrict $
+                Aeson.encode $
+                    Aeson.Object (KeyMap.insert "op" (Aeson.String "tx.intent") request)
+        _ -> input
+
+-- | Extract @tx_cbor@ from a review request.
+reviewTxCbor :: BS.ByteString -> Maybe T.Text
+reviewTxCbor input = do
+    Aeson.Object request <- Aeson.decodeStrict' input
+    Aeson.String txCbor <- KeyMap.lookup "tx_cbor" request
+    pure txCbor
+
+-- | Extract the enriched @result.intent@ object from a response envelope.
+intentResultObject :: Aeson.Value -> Maybe Aeson.Value
+intentResultObject (Aeson.Object root) =
+    KeyMap.lookup "result" root
+        >>= asObject
+        >>= KeyMap.lookup "intent"
+  where
+    asObject (Aeson.Object value) = Just value
+    asObject _ = Nothing
+intentResultObject _ = Nothing
+
+{- | Fully serialized address hexes for regular inputs resolved from explicit
+producer context. These back the context-proven same-address continuation role
+in the review projection.
+-}
+resolvedRegularInputAddresses
+    :: ConwayTx -> ProducerContext -> Set.Set T.Text
+resolvedRegularInputAddresses tx (ProducerContext producers) =
+    Set.fromList $
+        mapMaybe resolveInput $
+            Foldable.toList (tx ^. (Core.bodyTxL . L.inputsTxBodyL))
+  where
+    resolveInput txIn = do
+        ProducerTx (Right producerTx) <-
+            Map.lookup (txInTxIdHex txIn) producers
+        output <- producerOutputAt (txInIndex txIn) producerTx
+        pure (outputAddressHex output)
+
+producerOutputAt :: Int -> ConwayTx -> Maybe (TxOut ConwayEra)
+producerOutputAt index producer
+    | index < 0 = Nothing
+    | otherwise =
+        case drop index outputs of
+            output : _ -> Just output
+            [] -> Nothing
+  where
+    outputs =
+        Foldable.toList (producer ^. (Core.bodyTxL . L.outputsTxBodyL))
+
+outputAddressHex :: TxOut ConwayEra -> T.Text
+outputAddressHex output =
+    TextEncoding.decodeUtf8
+        (B16.encode (serialiseAddr (output ^. addrTxOutL)))
+
+txInTxIdHex :: TxIn.TxIn -> T.Text
+txInTxIdHex (TxIn.TxIn (TxIn.TxId hash) _) =
+    TextEncoding.decodeUtf8 (B16.encode (hashToBytes (extractHash hash)))
+
+txInIndex :: TxIn.TxIn -> Int
+txInIndex (TxIn.TxIn _ (TxIx index)) = fromEnum index
+
+-- | Collateral return value in lovelace, if the body declares one.
+collateralReturnCoin :: ConwayTx -> Maybe Integer
+collateralReturnCoin tx =
+    case BaseTypes.strictMaybeToMaybe
+        (tx ^. (Core.bodyTxL . L.collateralReturnTxBodyL)) of
+        Nothing -> Nothing
+        Just output -> Just (Coin.unCoin (output ^. Core.coinTxOutL @ConwayEra))
+
+-- | Build the @tx.review@ response envelope around a review result.
+reviewResponse :: Review.ReviewResult -> Aeson.Value
+reviewResponse result =
+    Aeson.object
+        [ "ledger_functional_layer"
+            .= ("cardano-ledger-functional/v1" :: T.Text)
+        , "op" .= ("tx.review" :: T.Text)
+        , "result" .= Aeson.object ["review" .= result]
+        ]
 
 enrichIntentResponse :: BS.ByteString -> Aeson.Value -> Aeson.Value
 enrichIntentResponse input response =

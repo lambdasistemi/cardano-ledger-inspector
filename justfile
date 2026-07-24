@@ -40,6 +40,9 @@ check-evaluate-scripts:
 check-review-types:
     nix build .#checks.x86_64-linux.tx-review-types-test -o result-review-types-check
 
+check-review:
+    nix build .#checks.x86_64-linux.tx-review-smoke -o result-review-smoke
+
 build-extism-spike:
     nix build .#packages.x86_64-linux.wasm-extism-spike -o result-extism-spike
 
@@ -78,6 +81,7 @@ ci:
       .#checks.x86_64-linux.protocol-registry-drift-check \
       -o result-gate
     just check-review-types
+    just check-review
     nix run --quiet .#ledger-functional-openapi-check
     nix run --quiet .#ledger-functional-swagger-check
     nix run --quiet .#tx-identify-smoke

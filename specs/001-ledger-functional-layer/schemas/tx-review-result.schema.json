@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lambdasistemi.github.io/cardano-ledger-inspector/schemas/tx-review-result.schema.json",
+  "title": "Cardano Ledger WASI Transaction Review Result",
+  "description": "Signer-facing transaction value-flow review. A deterministic projection over the shared, locally enriched tx.intent result plus the decoded Conway transaction. Ledger amounts are decimal strings; claims are isolated self-declared metadata.",
+  "type": "object",
+  "required": [
+    "version",
+    "tx_id",
+    "body_hash",
+    "context",
+    "sources",
+    "control_groups",
+    "high_value_movements",
+    "fee",
+    "collateral",
+    "net_signer_value",
+    "claims",
+    "warnings"
+  ],
+  "properties": {
+    "version": { "type": "string", "const": "cardano-tx-review/v1" },
+    "tx_id": { "type": "string" },
+    "body_hash": { "type": "string" },
+    "context": { "$ref": "#/$defs/context" },
+    "sources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "control_groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/controlGroup" }
+    },
+    "high_value_movements": {
+      "type": "array",
+      "description": "Control groups holding at least one percent of total output lovelace, with the largest non-empty group always included, ordered by descending lovelace.",
+      "items": { "$ref": "#/$defs/controlGroup" }
+    },
+    "fee": {
+      "type": "object",
+      "required": ["lovelace"],
+      "properties": { "lovelace": { "$ref": "#/$defs/decimal" } },
+      "additionalProperties": true
+    },
+    "collateral": { "$ref": "#/$defs/collateral" },
+    "net_signer_value": { "$ref": "#/$defs/netSignerValue" },
+    "claims": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "decimal": {
+      "type": "string",
+      "pattern": "^-?[0-9]+$"
+    },
+    "controlCategory": {
+      "type": "string",
+      "enum": ["signer_controlled", "external_key", "script", "bootstrap", "unknown"]
+    },
+    "evidenceProvenance": {
+      "type": "string",
+      "enum": ["ledger_proven", "context_proven", "registry_decoded", "metadata_claim", "heuristic"]
+    },
+    "context": {
+      "type": "object",
+      "required": [
+        "input_status",
+        "regular_input_count",
+        "resolved_regular_input_count",
+        "missing_regular_input_count"
+      ],
+      "properties": {
+        "input_status": { "type": "string", "enum": ["complete", "incomplete"] },
+        "regular_input_count": { "type": "integer", "minimum": 0 },
+        "resolved_regular_input_count": { "type": "integer", "minimum": 0 },
+        "missing_regular_input_count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "controlGroup": {
+      "type": "object",
+      "required": [
+        "category",
+        "addresses",
+        "output_indices",
+        "output_count",
+        "lovelace",
+        "asset_class_count",
+        "role",
+        "role_provenance",
+        "evidence"
+      ],
+      "properties": {
+        "category": { "$ref": "#/$defs/controlCategory" },
+        "addresses": { "type": "array", "items": { "type": "string" } },
+        "output_indices": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "output_count": { "type": "integer", "minimum": 0 },
+        "lovelace": { "$ref": "#/$defs/decimal" },
+        "asset_class_count": { "type": "integer", "minimum": 0 },
+        "role": { "type": "string" },
+        "role_provenance": { "$ref": "#/$defs/evidenceProvenance" },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceProvenance" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "oneOf": [
+        { "$ref": "#/$defs/regularInputSource" },
+        { "$ref": "#/$defs/withdrawalSource" },
+        { "$ref": "#/$defs/collateralSource" },
+        { "$ref": "#/$defs/referenceInputSource" }
+      ]
+    },
+    "regularInputSource": {
+      "type": "object",
+      "required": ["kind", "count", "resolved_count", "missing_count"],
+      "properties": {
+        "kind": { "const": "regular_input" },
+        "count": { "type": "integer", "minimum": 0 },
+        "resolved_count": { "type": "integer", "minimum": 0 },
+        "missing_count": { "type": "integer", "minimum": 0 },
+        "resolved_lovelace": { "$ref": "#/$defs/decimal" }
+      },
+      "additionalProperties": true
+    },
+    "withdrawalSource": {
+      "type": "object",
+      "required": ["kind", "count", "lovelace"],
+      "properties": {
+        "kind": { "const": "withdrawal" },
+        "count": { "type": "integer", "minimum": 0 },
+        "lovelace": { "$ref": "#/$defs/decimal" }
+      },
+      "additionalProperties": true
+    },
+    "collateralSource": {
+      "type": "object",
+      "required": ["kind", "conditional", "input_count", "body_total_lovelace"],
+      "properties": {
+        "kind": { "const": "collateral" },
+        "conditional": { "type": "boolean" },
+        "input_count": { "type": "integer", "minimum": 0 },
+        "body_total_lovelace": { "$ref": "#/$defs/decimal" },
+        "return_lovelace": {
+          "anyOf": [{ "$ref": "#/$defs/decimal" }, { "type": "null" }]
+        }
+      },
+      "additionalProperties": true
+    },
+    "referenceInputSource": {
+      "type": "object",
+      "required": ["kind", "read_only", "count"],
+      "properties": {
+        "kind": { "const": "reference_input" },
+        "read_only": { "type": "boolean", "const": true },
+        "count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "collateral": {
+      "type": "object",
+      "required": ["conditional", "input_count", "body_total_lovelace"],
+      "properties": {
+        "conditional": { "type": "boolean" },
+        "input_count": { "type": "integer", "minimum": 0 },
+        "body_total_lovelace": { "$ref": "#/$defs/decimal" },
+        "return_lovelace": {
+          "anyOf": [{ "$ref": "#/$defs/decimal" }, { "type": "null" }]
+        }
+      },
+      "additionalProperties": true
+    },
+    "netSignerValue": {
+      "type": "object",
+      "required": ["provable", "lovelace", "note"],
+      "properties": {
+        "provable": { "type": "boolean" },
+        "lovelace": {
+          "anyOf": [{ "$ref": "#/$defs/decimal" }, { "type": "null" }]
+        },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "claim": {
+      "type": "object",
+      "required": ["label", "value", "detail", "provenance", "self_declared"],
+      "properties": {
+        "label": { "type": "string" },
+        "value": { "type": "string" },
+        "detail": { "type": "string" },
+        "provenance": { "const": "metadata_claim" },
+        "self_declared": { "type": "boolean", "const": true }
+      },
+      "additionalProperties": true
+    }
+  }
+}

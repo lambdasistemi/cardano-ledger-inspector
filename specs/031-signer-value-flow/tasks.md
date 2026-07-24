@@ -19,31 +19,31 @@
 
 ## Slice 2 — shared review projection and three-target contract
 
-- [ ] T036 Add RED operation smokes for complete-context and issue-fixture
+- [X] T036 Add RED operation smokes for complete-context and issue-fixture
       `tx.review` requests, including the explicit unprovable-net message.
-- [ ] T037 Project the shared enriched `tx.intent` result into the versioned
+- [X] T037 Project the shared enriched `tx.intent` result into the versioned
       signer-review result without parsing human-readable intent strings or
       changing existing operation bytes.
-- [ ] T038 Group outputs deterministically into signer-controlled, external
+- [X] T038 Group outputs deterministically into signer-controlled, external
       key, script, bootstrap, and unknown categories with authoritative role
       selection and explicit evidence provenance.
-- [ ] T039 Surface high-value groups in descending order and separately report
+- [X] T039 Surface high-value groups in descending order and separately report
       regular inputs, withdrawals, conditional collateral, read-only reference
       inputs, fee, and net-signer-value status.
-- [ ] T040 Prove the issue fixture's treasury continuation, nine SundaeSwap
+- [X] T040 Prove the issue fixture's treasury continuation, nine SundaeSwap
       order locks, unlabeled script lock, external-key destination, fee,
       collateral values, and one missing regular input.
-- [ ] T041 Keep self-declared metadata claims isolated from ledger facts,
+- [X] T041 Keep self-declared metadata claims isolated from ledger facts,
       context-proven facts, registry annotations, and heuristic labels.
-- [ ] T042 Export `tx_review` from Extism and prove registered plus
+- [X] T042 Export `tx_review` from Extism and prove registered plus
       unknown-registry response-byte parity across WASI, native, and Extism.
-- [ ] T043 Publish the `tx.review` JSON schema and regenerate the committed
+- [X] T043 Publish the `tx.review` JSON schema and regenerate the committed
       OpenAPI document.
-- [ ] T044 Update the operation registry, API/architecture/installation
+- [X] T044 Update the operation registry, API/architecture/installation
       documentation, release export descriptions, and operation count.
-- [ ] T045 Re-run existing intent and wrapper-parity checks to prove no
+- [X] T045 Re-run existing intent and wrapper-parity checks to prove no
       regression in `tx.intent`.
-- [ ] T046 Run all focused checks, format, hlint, and permanent gate, then
+- [X] T046 Run all focused checks, format, hlint, and permanent gate, then
       commit one bisect-safe slice as
       `feat: explain signer-facing transaction value flow` with
       `Tasks: T036, T037, T038, T039, T040, T041, T042, T043, T044, T045, T046`.
