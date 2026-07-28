@@ -502,6 +502,7 @@
                               output_count = 1;
                               lovelace = "1041836734694";
                               asset_class_count = 0;
+                              assets = {};
                               role = "Amaru Network Compliance treasury";
                               role_provenance = "context_proven";
                               evidence = [ "ledger_proven" "context_proven" "registry_decoded" ];
@@ -515,6 +516,7 @@
                               output_count = 1;
                               lovelace = "1041836734694";
                               asset_class_count = 0;
+                              assets = {};
                               role = "Amaru Network Compliance treasury";
                               role_provenance = "context_proven";
                               evidence = [ "ledger_proven" "context_proven" "registry_decoded" ];

@@ -39,34 +39,43 @@ Commit subject: `feat: expose per-asset amounts on tx.review control groups`
 
 Commit subject: `feat: require per-asset amounts in the tx.review contract`
 
-- [ ] T174 Add an `assetMap` `$def` to `tx-review-result.schema.json` mirroring
+- [X] T174 Add an `assetMap` `$def` to `tx-review-result.schema.json` mirroring
       the `tx.intent` schema's, reference it from `controlGroup.properties.assets`,
       and add `"assets"` to `controlGroup.required` alongside `asset_class_count`.
-- [ ] T175 Add `assets` to every tx.review ControlGroup example in the OpenAPI
+- [X] T175 Add `assets` to every tx.review ControlGroup example in the OpenAPI
       SOURCE `nix/ledger-functional-openapi.nix` (both `control_groups` and
       `high_value_movements`), then regenerate the committed
       `.openapi.json` via `just build-openapi` + copy. Do NOT hand-edit the
       JSON, and do NOT touch tx.intent `output_buckets` examples.
-- [ ] T176 Update the `tx.review` section of
+- [X] T176 Update the `tx.review` section of
       `contracts/ledger-functional-api.md` — control-group field description and
       worked example — stating that `asset_class_count` remains a strict count
       and `assets` carries the detail.
-- [ ] T177 Confirm README.md / gh-docs need no change (verified: neither
+- [X] T177 Confirm README.md / gh-docs need no change (verified: neither
       mentions `asset_class_count`); state the finding rather than editing.
-- [ ] T177a Document the unparseable-quantity rule in
+- [X] T177a Document the unparseable-quantity rule in
       `contracts/ledger-functional-api.md`: an asset whose quantity cannot be
       parsed as a decimal integer is still reported, still counts toward
       `asset_class_count`, and has its quantity rendered as `"0"`. Landed in
       slice 1 (T173a); this makes the behaviour contractual rather than hidden.
-- [ ] T178 Proof: `nix run .#ledger-functional-openapi-check` and
+- [X] T178 Proof: `nix run .#ledger-functional-openapi-check` and
       `just check-openapi` green.
 
 ## Slice 3 — regression-fixtures-and-parity
 
 Commit subject: `test: prove per-asset control-group amounts across all surfaces`
 
-- [ ] T179 Assess the committed review fixture for a control group holding more
-      than one asset class; add one if absent.
+- [ ] T179 Add a fixture with a control group holding more than one distinct
+      asset class. **Assessment already done — do not repeat it.** `tx.review`
+      was run against the real WASI artifact on both existing review fixtures:
+      `tx-validate-complete-request.json` yields a best case of ONE distinct
+      class (policy `193ee65211bb…`, empty asset name, quantity summed to `"4"`
+      across four grouped outputs), and `sundae-swap-usdm-disbursement.hex`
+      yields zero asset classes in every group. So the ticket's multi-asset
+      regression criterion cannot be met with what is committed, and a new
+      fixture is required. Acquisition route is an operator decision (real
+      Conway tx via `scripts/fetch-tx-cbor.sh`, which needs a Blockfrost
+      project id) — do not invent CBOR.
 - [ ] T180 Extend `tx-review-smoke` to assert an empty control group reports
       `assets == {}`.
 - [ ] T181 Extend `tx-review-smoke` to assert a multi-asset control group

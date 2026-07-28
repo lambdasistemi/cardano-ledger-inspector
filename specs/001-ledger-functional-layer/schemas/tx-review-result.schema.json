@@ -92,6 +92,7 @@
         "output_count",
         "lovelace",
         "asset_class_count",
+        "assets",
         "role",
         "role_provenance",
         "evidence"
@@ -103,6 +104,7 @@
         "output_count": { "type": "integer", "minimum": 0 },
         "lovelace": { "$ref": "#/$defs/decimal" },
         "asset_class_count": { "type": "integer", "minimum": 0 },
+        "assets": { "$ref": "#/$defs/assetMap" },
         "role": { "type": "string" },
         "role_provenance": { "$ref": "#/$defs/evidenceProvenance" },
         "evidence": {
@@ -202,6 +204,14 @@
         "self_declared": { "type": "boolean", "const": true }
       },
       "additionalProperties": true
+    },
+    "assetMap": {
+      "type": "object",
+      "description": "Nested policy-id -> asset-name -> quantity map. Policy ids and asset names are hex strings; quantities are decimal strings.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
     }
   }
 }
