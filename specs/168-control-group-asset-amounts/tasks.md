@@ -1,0 +1,64 @@
+# Tasks — Per-Asset Amounts on tx.review Control Groups
+
+Issue: https://github.com/lambdasistemi/cardano-ledger-inspector/issues/168
+
+One commit per slice, bisect-safe, `Tasks:` trailer naming the closed tasks.
+
+## Slice 1 — engine-asset-amounts
+
+Commit subject: `feat: expose per-asset amounts on tx.review control groups`
+
+- [ ] T168 RED: add a `ReviewSpec` case for a multi-asset control group — two
+      distinct asset classes, one of them present in two grouped outputs so the
+      per-class sum is exercised — asserting exact policy id, asset name, and
+      summed quantity in the emitted `assets` map.
+- [ ] T169 RED: add a `ReviewSpec` case for a control group holding no non-ADA
+      assets, asserting `assets` is present and empty (`{}`), not absent or
+      null.
+- [ ] T170 GREEN: parse quantities — replace the discarding `outputAssetKeys`
+      with an asset-map parser returning `Map (Text, Text) Integer`.
+- [ ] T171 GREEN: accumulate quantities — `GroupAcc.gaAssetKeys` becomes
+      `gaAssets :: Map (Text, Text) Integer`; `combineAcc` sums with
+      `Map.unionWith (+)`.
+- [ ] T172 GREEN: project — `ControlGroup` gains `cgAssets`, its `ToJSON` emits
+      `"assets"`, and `cgAssetClassCount` becomes `Map.size` over the same map,
+      preserving its existing value and meaning.
+- [ ] T173 Proof: `just check-review-types` green; existing `ReviewSpec` cases
+      unchanged in their `asset_class_count` expectations.
+
+## Slice 2 — contract-surfaces
+
+Commit subject: `feat: require per-asset amounts in the tx.review contract`
+
+- [ ] T174 Add an `assetMap` `$def` to `tx-review-result.schema.json` mirroring
+      the `tx.intent` schema's, reference it from `controlGroup.properties.assets`,
+      and add `"assets"` to `controlGroup.required` alongside `asset_class_count`.
+- [ ] T175 Regenerate the OpenAPI document (do not hand-edit) so the committed
+      copy matches the generator.
+- [ ] T176 Update the `tx.review` section of
+      `contracts/ledger-functional-api.md` — control-group field description and
+      worked example — stating that `asset_class_count` remains a strict count
+      and `assets` carries the detail.
+- [ ] T177 Update `README.md` / `gh-docs/` only where they describe the
+      control-group shape.
+- [ ] T178 Proof: `nix run .#ledger-functional-openapi-check` and
+      `just check-openapi` green.
+
+## Slice 3 — regression-fixtures-and-parity
+
+Commit subject: `test: prove per-asset control-group amounts across all surfaces`
+
+- [ ] T179 Assess the committed review fixture for a control group holding more
+      than one asset class; add one if absent.
+- [ ] T180 Extend `tx-review-smoke` to assert an empty control group reports
+      `assets == {}`.
+- [ ] T181 Extend `tx-review-smoke` to assert a multi-asset control group
+      reports each policy id, asset name, and exact quantity.
+- [ ] T182 Confirm `tx-review-smoke` still compares WASI, native, and Extism
+      `tx_review` bytes with the new field present on all three.
+- [ ] T183 Proof: `just check-review` and `just check-extism-spike` green.
+
+## Orchestrator-owned
+
+- [ ] T184 Final: full `./gate.sh` green at HEAD, gate restored to `main`'s
+      content, PR body audited, PR marked ready for review. Never self-merge.
