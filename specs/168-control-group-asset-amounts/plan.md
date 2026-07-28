@@ -73,11 +73,27 @@ contract describes control groups.
 - `specs/001-ledger-functional-layer/schemas/tx-review-result.schema.json` —
   add an `assetMap` `$def` mirroring the intent schema's, reference it from
   `controlGroup.properties.assets`, add `"assets"` to `controlGroup.required`.
+- `nix/ledger-functional-openapi.nix` — **the OpenAPI source of truth**. Corrected
+  after inspection: the OpenAPI document is a hand-authored Nix attrset, NOT
+  derived from the JSON schemas. The committed `.openapi.json` is produced by
+  evaluating this file, and `ledger-functional-openapi-check` does a literal
+  `diff -u` of the committed file against the generated one. So the edit goes in
+  the `.nix` file; the `.json` is then regenerated and copied over. Hand-editing
+  the `.json` would pass a human diff review and fail the check.
 - `specs/001-ledger-functional-layer/openapi/cardano-ledger-functional.openapi.json`
-  — regenerated, not hand-edited.
+  — regenerated only (`just build-openapi`, then copy from `result-openapi/`).
 - `specs/001-ledger-functional-layer/contracts/ledger-functional-api.md` —
   the `tx.review` section's control-group description and example.
-- `README.md` / `gh-docs/` only if they describe the control-group shape.
+- `README.md` / `gh-docs/` — verified to contain no `asset_class_count`
+  reference, so no change is expected here.
+
+**Scope boundary that matters.** `asset_class_count` also appears on
+`tx.intent`'s `output_buckets` / `resolved_input_buckets` (value buckets), which
+are explicitly out of scope for this ticket. Only `tx.review`'s control-group
+shape changes — that includes both `control_groups` and `high_value_movements`,
+since the latter is also a `[ControlGroup]`. Touching an `output_buckets` example
+would be both out of scope and wrong, because value buckets have no `assets`
+field.
 
 Proof: `nix run .#ledger-functional-openapi-check`, `just check-openapi`.
 

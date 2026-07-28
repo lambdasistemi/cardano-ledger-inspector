@@ -42,14 +42,22 @@ Commit subject: `feat: require per-asset amounts in the tx.review contract`
 - [ ] T174 Add an `assetMap` `$def` to `tx-review-result.schema.json` mirroring
       the `tx.intent` schema's, reference it from `controlGroup.properties.assets`,
       and add `"assets"` to `controlGroup.required` alongside `asset_class_count`.
-- [ ] T175 Regenerate the OpenAPI document (do not hand-edit) so the committed
-      copy matches the generator.
+- [ ] T175 Add `assets` to every tx.review ControlGroup example in the OpenAPI
+      SOURCE `nix/ledger-functional-openapi.nix` (both `control_groups` and
+      `high_value_movements`), then regenerate the committed
+      `.openapi.json` via `just build-openapi` + copy. Do NOT hand-edit the
+      JSON, and do NOT touch tx.intent `output_buckets` examples.
 - [ ] T176 Update the `tx.review` section of
       `contracts/ledger-functional-api.md` — control-group field description and
       worked example — stating that `asset_class_count` remains a strict count
       and `assets` carries the detail.
-- [ ] T177 Update `README.md` / `gh-docs/` only where they describe the
-      control-group shape.
+- [ ] T177 Confirm README.md / gh-docs need no change (verified: neither
+      mentions `asset_class_count`); state the finding rather than editing.
+- [ ] T177a Document the unparseable-quantity rule in
+      `contracts/ledger-functional-api.md`: an asset whose quantity cannot be
+      parsed as a decimal integer is still reported, still counts toward
+      `asset_class_count`, and has its quantity rendered as `"0"`. Landed in
+      slice 1 (T173a); this makes the behaviour contractual rather than hidden.
 - [ ] T178 Proof: `nix run .#ledger-functional-openapi-check` and
       `just check-openapi` green.
 
