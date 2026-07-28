@@ -8,6 +8,8 @@ import Conway.Inspector.Review
     , ControlGroup (..)
     , EvidenceProvenance (..)
     , NetSignerValue (..)
+    , ReviewResult (..)
+    , projectReview
     , reviewVersion
     )
 import Data.Aeson ((.=))
@@ -115,6 +117,7 @@ spec = do
                     , "lovelace"
                         .= Aeson.String "1041000000"
                     , "asset_class_count" .= (0 :: Int)
+                    , "assets" .= Aeson.object []
                     , "role"
                         .= Aeson.String "continuation"
                     , "role_provenance"
@@ -124,7 +127,226 @@ spec = do
                            , Aeson.String "context_proven"
                            ]
                     ]
+    describe "ControlGroup per-asset amounts" $ do
+        it "T168 sums quantities across grouped outputs" $
+            Aeson.toJSON (head (rrControlGroups multiAssetReview))
+                `shouldBe` Aeson.object
+                    [ "category"
+                        .= Aeson.String "external_key"
+                    , "addresses"
+                        .= [Aeson.String "addr1_shared"]
+                    , "output_indices"
+                        .= ([0, 1] :: [Int])
+                    , "output_count" .= (2 :: Int)
+                    , "lovelace"
+                        .= Aeson.String "3000000"
+                    , "asset_class_count" .= (2 :: Int)
+                    , "assets"
+                        .= Aeson.object
+                            [ "aaaa"
+                                .= Aeson.object
+                                    ["01" .= Aeson.String "300"]
+                            , "bbbb"
+                                .= Aeson.object
+                                    ["02" .= Aeson.String "50"]
+                            ]
+                    , "role"
+                        .= Aeson.String
+                            "external_key_destination"
+                    , "role_provenance"
+                        .= Aeson.String "ledger_proven"
+                    , "evidence"
+                        .= [Aeson.String "ledger_proven"]
+                    ]
+        it "T169 emits empty assets object for ada-only group" $
+            Aeson.toJSON (head (rrControlGroups adaOnlyReview))
+                `shouldBe` Aeson.object
+                    [ "category"
+                        .= Aeson.String "external_key"
+                    , "addresses"
+                        .= [Aeson.String "addr1_bare"]
+                    , "output_indices"
+                        .= ([0] :: [Int])
+                    , "output_count" .= (1 :: Int)
+                    , "lovelace"
+                        .= Aeson.String "5000000"
+                    , "asset_class_count" .= (0 :: Int)
+                    , "assets" .= Aeson.object []
+                    , "role"
+                        .= Aeson.String
+                            "external_key_destination"
+                    , "role_provenance"
+                        .= Aeson.String "ledger_proven"
+                    , "evidence"
+                        .= [Aeson.String "ledger_proven"]
+                    ]
+        it "T170 counts asset classes with unparseable quantities" $
+            Aeson.toJSON
+                (head (rrControlGroups unparseableQtyReview))
+                `shouldBe` Aeson.object
+                    [ "category"
+                        .= Aeson.String "external_key"
+                    , "addresses"
+                        .= [Aeson.String "addr1_mixed"]
+                    , "output_indices"
+                        .= ([0] :: [Int])
+                    , "output_count" .= (1 :: Int)
+                    , "lovelace"
+                        .= Aeson.String "1000000"
+                    , "asset_class_count" .= (2 :: Int)
+                    , "assets"
+                        .= Aeson.object
+                            [ "aaaa"
+                                .= Aeson.object
+                                    ["01" .= Aeson.String "100"]
+                            , "bbbb"
+                                .= Aeson.object
+                                    ["02" .= Aeson.String "0"]
+                            ]
+                    , "role"
+                        .= Aeson.String
+                            "external_key_destination"
+                    , "role_provenance"
+                        .= Aeson.String "ledger_proven"
+                    , "evidence"
+                        .= [Aeson.String "ledger_proven"]
+                    ]
   where
+    multiAssetReview =
+        projectReview
+            mempty
+            Nothing
+            Nothing
+            ( Aeson.object
+                [ "tx_id" .= Aeson.String "test_tx"
+                , "body_hash" .= Aeson.String "test_hash"
+                , "fee_lovelace" .= Aeson.String "200000"
+                , "value"
+                    .= Aeson.object
+                        [ "outputs"
+                            .= [ Aeson.object
+                                    [ "index" .= (0 :: Int)
+                                    , "bucket"
+                                        .= Aeson.String
+                                            "external_key"
+                                    , "address_hex"
+                                        .= Aeson.String
+                                            "addr1_shared"
+                                    , "coin_lovelace"
+                                        .= Aeson.String
+                                            "1000000"
+                                    , "assets"
+                                        .= Aeson.object
+                                            [ "aaaa"
+                                                .= Aeson.object
+                                                    [ "01"
+                                                        .= Aeson.String
+                                                            "100"
+                                                    ]
+                                            ]
+                                    ]
+                               , Aeson.object
+                                    [ "index" .= (1 :: Int)
+                                    , "bucket"
+                                        .= Aeson.String
+                                            "external_key"
+                                    , "address_hex"
+                                        .= Aeson.String
+                                            "addr1_shared"
+                                    , "coin_lovelace"
+                                        .= Aeson.String
+                                            "2000000"
+                                    , "assets"
+                                        .= Aeson.object
+                                            [ "aaaa"
+                                                .= Aeson.object
+                                                    [ "01"
+                                                        .= Aeson.String
+                                                            "200"
+                                                    ]
+                                            , "bbbb"
+                                                .= Aeson.object
+                                                    [ "02"
+                                                        .= Aeson.String
+                                                            "50"
+                                                    ]
+                                            ]
+                                    ]
+                               ]
+                        ]
+                ]
+            )
+    adaOnlyReview =
+        projectReview
+            mempty
+            Nothing
+            Nothing
+            ( Aeson.object
+                [ "tx_id" .= Aeson.String "test_tx"
+                , "body_hash" .= Aeson.String "test_hash"
+                , "fee_lovelace" .= Aeson.String "200000"
+                , "value"
+                    .= Aeson.object
+                        [ "outputs"
+                            .= [ Aeson.object
+                                    [ "index" .= (0 :: Int)
+                                    , "bucket"
+                                        .= Aeson.String
+                                            "external_key"
+                                    , "address_hex"
+                                        .= Aeson.String
+                                            "addr1_bare"
+                                    , "coin_lovelace"
+                                        .= Aeson.String
+                                            "5000000"
+                                    ]
+                               ]
+                        ]
+                ]
+            )
+    unparseableQtyReview =
+        projectReview
+            mempty
+            Nothing
+            Nothing
+            ( Aeson.object
+                [ "tx_id" .= Aeson.String "test_tx"
+                , "body_hash" .= Aeson.String "test_hash"
+                , "fee_lovelace" .= Aeson.String "200000"
+                , "value"
+                    .= Aeson.object
+                        [ "outputs"
+                            .= [ Aeson.object
+                                    [ "index" .= (0 :: Int)
+                                    , "bucket"
+                                        .= Aeson.String
+                                            "external_key"
+                                    , "address_hex"
+                                        .= Aeson.String
+                                            "addr1_mixed"
+                                    , "coin_lovelace"
+                                        .= Aeson.String
+                                            "1000000"
+                                    , "assets"
+                                        .= Aeson.object
+                                            [ "aaaa"
+                                                .= Aeson.object
+                                                    [ "01"
+                                                        .= Aeson.String
+                                                            "100"
+                                                    ]
+                                            , "bbbb"
+                                                .= Aeson.object
+                                                    [ "02"
+                                                        .= Aeson.String
+                                                            "not_a_number"
+                                                    ]
+                                            ]
+                                    ]
+                               ]
+                        ]
+                ]
+            )
     testControlGroup =
         ControlGroup
             { cgCategory = SignerControlled
@@ -132,7 +354,7 @@ spec = do
             , cgOutputIndices = [0, 1]
             , cgOutputCount = 2
             , cgLovelace = "1041000000"
-            , cgAssetClassCount = 0
+            , cgAssets = mempty
             , cgRole = "continuation"
             , cgRoleProvenance = ContextProven
             , cgEvidence =

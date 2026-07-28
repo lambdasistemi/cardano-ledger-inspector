@@ -127,8 +127,8 @@ data ControlGroup = ControlGroup
     -- ^ Number of outputs in the group.
     , cgLovelace :: Text
     -- ^ Total lovelace as a decimal string.
-    , cgAssetClassCount :: Int
-    -- ^ Number of distinct non-ADA asset classes.
+    , cgAssets :: Map.Map (Text, Text) Integer
+    -- ^ Per-asset quantities keyed by (policy id, asset name).
     , cgRole :: Text
     -- ^ Role label (e.g. continuation, order, destination).
     , cgRoleProvenance :: EvidenceProvenance
@@ -147,7 +147,8 @@ instance Aeson.ToJSON ControlGroup where
                 , "output_indices" .= idxs
                 , "output_count" .= count
                 , "lovelace" .= lov
-                , "asset_class_count" .= assets
+                , "asset_class_count" .= Map.size assets
+                , "assets" .= nestedAssets assets
                 , "role" .= role
                 , "role_provenance" .= roleProv
                 , "evidence" .= ev
@@ -454,7 +455,7 @@ projectReview resolvedAddrs totalCollateral collateralReturn intent =
                             (ofAddressHex opf)
                             [ofIndex opf]
                             (ofLovelace opf)
-                            (ofAssetKeys opf)
+                            (ofAssets opf)
                             (riRole (outputRole opf))
                             (riProvenance (outputRole opf))
                             (riEvidence (outputRole opf))
@@ -478,7 +479,7 @@ projectReview resolvedAddrs totalCollateral collateralReturn intent =
         existing
             { gaIndices = gaIndices new <> gaIndices existing
             , gaLovelace = gaLovelace existing + gaLovelace new
-            , gaAssetKeys = gaAssetKeys existing <> gaAssetKeys new
+            , gaAssets = Map.unionWith (+) (gaAssets existing) (gaAssets new)
             }
 
     groupMinIndex group = minimum (cgOutputIndices group)
@@ -489,7 +490,7 @@ data OutputFacts = OutputFacts
     , ofCategory :: ControlCategory
     , ofAddressHex :: Text
     , ofLovelace :: Integer
-    , ofAssetKeys :: Set.Set (Text, Text)
+    , ofAssets :: Map.Map (Text, Text) Integer
     , ofRegistryLabel :: Maybe Text
     }
 
@@ -505,18 +506,22 @@ parseOutput v = do
             , ofCategory = bucketToCategory bucket
             , ofAddressHex = addr
             , ofLovelace = lov
-            , ofAssetKeys = outputAssetKeys (lookupKey "assets" v)
+            , ofAssets = outputAssets (lookupKey "assets" v)
             , ofRegistryLabel = lookupKey "decoded_datum" v >>= textAt "label"
             }
 
-outputAssetKeys :: Maybe Aeson.Value -> Set.Set (Text, Text)
-outputAssetKeys (Just (Aeson.Object policies)) =
-    Set.fromList
-        [ (AesonKey.toText policyId, AesonKey.toText assetName)
+outputAssets :: Maybe Aeson.Value -> Map.Map (Text, Text) Integer
+outputAssets (Just (Aeson.Object policies)) =
+    Map.fromList
+        [ ((AesonKey.toText policyId, AesonKey.toText assetName), qty)
         | (policyId, Aeson.Object names) <- KeyMap.toList policies
-        , (assetName, _) <- KeyMap.toList names
+        , (assetName, val) <- KeyMap.toList names
+        , let qty = case val of
+                Aeson.String t ->
+                    fromMaybe 0 (readMaybe (T.unpack t))
+                _ -> 0
         ]
-outputAssetKeys _ = Set.empty
+outputAssets _ = Map.empty
 
 -- | Role selection result for one output.
 data RoleInfo = RoleInfo
@@ -594,7 +599,7 @@ data GroupAcc = GroupAcc
     , gaAddress :: Text
     , gaIndices :: [Int]
     , gaLovelace :: Integer
-    , gaAssetKeys :: Set.Set (Text, Text)
+    , gaAssets :: Map.Map (Text, Text) Integer
     , gaRole :: Text
     , gaProvenance :: EvidenceProvenance
     , gaEvidence :: [EvidenceProvenance]
@@ -608,11 +613,28 @@ accToGroup acc =
         , cgOutputIndices = sort (gaIndices acc)
         , cgOutputCount = length (gaIndices acc)
         , cgLovelace = T.pack (show (gaLovelace acc))
-        , cgAssetClassCount = Set.size (gaAssetKeys acc)
+        , cgAssets = gaAssets acc
         , cgRole = gaRole acc
         , cgRoleProvenance = gaProvenance acc
         , cgEvidence = gaEvidence acc
         }
+
+nestedAssets :: Map.Map (Text, Text) Integer -> Aeson.Value
+nestedAssets m =
+    Aeson.object
+        [ AesonKey.fromText policy
+            .= Aeson.object
+                [ AesonKey.fromText name
+                    .= Aeson.String (T.pack (show qty))
+                | (name, qty) <- names
+                ]
+        | (policy, names) <- Map.toList grouped
+        ]
+  where
+    grouped =
+        Map.fromListWith
+            (<>)
+            [(policy, [(name, qty)]) | ((policy, name), qty) <- Map.toList m]
 
 {- | Select high-value groups: every group holding at least one percent
 of total output lovelace, with the largest non-empty group always

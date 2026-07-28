@@ -8,23 +8,32 @@ One commit per slice, bisect-safe, `Tasks:` trailer naming the closed tasks.
 
 Commit subject: `feat: expose per-asset amounts on tx.review control groups`
 
-- [ ] T168 RED: add a `ReviewSpec` case for a multi-asset control group — two
+- [X] T168 RED: add a `ReviewSpec` case for a multi-asset control group — two
       distinct asset classes, one of them present in two grouped outputs so the
       per-class sum is exercised — asserting exact policy id, asset name, and
       summed quantity in the emitted `assets` map.
-- [ ] T169 RED: add a `ReviewSpec` case for a control group holding no non-ADA
+- [X] T169 RED: add a `ReviewSpec` case for a control group holding no non-ADA
       assets, asserting `assets` is present and empty (`{}`), not absent or
       null.
-- [ ] T170 GREEN: parse quantities — replace the discarding `outputAssetKeys`
+- [X] T170 GREEN: parse quantities — replace the discarding `outputAssetKeys`
       with an asset-map parser returning `Map (Text, Text) Integer`.
-- [ ] T171 GREEN: accumulate quantities — `GroupAcc.gaAssetKeys` becomes
+- [X] T171 GREEN: accumulate quantities — `GroupAcc.gaAssetKeys` becomes
       `gaAssets :: Map (Text, Text) Integer`; `combineAcc` sums with
       `Map.unionWith (+)`.
-- [ ] T172 GREEN: project — `ControlGroup` gains `cgAssets`, its `ToJSON` emits
+- [X] T172 GREEN: project — `ControlGroup` gains `cgAssets`, its `ToJSON` emits
       `"assets"`, and `cgAssetClassCount` becomes `Map.size` over the same map,
       preserving its existing value and meaning.
-- [ ] T173 Proof: `just check-review-types` green; existing `ReviewSpec` cases
+- [X] T173 Proof: `just check-review-types` green; existing `ReviewSpec` cases
       unchanged in their `asset_class_count` expectations.
+- [X] T173a Added during slice-1 review, not in the original plan. The first
+      GREEN parsed quantities with skip-on-mismatch pattern guards, so an entry
+      whose quantity was not a parseable decimal string was dropped entirely —
+      shrinking `asset_class_count` below its pre-change value (an FR-004 break)
+      and silently removing an asset from a signer-facing review. Requirement:
+      the `(policy, name)` key set must be derived from the structure of the
+      assets object, independent of whether each quantity parses. Delivered as
+      `fromMaybe 0` over a total `case` on the value, with RED test T170
+      (`"not_a_number"` → class still counted, quantity reported `0`).
 
 ## Slice 2 — contract-surfaces
 
