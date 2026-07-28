@@ -65,7 +65,7 @@ Commit subject: `feat: require per-asset amounts in the tx.review contract`
 
 Commit subject: `test: prove per-asset control-group amounts across all surfaces`
 
-- [ ] T179 Add a fixture with a control group holding more than one distinct
+- [X] T179 Add a fixture with a control group holding more than one distinct
       asset class. **Assessment already done — do not repeat it.** `tx.review`
       was run against the real WASI artifact on both existing review fixtures:
       `tx-validate-complete-request.json` yields a best case of ONE distinct
@@ -76,13 +76,13 @@ Commit subject: `test: prove per-asset control-group amounts across all surfaces
       fixture is required. Acquisition route is an operator decision (real
       Conway tx via `scripts/fetch-tx-cbor.sh`, which needs a Blockfrost
       project id) — do not invent CBOR.
-- [ ] T180 Extend `tx-review-smoke` to assert an empty control group reports
+- [X] T180 Extend `tx-review-smoke` to assert an empty control group reports
       `assets == {}`.
-- [ ] T181 Extend `tx-review-smoke` to assert a multi-asset control group
+- [X] T181 Extend `tx-review-smoke` to assert a multi-asset control group
       reports each policy id, asset name, and exact quantity.
-- [ ] T182 Confirm `tx-review-smoke` still compares WASI, native, and Extism
+- [X] T182 Confirm `tx-review-smoke` still compares WASI, native, and Extism
       `tx_review` bytes with the new field present on all three.
-- [ ] T183 Proof: `just check-review` and `just check-extism-spike` green.
+- [X] T183 Proof: `just check-review` and `just check-extism-spike` green.
 
 ## Orchestrator-owned
 
