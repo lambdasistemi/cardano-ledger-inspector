@@ -86,5 +86,11 @@ Commit subject: `test: prove per-asset control-group amounts across all surfaces
 
 ## Orchestrator-owned
 
-- [ ] T184 Final: full `./gate.sh` green at HEAD, gate restored to `main`'s
+- [X] T184 Final: full `./gate.sh` green at HEAD, gate restored to `main`'s
       content, PR body audited, PR marked ready for review. Never self-merge.
+- [X] T184a Fixture provenance proven independently: mainnet tx
+      `014931dcc875b7fe89dae569bf62f202bd6b85c8b406f69c9c3bc3da1316e02e`
+      confirmed still on-chain at its original height 13736638 at depth >100,
+      and the committed fixture verified byte-identical to a fresh refetch from
+      the chain — not merely to the locally staged copy, so corruption or
+      hand-editing anywhere between fetch and commit is ruled out.
