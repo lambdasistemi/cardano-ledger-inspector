@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.0](https://github.com/lambdasistemi/cardano-ledger-inspector/compare/v0.1.0...v0.2.0) (2026-07-29)
+
+
+### Features
+
+* decode registered Plutus data in tx.intent ([cd346f3](https://github.com/lambdasistemi/cardano-ledger-inspector/commit/cd346f3577dc243df09bf4b141b91d9470c5ec00))
+* explain transactions as signer-facing value flows ([#167](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/167)) ([b99028a](https://github.com/lambdasistemi/cardano-ledger-inspector/commit/b99028af070c85211098cbfee87bb5a80e4639df))
+* expose per-asset amounts on tx.review control groups ([#169](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/169)) ([007251e](https://github.com/lambdasistemi/cardano-ledger-inspector/commit/007251eaaf3d5b75df2bd0902b4f01081c0df0a1)), closes [#168](https://github.com/lambdasistemi/cardano-ledger-inspector/issues/168)
+* expose typed auxiliary metadata ([a4cf31f](https://github.com/lambdasistemi/cardano-ledger-inspector/commit/a4cf31f4abd7ab0b9872d70dd8f0afe3dbccf5d7))
+
 ## 0.1.0 (2026-07-16)
 
 
