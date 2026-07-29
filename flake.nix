@@ -1392,6 +1392,8 @@
               and ($r.sources | length >= 1)
               and any($r.sources[]; .kind == "regular_input" and .missing_count == 0)
               and any($r.sources[]; .kind == "withdrawal" and .count == 0 and .lovelace == "0")
+              and all($r.control_groups[]; .assets | type == "object")
+              and ([$r.control_groups[] | select(.assets == {})] | length == 1)
             ' complete-response.json
 
             # Issue-fixture review request: the SundaeSwap/USDM disbursement
@@ -1505,10 +1507,54 @@
             ${pkgs.diffutils}/bin/cmp \
               native-complete-response.json complete-response.json
 
+            # Multi-asset review request: mainnet NIGHT/FLOW tx with a
+            # two-asset signer group and a one-asset script group.
+            ${pkgs.jq}/bin/jq -n \
+              --rawfile tx ${./specs/001-ledger-functional-layer/fixtures/multi-asset-night-flow.hex} \
+              '{
+                ledger_functional_layer: "cardano-ledger-functional/v1",
+                tx_cbor: ($tx | gsub("\\s"; "")),
+                op: "tx.review"
+              }' > multi-asset-request.json
+            ${pkgs.wasmtime}/bin/wasmtime "$REACTOR" \
+              < multi-asset-request.json > multi-asset-response.json
+            ${pkgs.jq}/bin/jq -e '
+              .result.review as $r
+              | .op == "tx.review"
+              and $r.version == "cardano-tx-review/v1"
+              and any(
+                $r.control_groups[];
+                .category == "signer_controlled"
+                and .role == "signer_change"
+                and .asset_class_count == 2
+                and .assets["0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa"]["4e49474854"] == "5900446363353"
+                and .assets["2d9db8a89f074aa045eab177f23a3395f62ced8b53499a9e4ad46c80"]["464c4f57"] == "35388438327"
+              )
+              and any(
+                $r.control_groups[];
+                .category == "script"
+                and .role == "script_lock"
+                and .asset_class_count == 1
+              )
+            ' multi-asset-response.json
+
+            # Conformance: multi-asset review response (populated assets map)
+            # is byte-identical across WASI, native, and Extism.
+            "$HOST" "$WASM" tx_review \
+              < multi-asset-request.json > extism-multi-asset-response.json
+            "$NATIVE" \
+              < multi-asset-request.json > native-multi-asset-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              extism-multi-asset-response.json multi-asset-response.json
+            ${pkgs.diffutils}/bin/cmp \
+              native-multi-asset-response.json multi-asset-response.json
+
             cp complete-request.json complete-response.json \
               registered-request.json registered-response-1.json registered-response-2.json \
               extism-registered-response.json native-registered-response.json \
               extism-complete-response.json native-complete-response.json \
+              multi-asset-request.json multi-asset-response.json \
+              extism-multi-asset-response.json native-multi-asset-response.json \
               $out/
           '';
 

@@ -654,6 +654,7 @@ response bytes.
           "output_count": 1,
           "lovelace": "1041836734694",
           "asset_class_count": 0,
+          "assets": {},
           "role": "Amaru Network Compliance treasury",
           "role_provenance": "context_proven",
           "evidence": ["ledger_proven", "context_proven", "registry_decoded"]
@@ -686,6 +687,34 @@ label, to a heuristic signer return/change candidate, to a generic
 ledger-proven role; metadata never selects a role. Evidence provenance uses
 the explicit tags `ledger_proven`, `context_proven`, `registry_decoded`,
 `metadata_claim`, and `heuristic`.
+
+Each control group carries an `assets` field: a nested map from policy id
+(hex) to asset name (hex) to decimal-string quantity. Each quantity is the
+total for that asset class summed across every output in the group. An
+asset-free group emits `"assets": {}`. An empty asset name — a real and
+common case on Cardano — appears as the key `""`.
+
+`asset_class_count` remains a strict count of distinct non-ADA asset classes
+in the group. It is not redundant with `assets` and neither field is
+derivable from the other: `asset_class_count` counts classes regardless of
+whether their quantities are parseable, while `assets` carries the quantities
+themselves.
+
+An asset whose quantity cannot be parsed as a decimal integer is still
+reported in `assets`, still counts toward `asset_class_count`, and has its
+quantity rendered as `"0"`.
+
+The following is an illustrative example of a populated `assets` map for a
+group holding two asset classes (one summed across two grouped outputs); it
+does not correspond to the worked example above:
+
+```json
+"asset_class_count": 2,
+"assets": {
+  "<policy-id-hex>": { "<asset-name-hex>": "300" },
+  "<other-policy-hex>": { "": "50" }
+}
+```
 
 Sources keep regular inputs, withdrawals, conditional collateral, and
 read-only reference inputs separate. High-value movements list every control

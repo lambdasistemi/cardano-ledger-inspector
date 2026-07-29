@@ -633,6 +633,7 @@
                                 "3132201dc1e82708..."
                               ],
                               "asset_class_count": 0,
+                              "assets": {},
                               "category": "script",
                               "evidence": [
                                 "ledger_proven",
@@ -657,6 +658,7 @@
                                 "3132201dc1e82708..."
                               ],
                               "asset_class_count": 0,
+                              "assets": {},
                               "category": "script",
                               "evidence": [
                                 "ledger_proven",
