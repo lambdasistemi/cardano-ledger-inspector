@@ -36,6 +36,8 @@ nav:
   - Architecture: architecture.md
   - Development:
       - Build and Artifacts: build.md
+  - Design:
+      - RDF composability: design/rdf-composability.md
   - Repository: https://github.com/lambdasistemi/cardano-ledger-inspector
 
 plugins:
